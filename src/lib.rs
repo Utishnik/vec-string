@@ -1,4 +1,4 @@
-#![no_std]
+#![cfg_attr(not(feature = "std"), no_std)]
 
 extern crate alloc;
 
@@ -25,6 +25,20 @@ pub trait VecString {
     fn vec_string(&self, format_rule: FormatRuleFn) -> String;
 }
 
+pub trait VecStringFn<F>
+where
+    F: Fn(&str, usize, usize) -> String,
+{
+    fn vec_string(&self, format_rule: F) -> String;
+}
+
+pub trait VecStringFnMut<F>
+where
+    F: FnMut(&str, usize, usize) -> String,
+{
+    fn vec_string(&self, format_rule: F) -> String;
+}
+
 /// Get string of Vec<T> where T: Display
 impl<T> VecString for Vec<T>
 where
@@ -32,6 +46,36 @@ where
 {
     /// assert_eq!("1, 2, 3", vec![1, 2, 3].vec_string());
     fn vec_string(&self, format_rule: FormatRuleFn) -> String {
+        let mut string: String = String::new();
+        for x in self.iter().enumerate() {
+            string.push_str(&format_rule(&format!("{}", x.1), x.0, self.len()));
+        }
+        string
+    }
+}
+
+impl<T, F> VecStringFn<F> for Vec<T>
+where
+    T: core::fmt::Display,
+    F: Fn(&str, usize, usize) -> String,
+{
+    /// assert_eq!("1, 2, 3", vec![1, 2, 3].vec_string());
+    fn vec_string(&self, format_rule: F) -> String {
+        let mut string: String = String::new();
+        for x in self.iter().enumerate() {
+            string.push_str(&format_rule(&format!("{}", x.1), x.0, self.len()));
+        }
+        string
+    }
+}
+
+impl<T, F> VecStringFnMut<F> for Vec<T>
+where
+    T: core::fmt::Display,
+    F: FnMut(&str, usize, usize) -> String,
+{
+    /// assert_eq!("1, 2, 3", vec![1, 2, 3].vec_string());
+    fn vec_string(&self, mut format_rule: F) -> String {
         let mut string: String = String::new();
         for x in self.iter().enumerate() {
             string.push_str(&format_rule(&format!("{}", x.1), x.0, self.len()));

@@ -14,3 +14,7 @@ categories = ["util"]
 
 [dependencies]
 #zero
+
+[features]
+std = []
+default = ["std"]

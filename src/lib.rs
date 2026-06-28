@@ -32,6 +32,99 @@ fn default_format_rule(val: &str, index: usize, len: usize) -> String {
 
 pub const DEFAULT_FORMAT_RULE: FormatRuleFn = default_format_rule;
 
+// ============================================================================
+// НОВЫЕ ТРЕЙТЫ С ИМЕНОВАННЫМИ АРГУМЕНТАМИ
+// ============================================================================
+
+/// Правило форматирования БЕЗ состояния
+pub trait FormatRuleNoStateLongLf<'a, F>
+where
+    F: Fn(&'a str, usize, usize) -> String + 'a,
+{
+    /// Форматирует один элемент коллекции.
+    ///
+    /// # Arguments
+    /// * `value` - Строковое представление текущего элемента
+    /// * `index` - Индекс текущего элемента (от 0)
+    /// * `length` - Общее количество элементов в коллекции
+    fn format(&'a self, value: &'a str, index: usize, length: usize) -> String;
+}
+
+impl<'a, F> FormatRuleNoStateLongLf<'a, F> for F
+where
+    F: Fn(&str, usize, usize) -> String + 'a,
+{
+    fn format(&'a self, value: &str, index: usize, length: usize) -> String {
+        (self)(value, index, length)
+    }
+}
+
+/// Правило форматирования БЕЗ состояния с изменяемым внутренним состоянием замыкания
+pub trait FormatRuleMutNoState {
+    /// Форматирует один элемент коллекции.
+    ///
+    /// # Arguments
+    /// * `value` - Строковое представление текущего элемента
+    /// * `index` - Индекс текущего элемента (от 0)
+    /// * `length` - Общее количество элементов в коллекции
+    fn format(&mut self, value: &str, index: usize, length: usize) -> String;
+}
+
+impl<F> FormatRuleMutNoState for F
+where
+    F: FnMut(&str, usize, usize) -> String,
+{
+    fn format(&mut self, value: &str, index: usize, length: usize) -> String {
+        (self)(value, index, length)
+    }
+}
+
+/// Правило форматирования с неизменяемым состоянием
+pub trait FormatRule<S> {
+    /// Форматирует один элемент коллекции.
+    ///
+    /// # Arguments
+    /// * `state` - Ссылка на состояние (контекст), передаваемое между вызовами
+    /// * `value` - Строковое представление текущего элемента
+    /// * `index` - Индекс текущего элемента (от 0)
+    /// * `length` - Общее количество элементов в коллекции
+    fn format(&self, state: &S, value: &str, index: usize, length: usize) -> String;
+}
+
+impl<S, F> FormatRule<S> for F
+where
+    F: Fn(&S, &str, usize, usize) -> String,
+{
+    fn format(&self, state: &S, value: &str, index: usize, length: usize) -> String {
+        (self)(state, value, index, length)
+    }
+}
+
+/// Правило форматирования с изменяемым состоянием
+pub trait FormatRuleMut<S> {
+    /// Форматирует один элемент коллекции.
+    ///
+    /// # Arguments
+    /// * `state` - Изменяемая ссылка на состояние (контекст), передаваемое между вызовами
+    /// * `value` - Строковое представление текущего элемента
+    /// * `index` - Индекс текущего элемента (от 0)
+    /// * `length` - Общее количество элементов в коллекции
+    fn format(&mut self, state: &mut S, value: &str, index: usize, length: usize) -> String;
+}
+
+impl<S, F> FormatRuleMut<S> for F
+where
+    F: FnMut(&mut S, &str, usize, usize) -> String,
+{
+    fn format(&mut self, state: &mut S, value: &str, index: usize, length: usize) -> String {
+        (self)(state, value, index, length)
+    }
+}
+
+// ============================================================================
+// СТАРЫЕ ТРЕЙТЫ (ПОЛНАЯ ОБРАТНАЯ СОВМЕСТИМОСТЬ)
+// ============================================================================
+
 pub trait VecString {
     fn vec_string(&self, format_rule: FormatRuleFn) -> String;
 }
@@ -309,6 +402,208 @@ where
         let mut result = String::new();
         for (i, s) in items.into_iter().enumerate() {
             result.push_str(&format_rule(state, &s, i, len));
+        }
+        result
+    }
+}
+
+// ============================================================================
+// НОВЫЕ ТРЕЙТЫ С ИСПОЛЬЗОВАНИЕМ FormatRule (С ИМЕНОВАННЫМИ АРГУМЕНТАМИ)
+// ============================================================================
+
+/// Расширение для Vec с использованием FormatRuleNoState
+pub trait VecStringRule<'a, R, F>
+where
+    R: FormatRuleNoStateLongLf<'a, F>,
+    F: Fn(&'a str, usize, usize) -> String + 'a,
+{
+    fn vec_string_rule(&'a self, rule: R) -> String;
+}
+
+impl<'a, T, R, F> VecStringRule<'a, R, F> for Vec<T>
+where
+    T: core::fmt::Display,
+    R: FormatRuleNoStateLongLf<'a, F>,
+    F: Fn(&'a str, usize, usize) -> String + 'a,
+{
+    fn vec_string_rule(&'a self, rule: R) -> String {
+        let mut string: String = String::new();
+        let len = self.len();
+        for (i, x) in self.iter().enumerate() {
+            string.push_str(&rule.format(&format!("{}", x), i, len));
+        }
+        string
+    }
+}
+
+/// Расширение для Vec с использованием FormatRuleMutNoState
+pub trait VecStringMutRule<R>
+where
+    R: FormatRuleMutNoState,
+{
+    fn vec_string_mut_rule(&self, rule: R) -> String;
+}
+
+impl<T, R> VecStringMutRule<R> for Vec<T>
+where
+    T: core::fmt::Display,
+    R: FormatRuleMutNoState,
+{
+    fn vec_string_mut_rule(&self, mut rule: R) -> String {
+        let mut string: String = String::new();
+        let len = self.len();
+        for (i, x) in self.iter().enumerate() {
+            string.push_str(&rule.format(&format!("{}", x), i, len));
+        }
+        string
+    }
+}
+
+/// Расширение для итераторов с использованием FormatRuleNoState
+pub trait IteratorStringRule<'a, R, F>
+where
+    R: FormatRuleNoStateLongLf<'a, F>,
+    F: Fn(&'a str, usize, usize) -> String + 'a,
+{
+    fn iter_string_rule(self, rule: R) -> String;
+}
+
+impl<'a, I, T, R, F> IteratorStringRule<'a, R, F> for I
+where
+    I: Iterator<Item = T>,
+    T: core::fmt::Display,
+    F: Fn(&'a str, usize, usize) -> String + 'a,
+    R: FormatRuleNoStateLongLf<'a, F> + 'a,
+{
+    fn iter_string_rule(self, rule: R) -> String {
+        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let len = items.len();
+        let mut result = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            result.push_str(&rule.format(&s, i, len));
+        }
+        result
+    }
+}
+
+/// Расширение для итераторов с использованием FormatRuleMutNoState
+pub trait IteratorStringMutRule<R>
+where
+    R: FormatRuleMutNoState,
+{
+    fn iter_string_mut_rule(self, rule: R) -> String;
+}
+
+impl<I, T, R> IteratorStringMutRule<R> for I
+where
+    I: Iterator<Item = T>,
+    T: core::fmt::Display,
+    R: FormatRuleMutNoState,
+{
+    fn iter_string_mut_rule(self, mut rule: R) -> String {
+        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let len = items.len();
+        let mut result = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            result.push_str(&rule.format(&s, i, len));
+        }
+        result
+    }
+}
+
+/// Расширение для Vec с использованием FormatRule (неизменяемое состояние)
+pub trait VecStringWithStateRule<S, R>
+where
+    R: FormatRule<S>,
+{
+    fn vec_string_with_state_rule(&self, state: &S, rule: R) -> String;
+}
+
+impl<T, S, R> VecStringWithStateRule<S, R> for Vec<T>
+where
+    T: core::fmt::Display,
+    R: FormatRule<S>,
+{
+    fn vec_string_with_state_rule(&self, state: &S, rule: R) -> String {
+        let mut result = String::new();
+        let len = self.len();
+        for (i, x) in self.iter().enumerate() {
+            let s = format!("{}", x);
+            result.push_str(&rule.format(state, &s, i, len));
+        }
+        result
+    }
+}
+
+/// Расширение для итераторов с использованием FormatRule (неизменяемое состояние)
+pub trait IteratorStringWithStateRule<S, R>
+where
+    R: FormatRule<S>,
+{
+    fn iter_string_with_state_rule(self, state: &S, rule: R) -> String;
+}
+
+impl<I, T, S, R> IteratorStringWithStateRule<S, R> for I
+where
+    I: Iterator<Item = T>,
+    T: core::fmt::Display,
+    R: FormatRule<S>,
+{
+    fn iter_string_with_state_rule(self, state: &S, rule: R) -> String {
+        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let len = items.len();
+        let mut result = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            result.push_str(&rule.format(state, &s, i, len));
+        }
+        result
+    }
+}
+
+/// Расширение для Vec с использованием FormatRuleMut (изменяемое состояние)
+pub trait VecStringWithStateMutRule<S, R>
+where
+    R: FormatRuleMut<S>,
+{
+    fn vec_string_with_state_mut_rule(&self, initial_state: S, rule: R) -> String;
+}
+
+impl<T, S, R> VecStringWithStateMutRule<S, R> for Vec<T>
+where
+    T: core::fmt::Display,
+    R: FormatRuleMut<S>,
+{
+    fn vec_string_with_state_mut_rule(&self, mut initial_state: S, mut rule: R) -> String {
+        let mut result = String::new();
+        let len = self.len();
+        for (i, x) in self.iter().enumerate() {
+            let s = format!("{}", x);
+            result.push_str(&rule.format(&mut initial_state, &s, i, len));
+        }
+        result
+    }
+}
+
+/// Расширение для итераторов с использованием FormatRuleMut (изменяемое состояние)
+pub trait IteratorStringWithStateMutRule<S, R>
+where
+    R: FormatRuleMut<S>,
+{
+    fn iter_string_with_state_mut_rule(self, initial_state: S, rule: R) -> String;
+}
+
+impl<I, T, S, R> IteratorStringWithStateMutRule<S, R> for I
+where
+    I: Iterator<Item = T>,
+    T: core::fmt::Display,
+    R: FormatRuleMut<S>,
+{
+    fn iter_string_with_state_mut_rule(self, mut initial_state: S, mut rule: R) -> String {
+        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let len = items.len();
+        let mut result = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            result.push_str(&rule.format(&mut initial_state, &s, i, len));
         }
         result
     }
@@ -690,5 +985,201 @@ mod tests {
 
         let result = data.vec_string_with_state_fn_ptr(&prefix, format_with_prefix);
         assert_eq!(result, "");
+    }
+
+    // ========================================================================
+    // ТЕСТЫ ДЛЯ НОВЫХ ТРЕЙТОВ С ИМЕНОВАННЫМИ АРГУМЕНТАМИ
+    // ========================================================================
+
+    #[test]
+    fn test_vec_string_rule() {
+        let v = vec![1, 2, 3];
+        let res = v.vec_string_rule(|value, index, length| {
+            if length == 0 {
+                return String::new();
+            }
+            let is_last = index == length - 1;
+            if index == 0 {
+                if is_last {
+                    format!("<{}>", value)
+                } else {
+                    format!("<{}", value)
+                }
+            } else if is_last {
+                format!(", {}>", value)
+            } else {
+                format!(", {}", value)
+            }
+        });
+        assert_eq!(res, "<1, 2, 3>");
+    }
+
+    #[test]
+    fn test_vec_string_mut_rule() {
+        let v = vec!["a", "b", "c"];
+        let mut counter = 0;
+        let res = v.vec_string_mut_rule(|value, _index, _length| {
+            counter += 1;
+            format!("[{}{}]", value, counter)
+        });
+        assert_eq!(res, "[a1][b2][c3]");
+        assert_eq!(counter, 3);
+    }
+
+    #[test]
+    fn test_iterator_string_rule() {
+        let v = vec![10, 20, 30];
+        let res = v.iter().iter_string_rule(|value, index, length| {
+            if length == 0 {
+                return String::new();
+            }
+            let is_last = index == length - 1;
+            if index == 0 {
+                if is_last {
+                    format!("{{{}}}", value)
+                } else {
+                    format!("{{{}", value)
+                }
+            } else if is_last {
+                format!(", {}}}", value)
+            } else {
+                format!(", {}", value)
+            }
+        });
+        assert_eq!(res, "{10, 20, 30}");
+    }
+
+    #[test]
+    fn test_iterator_string_mut_rule() {
+        let v = vec![1, 2, 3];
+        let mut sum = 0;
+        let res = v.iter().iter_string_mut_rule(|value, index, length| {
+            let num: i32 = value.parse().unwrap_or(0);
+            sum += num;
+            if length == 0 {
+                return String::new();
+            }
+            let is_last = index == length - 1;
+            if is_last {
+                format!("{} (total={})", value, sum)
+            } else {
+                format!("{}, ", value)
+            }
+        });
+        assert_eq!(res, "1, 2, 3 (total=6)");
+        assert_eq!(sum, 6);
+    }
+
+    #[test]
+    fn test_vec_string_with_state_rule() {
+        let data = vec!["hello", "world"];
+        let prefix = ">>";
+
+        let result = data.vec_string_with_state_rule(&prefix, |state, value, index, length| {
+            if length == 0 {
+                return String::new();
+            }
+            let is_last = index == length - 1;
+            if index == 0 {
+                if is_last {
+                    format!("[{}{}]", state, value)
+                } else {
+                    format!("[{}{}", state, value)
+                }
+            } else if is_last {
+                format!(", {}{}]", state, value)
+            } else {
+                format!(", {}{}", state, value)
+            }
+        });
+        assert_eq!(result, "[>>hello, >>world]");
+    }
+
+    #[test]
+    fn test_iterator_string_with_state_rule() {
+        let data = vec![1, 2, 3].into_iter();
+        let multiplier = 10;
+
+        let result =
+            data.iter_string_with_state_rule(&multiplier, |state, value, index, length| {
+                let num: i32 = value.parse().unwrap_or(0);
+                let formatted = format!("{}", num * state);
+                if length == 0 {
+                    return String::new();
+                }
+                let is_last = index == length - 1;
+                if index == 0 {
+                    if is_last {
+                        format!("[{}]", formatted)
+                    } else {
+                        format!("[{}", formatted)
+                    }
+                } else if is_last {
+                    format!(", {}]", formatted)
+                } else {
+                    format!(", {}", formatted)
+                }
+            });
+        assert_eq!(result, "[10, 20, 30]");
+    }
+
+    #[test]
+    fn test_vec_string_with_state_mut_rule() {
+        let data = vec![1, 2, 3];
+        let mut sum = 0;
+
+        let result = data.vec_string_with_state_mut_rule(sum, |state, value, index, length| {
+            let num: i32 = value.parse().unwrap_or(0);
+            *state += num;
+            if length == 0 {
+                return String::new();
+            }
+            let is_last = index == length - 1;
+            if index == 0 {
+                if is_last {
+                    format!("(sum={}: {})", state, value)
+                } else {
+                    format!("(sum={}: {}", state, value)
+                }
+            } else if is_last {
+                format!(", sum={}: {})", state, value)
+            } else {
+                format!(", sum={}: {}", state, value)
+            }
+        });
+        assert_eq!(result, "(sum=1: 1, sum=3: 2, sum=6: 3)");
+    }
+
+    #[test]
+    fn test_iterator_string_with_state_mut_rule() {
+        let data = vec!["hello", "world", "rust"];
+        let positions = [0usize, 1, 2].into_iter();
+
+        let result =
+            data.iter()
+                .iter_string_with_state_mut_rule(positions, |pos, value, index, length| {
+                    let start = pos.next().unwrap_or(0);
+                    let short = if value.len() > start {
+                        &value[start..]
+                    } else {
+                        value
+                    };
+                    if length == 0 {
+                        return String::new();
+                    }
+                    let is_last = index == length - 1;
+                    if index == 0 {
+                        if is_last {
+                            format!("[{}]", short)
+                        } else {
+                            format!("[{}", short)
+                        }
+                    } else if is_last {
+                        format!(", {}]", short)
+                    } else {
+                        format!(", {}", short)
+                    }
+                });
+        assert_eq!(result, "[hello, orld, st]");
     }
 }

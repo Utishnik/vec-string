@@ -162,7 +162,7 @@ where
     }
 }
 
-// Типажи с состоянием
+// Типажи с изменяемым состоянием (FnMut)
 pub trait VecStringWithState<S, F>
 where
     F: FnMut(&mut S, &str, usize, usize) -> String,
@@ -182,13 +182,12 @@ where
     T: core::fmt::Display,
     F: FnMut(&mut S, &str, usize, usize) -> String,
 {
-    fn vec_string_with_state(&self, initial_state: S, mut format_rule: F) -> String {
-        let mut state = initial_state;
+    fn vec_string_with_state(&self, mut initial_state: S, mut format_rule: F) -> String {
         let mut result = String::new();
         let len = self.len();
         for (i, x) in self.iter().enumerate() {
             let s = format!("{}", x);
-            result.push_str(&format_rule(&mut state, &s, i, len));
+            result.push_str(&format_rule(&mut initial_state, &s, i, len));
         }
         result
     }
@@ -200,13 +199,116 @@ where
     T: core::fmt::Display,
     F: FnMut(&mut S, &str, usize, usize) -> String,
 {
-    fn iter_string_with_state(self, initial_state: S, mut format_rule: F) -> String {
-        let mut state = initial_state;
+    fn iter_string_with_state(self, mut initial_state: S, mut format_rule: F) -> String {
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
         let len = items.len();
         let mut result = String::new();
         for (i, s) in items.into_iter().enumerate() {
-            result.push_str(&format_rule(&mut state, &s, i, len));
+            result.push_str(&format_rule(&mut initial_state, &s, i, len));
+        }
+        result
+    }
+}
+
+// Типажи с неизменяемым состоянием (Fn)
+pub trait VecStringWithStateFn<S, F>
+where
+    F: Fn(&S, &str, usize, usize) -> String,
+{
+    fn vec_string_with_state_fn(&self, state: &S, format_rule: F) -> String;
+}
+
+pub trait IteratorStringWithStateFn<S, F>
+where
+    F: Fn(&S, &str, usize, usize) -> String,
+{
+    fn iter_string_with_state_fn(self, state: &S, format_rule: F) -> String;
+}
+
+impl<T, S, F> VecStringWithStateFn<S, F> for Vec<T>
+where
+    T: core::fmt::Display,
+    F: Fn(&S, &str, usize, usize) -> String,
+{
+    fn vec_string_with_state_fn(&self, state: &S, format_rule: F) -> String {
+        let mut result = String::new();
+        let len = self.len();
+        for (i, x) in self.iter().enumerate() {
+            let s = format!("{}", x);
+            result.push_str(&format_rule(state, &s, i, len));
+        }
+        result
+    }
+}
+
+impl<I, T, S, F> IteratorStringWithStateFn<S, F> for I
+where
+    I: Iterator<Item = T>,
+    T: core::fmt::Display,
+    F: Fn(&S, &str, usize, usize) -> String,
+{
+    fn iter_string_with_state_fn(self, state: &S, format_rule: F) -> String {
+        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let len = items.len();
+        let mut result = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            result.push_str(&format_rule(state, &s, i, len));
+        }
+        result
+    }
+}
+
+// Типажи с неизменяемым состоянием (fn указатель)
+pub trait VecStringWithStateFnPtr<S> {
+    fn vec_string_with_state_fn_ptr(
+        &self,
+        state: &S,
+        format_rule: fn(&S, &str, usize, usize) -> String,
+    ) -> String;
+}
+
+pub trait IteratorStringWithStateFnPtr<S> {
+    fn iter_string_with_state_fn_ptr(
+        self,
+        state: &S,
+        format_rule: fn(&S, &str, usize, usize) -> String,
+    ) -> String;
+}
+
+impl<T, S> VecStringWithStateFnPtr<S> for Vec<T>
+where
+    T: core::fmt::Display,
+{
+    fn vec_string_with_state_fn_ptr(
+        &self,
+        state: &S,
+        format_rule: fn(&S, &str, usize, usize) -> String,
+    ) -> String {
+        let mut result = String::new();
+        let len = self.len();
+        for (i, x) in self.iter().enumerate() {
+            let s = format!("{}", x);
+            result.push_str(&format_rule(state, &s, i, len));
+        }
+        result
+    }
+}
+
+impl<I, T, S> IteratorStringWithStateFnPtr<S> for I
+where
+    I: Iterator<Item = T>,
+    T: core::fmt::Display,
+{
+    fn iter_string_with_state_fn_ptr(
+        self,
+        state: &S,
+        format_rule: fn(&S, &str, usize, usize) -> String,
+    ) -> String {
+        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let len = items.len();
+        let mut result = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            result.push_str(&format_rule(state, &s, i, len));
         }
         result
     }
@@ -227,7 +329,6 @@ mod tests {
 
     #[test]
     fn test_vec_string_single_element() {
-        // Проверка исправления бага с одним элементом
         assert_eq!(
             "[42]",
             VecString::vec_string(&vec![42], DEFAULT_FORMAT_RULE)
@@ -236,7 +337,6 @@ mod tests {
 
     #[test]
     fn test_vec_string_empty() {
-        // Проверка пустого вектора
         assert_eq!(
             "",
             VecString::vec_string(&Vec::<i32>::new(), DEFAULT_FORMAT_RULE)
@@ -412,7 +512,8 @@ mod tests {
     #[test]
     fn test_iterator_string_with_state() {
         let data = vec![1, 2, 3].into_iter();
-        let sum = 0;
+        #[allow(unused_mut)]
+        let mut sum = 0;
 
         let result = data.iter_string_with_state(sum, |state, val, idx, total| {
             let num: i32 = val.parse().unwrap_or(0);
@@ -433,7 +534,6 @@ mod tests {
                 format!(", sum={}: {}", state, val)
             }
         });
-        // sum обновляется по мере прохождения: 1, 3, 6
         assert_eq!(result, "(sum=1: 1, sum=3: 2, sum=6: 3)");
     }
 
@@ -465,6 +565,130 @@ mod tests {
                 format!(", {}", short)
             }
         });
+        assert_eq!(result, "");
+    }
+
+    // Тесты для неизменяемого состояния (Fn)
+    #[test]
+    fn test_vec_string_with_state_fn() {
+        let data = vec!["hello", "world"];
+        let prefix = ">>";
+
+        let result = data.vec_string_with_state_fn(&prefix, |state, val, idx, total| {
+            if total == 0 {
+                return String::new();
+            }
+            let is_last = idx == total - 1;
+            if idx == 0 {
+                if is_last {
+                    format!("[{}{}]", state, val)
+                } else {
+                    format!("[{}{}", state, val)
+                }
+            } else if is_last {
+                format!(", {}{}]", state, val)
+            } else {
+                format!(", {}{}", state, val)
+            }
+        });
+        assert_eq!(result, "[>>hello, >>world]");
+    }
+
+    #[test]
+    fn test_iterator_string_with_state_fn() {
+        let data = vec![1, 2, 3].into_iter();
+        let multiplier = 10;
+
+        let result = data.iter_string_with_state_fn(&multiplier, |state, val, idx, total| {
+            let num: i32 = val.parse().unwrap_or(0);
+            let formatted = format!("{}", num * state);
+            if total == 0 {
+                return String::new();
+            }
+            let is_last = idx == total - 1;
+            if idx == 0 {
+                if is_last {
+                    format!("[{}]", formatted)
+                } else {
+                    format!("[{}", formatted)
+                }
+            } else if is_last {
+                format!(", {}]", formatted)
+            } else {
+                format!(", {}", formatted)
+            }
+        });
+        assert_eq!(result, "[10, 20, 30]");
+    }
+
+    #[test]
+    fn test_vec_string_with_state_fn_empty() {
+        let data: Vec<i32> = vec![];
+        let prefix = ">>";
+
+        let result = data.vec_string_with_state_fn(&prefix, |state, val, idx, total| {
+            if total == 0 {
+                return String::new();
+            }
+            let is_last = idx == total - 1;
+            if idx == 0 {
+                if is_last {
+                    format!("[{}{}]", state, val)
+                } else {
+                    format!("[{}{}", state, val)
+                }
+            } else if is_last {
+                format!(", {}{}]", state, val)
+            } else {
+                format!(", {}{}", state, val)
+            }
+        });
+        assert_eq!(result, "");
+    }
+
+    // Тесты для неизменяемого состояния (fn указатель)
+    fn format_with_prefix(prefix: &String, val: &str, idx: usize, total: usize) -> String {
+        if total == 0 {
+            return String::new();
+        }
+        let is_last = idx == total - 1;
+        if idx == 0 {
+            if is_last {
+                format!("[{}{}]", prefix, val)
+            } else {
+                format!("[{}{}", prefix, val)
+            }
+        } else if is_last {
+            format!(", {}{}]", prefix, val)
+        } else {
+            format!(", {}{}", prefix, val)
+        }
+    }
+
+    #[test]
+    fn test_vec_string_with_state_fn_ptr() {
+        let data = vec!["a", "b", "c"];
+        let prefix = ">>".to_string();
+
+        let result = data.vec_string_with_state_fn_ptr(&prefix, format_with_prefix);
+        assert_eq!(result, "[>>a, >>b, >>c]");
+    }
+
+    #[test]
+    fn test_iterator_string_with_state_fn_ptr() {
+        let data = vec!["x", "y"].into_iter();
+        let prefix = "##".to_string();
+
+        let result = data.iter_string_with_state_fn_ptr(&prefix, format_with_prefix);
+        assert_eq!(result, "[##x, ##y]");
+    }
+
+    #[test]
+    fn test_vec_string_with_state_fn_ptr_empty() {
+        let data: Vec<&str> = vec![];
+        let prefix = ">>".to_string();
+
+        let result = data.vec_string_with_state_fn_ptr(&prefix, format_with_prefix);
         assert_eq!(result, "");
     }
 }

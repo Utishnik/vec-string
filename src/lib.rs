@@ -39,7 +39,8 @@ pub const DEFAULT_FORMAT_RULE: FormatRuleFn = default_format_rule;
 /// Правило форматирования БЕЗ состояния
 pub trait FormatRuleNoStateLongLf<'a, F>
 where
-    F: Fn(&'a str, usize, usize) -> String + 'a,
+    F: Fn(&'a str, usize, usize) -> String ,
+    F: 'a,
 {
     /// Форматирует один элемент коллекции.
     ///

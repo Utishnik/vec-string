@@ -487,7 +487,7 @@ where
     fn iter_string_mut_rule(self, rule: R) -> String;
 }
 
-impl<'a, I, T, R> IteratorStringMutRule<R> for I
+impl<I, T, R> IteratorStringMutRule<R> for I
 where
     I: Iterator<Item = T>,
     T: core::fmt::Display,
@@ -512,7 +512,7 @@ where
     fn vec_string_with_state_rule(&self, state: &S, rule: &R) -> String;
 }
 
-impl<'a, T, S: 'a, R> VecStringWithStateRule<S, R> for Vec<T>
+impl<T, S, R> VecStringWithStateRule<S, R> for Vec<T>
 where
     T: core::fmt::Display,
     R: FormatRule<S>,

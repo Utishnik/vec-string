@@ -1013,7 +1013,7 @@ mod tests {
     fn test_vec_string_mut_rule() {
         let v = vec!["a", "b", "c"];
         let mut counter = 0;
-        let mut fmt = |value: &str, index: usize, length: usize| {
+        let mut fmt = |value: &str, _index: usize, _length: usize| {
             counter += 1;
             format!("[{}{}]", value, counter)
         };
@@ -1127,6 +1127,7 @@ mod tests {
     #[test]
     fn test_vec_string_with_state_mut_rule() {
         let data = vec![1, 2, 3];
+        #[allow(unused_mut)]
         let mut sum = 0;
 
         let result = data.vec_string_with_state_mut_rule(

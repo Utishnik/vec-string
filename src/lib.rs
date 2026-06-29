@@ -37,15 +37,15 @@ pub const DEFAULT_FORMAT_RULE: FormatRuleFn = default_format_rule;
 // ТРЕЙТЫ ПРАВИЛ ФОРМАТИРОВАНИЯ
 // ============================================================================
 
-pub trait FormatRuleNoState {
-    fn format(& self, value: &str, index: usize, length: usize) -> String;
+pub trait FormatRuleNoState<'a> {
+    fn format(&'a self, value: &str, index: usize, length: usize) -> String;
 }
 
-impl<F> FormatRuleNoState for F
+impl<'a, F> FormatRuleNoState<'a> for F
 where
     F: Fn(&str, usize, usize) -> String,
 {
-    fn format(&self, value: &str, index: usize, length: usize) -> String {
+    fn format(&'a self, value: &str, index: usize, length: usize) -> String {
         (self)(value, index, length)
     }
 }
@@ -80,7 +80,7 @@ pub trait FormatRuleMut<S> {
     fn format(&mut self, state: &mut S, value: &str, index: usize, length: usize) -> String;
 }
 
-impl<S, F> FormatRuleMut<S> for F
+impl<'a, S, F> FormatRuleMut<S> for F
 where
     F: FnMut(&mut S, &str, usize, usize) -> String,
 {
@@ -376,23 +376,23 @@ where
 // НОВЫЕ ТРЕЙТЫ: ВЕРСИИ С ВЛАДЕНИЕМ (rule: R)
 // ============================================================================
 
-pub trait VecStringRuleOwned<'a,R>
+pub trait VecStringRuleOwned<'a, R>
 where
     R: FormatRuleNoState<'a>,
 {
-    fn vec_string_rule_owned(& self, rule: R) -> String;
+    fn vec_string_rule_owned(&self, rule: R) -> String;
 }
 
-impl<'a,T, R> VecStringRuleOwned<'a,R> for Vec<T>
+impl<'a, T, R> VecStringRuleOwned<'a, R> for Vec<T>
 where
     T: core::fmt::Display,
-    R: FormatRuleNoState<'a>,
+    R: FormatRuleNoState<'a> + 'a,
 {
     fn vec_string_rule_owned(&self, rule: R) -> String {
         let mut string = String::new();
         let len = self.len();
         for (i, x) in self.iter().enumerate() {
-            string.push_str(&rule.format(&format!("{}", x), i, len));
+            string.push_str(&rule.format(&format!("{}", x), i, len).to_string());
         }
         string
     }
@@ -420,18 +420,18 @@ where
     }
 }
 
-pub trait IteratorStringRuleOwned<R>
+pub trait IteratorStringRuleOwned<'a, R>
 where
-    R: FormatRuleNoState,
+    R: FormatRuleNoState<'a>,
 {
     fn iter_string_rule_owned(self, rule: R) -> String;
 }
 
-impl<I, T, R> IteratorStringRuleOwned<R> for I
+impl<'a, I, T, R> IteratorStringRuleOwned<'a, R> for I
 where
     I: Iterator<Item = T>,
     T: core::fmt::Display,
-    R: FormatRuleNoState,
+    R: FormatRuleNoState<'a>,
 {
     fn iter_string_rule_owned(self, rule: R) -> String {
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
@@ -448,7 +448,7 @@ pub trait IteratorStringMutRuleOwned<R>
 where
     R: FormatRuleMutNoState,
 {
-    fn iter_string_mut_rule_owned(self, mut rule: R) -> String;
+    fn iter_string_mut_rule_owned(self, rule: R) -> String;
 }
 
 impl<I, T, R> IteratorStringMutRuleOwned<R> for I
@@ -519,7 +519,7 @@ pub trait VecStringWithStateMutRuleOwned<S, R>
 where
     R: FormatRuleMut<S>,
 {
-    fn vec_string_with_state_mut_rule_owned(&self, initial_state: S, mut rule: R) -> String;
+    fn vec_string_with_state_mut_rule_owned(&self, initial_state: S, rule: R) -> String;
 }
 
 impl<T, S, R> VecStringWithStateMutRuleOwned<S, R> for Vec<T>
@@ -542,7 +542,7 @@ pub trait IteratorStringWithStateMutRuleOwned<S, R>
 where
     R: FormatRuleMut<S>,
 {
-    fn iter_string_with_state_mut_rule_owned(self, initial_state: S, mut rule: R) -> String;
+    fn iter_string_with_state_mut_rule_owned(self, initial_state: S, rule: R) -> String;
 }
 
 impl<I, T, S, R> IteratorStringWithStateMutRuleOwned<S, R> for I
@@ -566,19 +566,19 @@ where
 // НОВЫЕ ТРЕЙТЫ: ВЕРСИИ ПО ССЫЛКЕ (rule: &R)
 // ============================================================================
 
-pub trait VecStringRuleRef<R>
+pub trait VecStringRuleRef<'a, R>
 where
-    R: FormatRuleNoState,
+    R: FormatRuleNoState<'a>,
 {
-    fn vec_string_rule_ref(&self, rule: &R) -> String;
+    fn vec_string_rule_ref(&self, rule: &'a R) -> String;
 }
 
-impl<T, R> VecStringRuleRef<R> for Vec<T>
+impl<'a, T, R> VecStringRuleRef<'a, R> for Vec<T>
 where
     T: core::fmt::Display,
-    R: FormatRuleNoState,
+    R: FormatRuleNoState<'a>,
 {
-    fn vec_string_rule_ref(&self, rule: &R) -> String {
+    fn vec_string_rule_ref(&self, rule: &'a R) -> String {
         let mut string = String::new();
         let len = self.len();
         for (i, x) in self.iter().enumerate() {
@@ -610,20 +610,20 @@ where
     }
 }
 
-pub trait IteratorStringRuleRef<R>
+pub trait IteratorStringRuleRef<'a, R>
 where
-    R: FormatRuleNoState,
+    R: FormatRuleNoState<'a>,
 {
-    fn iter_string_rule_ref(self, rule: &R) -> String;
+    fn iter_string_rule_ref(self, rule: &'a R) -> String;
 }
 
-impl<I, T, R> IteratorStringRuleRef<R> for I
+impl<'a, I, T, R> IteratorStringRuleRef<'a, R> for I
 where
     I: Iterator<Item = T>,
     T: core::fmt::Display,
-    R: FormatRuleNoState,
+    R: FormatRuleNoState<'a>,
 {
-    fn iter_string_rule_ref(self, rule: &R) -> String {
+    fn iter_string_rule_ref(self, rule: &'a R) -> String {
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
         let len = items.len();
         let mut result = String::new();
@@ -1184,7 +1184,7 @@ mod tests {
     fn test_iterator_string_mut_rule_owned() {
         let v = vec![1, 2, 3];
         let mut sum = 0;
-        let res = v.iter().iter_string_mut_rule_owned(|value: &str, index, length| {
+        let res = v.iter().iter_string_mut_rule_owned(|value, index, length| {
             let num: i32 = value.parse().unwrap_or(0);
             sum += num;
             if length == 0 {

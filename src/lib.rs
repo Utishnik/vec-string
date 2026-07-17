@@ -1,10 +1,15 @@
 #![cfg_attr(not(feature = "std"), no_std)]
+#![feature(loop_hints)]
 
 extern crate alloc;
 
 use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
+
+pub trait ExtendedDisplay{
+    
+}
 
 pub type FormatRuleFn = fn(&str, usize, usize) -> String;
 
@@ -119,6 +124,7 @@ where
     fn vec_string(&self, format_rule: F) -> String;
 }
 
+
 impl<T> VecString for Vec<T>
 where
     T: core::fmt::Display,
@@ -126,6 +132,7 @@ where
     fn vec_string(&self, format_rule: FormatRuleFn) -> String {
         let mut string = String::new();
         let len = self.len();
+        #[unroll(full)]
         for (i, x) in self.iter().enumerate() {
             string.push_str(&format_rule(&format!("{}", x), i, len));
         }
@@ -141,6 +148,7 @@ where
     fn vec_string(&self, format_rule: F) -> String {
         let mut string = String::new();
         let len = self.len();
+        #[unroll(full)]
         for (i, x) in self.iter().enumerate() {
             string.push_str(&format_rule(&format!("{}", x), i, len));
         }
@@ -156,6 +164,7 @@ where
     fn vec_string(&self, mut format_rule: F) -> String {
         let mut string = String::new();
         let len = self.len();
+        #[unroll(full)]
         for (i, x) in self.iter().enumerate() {
             string.push_str(&format_rule(&format!("{}", x), i, len));
         }
@@ -190,6 +199,7 @@ where
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
         let len = items.len();
         let mut result = String::new();
+        #[unroll(full)]
         for (i, s) in items.into_iter().enumerate() {
             result.push_str(&format_rule(&s, i, len));
         }
@@ -207,6 +217,7 @@ where
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
         let len = items.len();
         let mut result = String::new();
+        #[unroll(full)]
         for (i, s) in items.into_iter().enumerate() {
             result.push_str(&format_rule(&s, i, len));
         }
@@ -224,6 +235,7 @@ where
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
         let len = items.len();
         let mut result = String::new();
+        #[unroll(full)]
         for (i, s) in items.into_iter().enumerate() {
             result.push_str(&format_rule(&s, i, len));
         }
@@ -253,6 +265,7 @@ where
     fn vec_string_with_state(&self, mut initial_state: S, mut format_rule: F) -> String {
         let mut result = String::new();
         let len = self.len();
+        #[unroll(full)]
         for (i, x) in self.iter().enumerate() {
             let s = format!("{}", x);
             result.push_str(&format_rule(&mut initial_state, &s, i, len));
@@ -271,6 +284,7 @@ where
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
         let len = items.len();
         let mut result = String::new();
+        #[unroll(full)]
         for (i, s) in items.into_iter().enumerate() {
             result.push_str(&format_rule(&mut initial_state, &s, i, len));
         }
@@ -300,6 +314,7 @@ where
     fn vec_string_with_state_fn(&self, state: &S, format_rule: F) -> String {
         let mut result = String::new();
         let len = self.len();
+        #[unroll(full)]
         for (i, x) in self.iter().enumerate() {
             let s = format!("{}", x);
             result.push_str(&format_rule(state, &s, i, len));
@@ -318,6 +333,7 @@ where
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
         let len = items.len();
         let mut result = String::new();
+        #[unroll(full)]
         for (i, s) in items.into_iter().enumerate() {
             result.push_str(&format_rule(state, &s, i, len));
         }
@@ -345,6 +361,7 @@ impl<T, S> VecStringWithStateFnPtr<S> for Vec<T>
 where
     T: core::fmt::Display,
 {
+    #[inline(always)]
     fn vec_string_with_state_fn_ptr(
         &self,
         state: &S,
@@ -352,6 +369,7 @@ where
     ) -> String {
         let mut result = String::new();
         let len = self.len();
+        #[unroll(full)]
         for (i, x) in self.iter().enumerate() {
             let s = format!("{}", x);
             result.push_str(&format_rule(state, &s, i, len));
@@ -365,6 +383,7 @@ where
     I: Iterator<Item = T>,
     T: core::fmt::Display,
 {
+    #[inline(always)]
     fn iter_string_with_state_fn_ptr(
         self,
         state: &S,
@@ -373,6 +392,7 @@ where
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
         let len = items.len();
         let mut result = String::new();
+        #[unroll(full)]
         for (i, s) in items.into_iter().enumerate() {
             result.push_str(&format_rule(state, &s, i, len));
         }
@@ -396,9 +416,11 @@ where
     T: core::fmt::Display,
     R: FormatRuleNoStateOwned + Clone,
 {
+    #[inline(always)]
     fn vec_string_rule_owned(self, rule: R) -> String {
         let mut string = String::new();
         let len = self.len();
+        #[unroll(full)]
         for (i, x) in self.iter().enumerate() {
             string.push_str(&rule.clone().format(&format!("{}", x), i, len).to_string());
         }
@@ -418,9 +440,11 @@ where
     T: core::fmt::Display,
     R: FormatRuleMutNoState,
 {
+    #[inline(always)]
     fn vec_string_mut_rule_owned(&self, mut rule: R) -> String {
         let mut string = String::new();
         let len = self.len();
+        #[unroll(full)]
         for (i, x) in self.iter().enumerate() {
             string.push_str(&rule.format(&format!("{}", x), i, len));
         }
@@ -441,10 +465,12 @@ where
     T: core::fmt::Display,
     R: FormatRuleNoStateOwned + Clone,
 {
+    #[inline(always)]
     fn iter_string_rule_owned(self, rule: R) -> String {
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
         let len = items.len();
         let mut result = String::new();
+        #[unroll(full)]
         for (i, s) in items.into_iter().enumerate() {
             result.push_str(&rule.clone().format(&s, i, len));
         }
@@ -465,10 +491,12 @@ where
     T: core::fmt::Display,
     R: FormatRuleMutNoState,
 {
+    #[inline(always)]
     fn iter_string_mut_rule_owned(self, mut rule: R) -> String {
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
         let len = items.len();
         let mut result = String::new();
+        #[unroll(full)]
         for (i, s) in items.into_iter().enumerate() {
             result.push_str(&rule.format(&s, i, len));
         }
@@ -488,9 +516,11 @@ where
     T: core::fmt::Display,
     R: FormatRule<S>,
 {
+    #[inline(always)]
     fn vec_string_with_state_rule_owned(&self, state: &S, rule: R) -> String {
         let mut result = String::new();
         let len = self.len();
+        #[unroll(full)]
         for (i, x) in self.iter().enumerate() {
             let s = format!("{}", x);
             result.push_str(&rule.format(state, &s, i, len));
@@ -512,10 +542,12 @@ where
     T: core::fmt::Display,
     R: FormatRule<S>,
 {
+    #[inline(always)]
     fn iter_string_with_state_rule_owned(self, state: &S, rule: R) -> String {
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
         let len = items.len();
         let mut result = String::new();
+        #[unroll(full)]
         for (i, s) in items.into_iter().enumerate() {
             result.push_str(&rule.format(state, &s, i, len));
         }
@@ -535,9 +567,11 @@ where
     T: core::fmt::Display,
     R: FormatRuleMut<S>,
 {
+    #[inline(always)]
     fn vec_string_with_state_mut_rule_owned(&self, mut initial_state: S, mut rule: R) -> String {
         let mut result = String::new();
         let len = self.len();
+        #[unroll(full)]
         for (i, x) in self.iter().enumerate() {
             let s = format!("{}", x);
             result.push_str(&rule.format(&mut initial_state, &s, i, len));
@@ -559,10 +593,12 @@ where
     T: core::fmt::Display,
     R: FormatRuleMut<S>,
 {
+    #[inline(always)]
     fn iter_string_with_state_mut_rule_owned(self, mut initial_state: S, mut rule: R) -> String {
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
         let len = items.len();
         let mut result = String::new();
+        #[unroll(full)]
         for (i, s) in items.into_iter().enumerate() {
             result.push_str(&rule.format(&mut initial_state, &s, i, len));
         }
@@ -586,9 +622,11 @@ where
     T: core::fmt::Display,
     R: FormatRuleNoState<'a>,
 {
+    #[inline(always)]
     fn vec_string_rule_ref(&self, rule: &'a R) -> String {
         let mut string = String::new();
         let len = self.len();
+        #[unroll(full)]
         for (i, x) in self.iter().enumerate() {
             string.push_str(&rule.format(&format!("{}", x), i, len));
         }
@@ -608,9 +646,11 @@ where
     T: core::fmt::Display,
     R: FormatRuleMutNoState,
 {
+    #[inline(always)]
     fn vec_string_mut_rule_ref(&self, rule: &mut R) -> String {
         let mut string = String::new();
         let len = self.len();
+        #[unroll(full)]
         for (i, x) in self.iter().enumerate() {
             string.push_str(&rule.format(&format!("{}", x), i, len));
         }
@@ -631,10 +671,12 @@ where
     T: core::fmt::Display,
     R: FormatRuleNoState<'a>,
 {
+    #[inline(always)]
     fn iter_string_rule_ref(self, rule: &'a R) -> String {
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
         let len = items.len();
         let mut result = String::new();
+        #[unroll(full)]
         for (i, s) in items.into_iter().enumerate() {
             result.push_str(&rule.format(&s, i, len));
         }
@@ -655,10 +697,12 @@ where
     T: core::fmt::Display,
     R: FormatRuleMutNoState,
 {
+    #[inline(always)]
     fn iter_string_mut_rule_ref(self, rule: &mut R) -> String {
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
         let len = items.len();
         let mut result = String::new();
+        #[unroll(full)]
         for (i, s) in items.into_iter().enumerate() {
             result.push_str(&rule.format(&s, i, len));
         }
@@ -678,9 +722,11 @@ where
     T: core::fmt::Display,
     R: FormatRule<S>,
 {
+    #[inline(always)]
     fn vec_string_with_state_rule_ref(&self, state: &S, rule: &R) -> String {
         let mut result = String::new();
         let len = self.len();
+        #[unroll(full)]
         for (i, x) in self.iter().enumerate() {
             let s = format!("{}", x);
             result.push_str(&rule.format(state, &s, i, len));
@@ -702,10 +748,12 @@ where
     T: core::fmt::Display,
     R: FormatRule<S>,
 {
+    #[inline(always)]
     fn iter_string_with_state_rule_ref(self, state: &S, rule: &R) -> String {
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
         let len = items.len();
         let mut result = String::new();
+        #[unroll(full)]
         for (i, s) in items.into_iter().enumerate() {
             result.push_str(&rule.format(state, &s, i, len));
         }
@@ -725,9 +773,11 @@ where
     T: core::fmt::Display,
     R: FormatRuleMut<S>,
 {
+    #[inline(always)]
     fn vec_string_with_state_mut_rule_ref(&self, mut initial_state: S, rule: &mut R) -> String {
         let mut result = String::new();
         let len = self.len();
+        #[unroll(full)]
         for (i, x) in self.iter().enumerate() {
             let s = format!("{}", x);
             result.push_str(&rule.format(&mut initial_state, &s, i, len));
@@ -749,10 +799,12 @@ where
     T: core::fmt::Display,
     R: FormatRuleMut<S>,
 {
+    #[inline(always)]
     fn iter_string_with_state_mut_rule_ref(self, mut initial_state: S, rule: &mut R) -> String {
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
         let len = items.len();
         let mut result = String::new();
+        #[unroll(full)]
         for (i, s) in items.into_iter().enumerate() {
             result.push_str(&rule.format(&mut initial_state, &s, i, len));
         }

@@ -1,5 +1,8 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![feature(loop_hints)]
+#![feature(allocator_api)]
+#![feature(auto_traits)]
+#![feature(negative_impls)]
 
 extern crate alloc;
 
@@ -7,9 +10,74 @@ use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 
-pub trait ExtendedDisplay{
-    
-}
+// ============================================================================
+// РАЗДЕЛЕНИЕ Vec И Iterator ЧЕРЕЗ auto_trait + negative_impls
+// ============================================================================
+
+/// Auto-trait: реализуется всеми типами *кроме* `Vec<T>`.
+/// Благодаря `negative_impls` мы можем явно отозвать реализацию у `Vec<_>`,
+/// что разрешает делать два blanket impl `ExtendedDisplay` без конфликта.
+auto trait NotVec {}
+
+/// Явно запрещаем `Vec<T>` реализовывать `NotVec`.
+/// Это безопасно, т.к. `NotVec` — локальный трейт.
+impl<T,A> !NotVec for Vec<T,A> {}
+// ============================================================================
+// ОБЩИЙ ТРЕЙТ ExtendedDisplay
+// ============================================================================
+
+/// Маркерный трейт, объединяющий **все** возможности форматирования.
+///
+/// Реализуется автоматически для:
+/// - `Vec<T>` (где `T: Display`) — через набор `VecString*`;
+/// - любого `I: Iterator<Item = T>` (кроме `Vec`) — через набор `IteratorString*`.
+///
+/// Пример использования в generic-границах:
+/// ```rust,ignore
+/// fn dump<T: ExtendedDisplay>(items: T) { ... }
+/// ```
+pub trait ExtendedDisplay {}
+
+// --- Blanket impl для Vec<T> ------------------------------------------------
+impl<T> ExtendedDisplay for Vec<T>
+where
+    T: core::fmt::Display,
+    Vec<T>: VecString,
+    Vec<T>: VecStringFn<fn(&str, usize, usize) -> String>,
+    Vec<T>: VecStringFnMut<fn(&str, usize, usize) -> String>,
+    Vec<T>: VecStringWithState<(), fn(&mut (), &str, usize, usize) -> String>,
+    Vec<T>: VecStringWithStateFn<(), fn(&(), &str, usize, usize) -> String>,
+    Vec<T>: VecStringWithStateFnPtr<()>,
+    Vec<T>: VecStringRuleOwned<fn(&str, usize, usize) -> String>,
+    Vec<T>: VecStringMutRuleOwned<fn(&str, usize, usize) -> String>,
+    Vec<T>: VecStringWithStateRuleOwned<(), fn(&(), &str, usize, usize) -> String>,
+    Vec<T>: VecStringWithStateMutRuleOwned<(), fn(&mut (), &str, usize, usize) -> String>,
+    Vec<T>: VecStringRuleRef<'static, fn(&str, usize, usize) -> String>,
+    Vec<T>: VecStringMutRuleRef<fn(&str, usize, usize) -> String>,
+    Vec<T>: VecStringWithStateRuleRef<(), fn(&(), &str, usize, usize) -> String>,
+    Vec<T>: VecStringWithStateMutRuleRef<(), fn(&mut (), &str, usize, usize) -> String>,
+{}
+
+// --- Blanket impl для Iterator (все, кто NotVec) ----------------------------
+impl<I, T> ExtendedDisplay for I
+where
+    I: Iterator<Item = T> + NotVec,
+    T: core::fmt::Display,
+    I: IteratorString,
+    I: IteratorStringFn<fn(&str, usize, usize) -> String>,
+    I: IteratorStringFnMut<fn(&str, usize, usize) -> String>,
+    I: IteratorStringWithState<(), fn(&mut (), &str, usize, usize) -> String>,
+    I: IteratorStringWithStateFn<(), fn(&(), &str, usize, usize) -> String>,
+    I: IteratorStringWithStateFnPtr<()>,
+    I: IteratorStringRuleOwned<fn(&str, usize, usize) -> String>,
+    I: IteratorStringMutRuleOwned<fn(&str, usize, usize) -> String>,
+    I: IteratorStringWithStateRuleOwned<(), fn(&(), &str, usize, usize) -> String>,
+    I: IteratorStringWithStateMutRuleOwned<(), fn(&mut (), &str, usize, usize) -> String>,
+    I: IteratorStringRuleRef<'static, fn(&str, usize, usize) -> String>,
+    I: IteratorStringMutRuleRef<fn(&str, usize, usize) -> String>,
+    I: IteratorStringWithStateRuleRef<(), fn(&(), &str, usize, usize) -> String>,
+    I: IteratorStringWithStateMutRuleRef<(), fn(&mut (), &str, usize, usize) -> String>,
+{}
 
 pub type FormatRuleFn = fn(&str, usize, usize) -> String;
 
@@ -123,7 +191,6 @@ where
 {
     fn vec_string(&self, format_rule: F) -> String;
 }
-
 
 impl<T> VecString for Vec<T>
 where
@@ -1579,5 +1646,25 @@ mod tests {
             .iter()
             .iter_string_with_state_mut_rule_ref(positions, &mut fmt);
         assert_eq!(result, "[hello, orld, st]");
+    }
+
+    // ========================================================================
+    // ТЕСТЫ ExtendedDisplay
+    // ========================================================================
+
+    #[test]
+    fn test_extended_display_vec() {
+        let v = vec![1, 2, 3];
+        fn takes_extended<T: ExtendedDisplay>(_x: T) {}
+        takes_extended(v);
+    }
+
+    #[test]
+    fn test_extended_display_iter() {
+        let v = vec![1, 2, 3];
+        fn takes_extended<T: ExtendedDisplay>(_x: T) {}
+        takes_extended(v.iter());
+        takes_extended(v.into_iter());
+        takes_extended(v.iter().map(|x| x * 2));
     }
 }

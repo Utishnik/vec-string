@@ -6,6 +6,278 @@ use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 
+// ============================================================================
+// ОБЩИЙ ТРЕЙТ ExtendedDisplay
+// ============================================================================
+
+/// Маркерный трейт, объединяющий все возможности форматирования.
+///
+/// Реализован для:
+/// * `Vec<T>` (by value) и `&Vec<T>`;
+/// * большинства стандартных итераторов (`Map`, `Filter`, `Take`, `Skip`,
+///   `Rev`, `Cloned`, `Copied`, `Chain`, `Flatten`, `StepBy`, `Peekable`,
+///   `Fuse`, `Once`, `Repeat`, `Empty`, `Range`, `RangeFrom`,
+///   `RangeInclusive`, `slice::Iter`, `vec::IntoIter`, `array::IntoIter`,
+///   `str::Chars`, `str::Lines`, `str::Bytes`, `str::SplitWhitespace` и др.);
+/// * любого пользовательского типа через макрос `impl_extended_display!`.
+///
+/// Пример generic-границы:
+/// ```rust,ignore
+/// fn dump<T: ExtendedDisplay>(items: T) { ... }
+/// ```
+pub trait ExtendedDisplay {}
+
+// --- Helper: все VecString* возможности с fn-правилами -----------------------
+#[doc(hidden)]
+pub trait VecStringAll:
+    VecString
+    + VecStringFn<fn(&str, usize, usize) -> String>
+    + VecStringFnMut<fn(&str, usize, usize) -> String>
+    + VecStringWithState<(), fn(&mut (), &str, usize, usize) -> String>
+    + VecStringWithStateFn<(), fn(&(), &str, usize, usize) -> String>
+    + VecStringWithStateFnPtr<()>
+    + VecStringRuleOwned<fn(&str, usize, usize) -> String>
+    + VecStringMutRuleOwned<fn(&str, usize, usize) -> String>
+    + VecStringWithStateRuleOwned<(), fn(&(), &str, usize, usize) -> String>
+    + VecStringWithStateMutRuleOwned<(), fn(&mut (), &str, usize, usize) -> String>
+    + VecStringRuleRef<'static, fn(&str, usize, usize) -> String>
+    + VecStringMutRuleRef<fn(&str, usize, usize) -> String>
+    + VecStringWithStateRuleRef<(), fn(&(), &str, usize, usize) -> String>
+    + VecStringWithStateMutRuleRef<(), fn(&mut (), &str, usize, usize) -> String>
+{}
+
+impl<T> VecStringAll for Vec<T>
+where
+    T: core::fmt::Display,
+    Vec<T>: VecString,
+    Vec<T>: VecStringFn<fn(&str, usize, usize) -> String>,
+    Vec<T>: VecStringFnMut<fn(&str, usize, usize) -> String>,
+    Vec<T>: VecStringWithState<(), fn(&mut (), &str, usize, usize) -> String>,
+    Vec<T>: VecStringWithStateFn<(), fn(&(), &str, usize, usize) -> String>,
+    Vec<T>: VecStringWithStateFnPtr<()>,
+    Vec<T>: VecStringRuleOwned<fn(&str, usize, usize) -> String>,
+    Vec<T>: VecStringMutRuleOwned<fn(&str, usize, usize) -> String>,
+    Vec<T>: VecStringWithStateRuleOwned<(), fn(&(), &str, usize, usize) -> String>,
+    Vec<T>: VecStringWithStateMutRuleOwned<(), fn(&mut (), &str, usize, usize) -> String>,
+    Vec<T>: VecStringRuleRef<'static, fn(&str, usize, usize) -> String>,
+    Vec<T>: VecStringMutRuleRef<fn(&str, usize, usize) -> String>,
+    Vec<T>: VecStringWithStateRuleRef<(), fn(&(), &str, usize, usize) -> String>,
+    Vec<T>: VecStringWithStateMutRuleRef<(), fn(&mut (), &str, usize, usize) -> String>,
+{}
+
+// --- Helper: все IteratorString* возможности с fn-правилами ------------------
+#[doc(hidden)]
+pub trait IteratorStringAll:
+    IteratorString
+    + IteratorStringFn<fn(&str, usize, usize) -> String>
+    + IteratorStringFnMut<fn(&str, usize, usize) -> String>
+    + IteratorStringWithState<(), fn(&mut (), &str, usize, usize) -> String>
+    + IteratorStringWithStateFn<(), fn(&(), &str, usize, usize) -> String>
+    + IteratorStringWithStateFnPtr<()>
+    + IteratorStringRuleOwned<fn(&str, usize, usize) -> String>
+    + IteratorStringMutRuleOwned<fn(&str, usize, usize) -> String>
+    + IteratorStringWithStateRuleOwned<(), fn(&(), &str, usize, usize) -> String>
+    + IteratorStringWithStateMutRuleOwned<(), fn(&mut (), &str, usize, usize) -> String>
+    + IteratorStringRuleRef<'static, fn(&str, usize, usize) -> String>
+    + IteratorStringMutRuleRef<fn(&str, usize, usize) -> String>
+    + IteratorStringWithStateRuleRef<(), fn(&(), &str, usize, usize) -> String>
+    + IteratorStringWithStateMutRuleRef<(), fn(&mut (), &str, usize, usize) -> String>
+{}
+
+impl<I> IteratorStringAll for I
+where
+    I: IteratorString
+        + IteratorStringFn<fn(&str, usize, usize) -> String>
+        + IteratorStringFnMut<fn(&str, usize, usize) -> String>
+        + IteratorStringWithState<(), fn(&mut (), &str, usize, usize) -> String>
+        + IteratorStringWithStateFn<(), fn(&(), &str, usize, usize) -> String>
+        + IteratorStringWithStateFnPtr<()>
+        + IteratorStringRuleOwned<fn(&str, usize, usize) -> String>
+        + IteratorStringMutRuleOwned<fn(&str, usize, usize) -> String>
+        + IteratorStringWithStateRuleOwned<(), fn(&(), &str, usize, usize) -> String>
+        + IteratorStringWithStateMutRuleOwned<(), fn(&mut (), &str, usize, usize) -> String>
+        + IteratorStringRuleRef<'static, fn(&str, usize, usize) -> String>
+        + IteratorStringMutRuleRef<fn(&str, usize, usize) -> String>
+        + IteratorStringWithStateRuleRef<(), fn(&(), &str, usize, usize) -> String>
+        + IteratorStringWithStateMutRuleRef<(), fn(&mut (), &str, usize, usize) -> String>,
+{}
+
+// --- Vec<T> -----------------------------------------------------------------
+impl<T> ExtendedDisplay for Vec<T> where Vec<T>: VecStringAll {}
+impl<T> ExtendedDisplay for &Vec<T> where Vec<T>: VecStringAll {}
+
+// --- core::iter адаптеры ----------------------------------------------------
+impl<I, F> ExtendedDisplay for core::iter::Map<I, F>
+where
+    core::iter::Map<I, F>: IteratorStringAll,
+{}
+impl<I, P> ExtendedDisplay for core::iter::Filter<I, P>
+where
+    core::iter::Filter<I, P>: IteratorStringAll,
+{}
+impl<I> ExtendedDisplay for core::iter::Take<I>
+where
+    core::iter::Take<I>: IteratorStringAll,
+{}
+impl<I> ExtendedDisplay for core::iter::Skip<I>
+where
+    core::iter::Skip<I>: IteratorStringAll,
+{}
+impl<I> ExtendedDisplay for core::iter::Fuse<I>
+where
+    core::iter::Fuse<I>: IteratorStringAll,
+{}
+impl<I> ExtendedDisplay for core::iter::Peekable<I>
+where
+    I: Iterator<Item: IntoIterator>,
+    core::iter::Peekable<I>: IteratorStringAll,
+{}
+impl<I> ExtendedDisplay for core::iter::Rev<I>
+where
+    core::iter::Rev<I>: IteratorStringAll,
+{}
+impl<I> ExtendedDisplay for core::iter::Cloned<I>
+where
+    core::iter::Cloned<I>: IteratorStringAll,
+{}
+impl<I> ExtendedDisplay for core::iter::Copied<I>
+where
+    core::iter::Copied<I>: IteratorStringAll,
+{}
+impl<I, U> ExtendedDisplay for core::iter::Chain<I, U>
+where
+    core::iter::Chain<I, U>: IteratorStringAll,
+{}
+impl<I, F, U> ExtendedDisplay for core::iter::FlatMap<I, F,U>
+where
+    F: Iterator<Item: IntoIterator>,
+    core::iter::FlatMap<I, F,U>: IteratorStringAll,
+{}
+impl<I> ExtendedDisplay for core::iter::Flatten<I>
+where
+    I: Iterator<Item: IntoIterator>,
+    core::iter::Flatten<I>: IteratorStringAll,
+{}
+impl<I> ExtendedDisplay for core::iter::StepBy<I>
+where
+    core::iter::StepBy<I>: IteratorStringAll,
+{}
+impl<I, P> ExtendedDisplay for core::iter::FilterMap<I, P>
+where
+    core::iter::FilterMap<I, P>: IteratorStringAll,
+{}
+impl<I, F> ExtendedDisplay for core::iter::Inspect<I, F>
+where
+    core::iter::Inspect<I, F>: IteratorStringAll,
+{}
+impl<I, St, F> ExtendedDisplay for core::iter::Scan<I, St, F>
+where
+    core::iter::Scan<I, St, F>: IteratorStringAll,
+{}
+impl<I, P> ExtendedDisplay for core::iter::SkipWhile<I, P>
+where
+    core::iter::SkipWhile<I, P>: IteratorStringAll,
+{}
+impl<I, P> ExtendedDisplay for core::iter::TakeWhile<I, P>
+where
+    core::iter::TakeWhile<I, P>: IteratorStringAll,
+{}
+impl<I, F> ExtendedDisplay for core::iter::MapWhile<I, F>
+where
+    core::iter::MapWhile<I, F>: IteratorStringAll,
+{}
+impl<I> ExtendedDisplay for core::iter::Cycle<I>
+where
+    core::iter::Cycle<I>: IteratorStringAll,
+{}
+// --- core::iter источники ---------------------------------------------------
+impl<T> ExtendedDisplay for core::iter::Once<T>
+where
+    core::iter::Once<T>: IteratorStringAll,
+{}
+impl<T: Clone> ExtendedDisplay for core::iter::Repeat<T>
+where
+    core::iter::Repeat<T>: IteratorStringAll,
+{}
+impl<F> ExtendedDisplay for core::iter::RepeatWith<F>
+where
+    core::iter::RepeatWith<F>: IteratorStringAll,
+{}
+impl<T> ExtendedDisplay for core::iter::Empty<T>
+where
+    core::iter::Empty<T>: IteratorStringAll,
+{}
+impl<F> ExtendedDisplay for core::iter::FromFn<F>
+where
+    core::iter::FromFn<F>: IteratorStringAll,
+{}
+impl<T, F> ExtendedDisplay for core::iter::Successors<T, F>
+where
+    core::iter::Successors<T, F>: IteratorStringAll,
+{}
+
+// --- Ranges -----------------------------------------------------------------
+impl<T> ExtendedDisplay for core::ops::Range<T>
+where
+    core::ops::Range<T>: IteratorStringAll,
+{}
+impl<T> ExtendedDisplay for core::ops::RangeFrom<T>
+where
+    core::ops::RangeFrom<T>: IteratorStringAll,
+{}
+impl<T> ExtendedDisplay for core::ops::RangeInclusive<T>
+where
+    core::ops::RangeInclusive<T>: IteratorStringAll,
+{}
+
+// --- slice / vec / array / option / result ----------------------------------
+impl<'a, T> ExtendedDisplay for core::slice::Iter<'a, T>
+where
+    core::slice::Iter<'a, T>: IteratorStringAll,
+{}
+impl<T> ExtendedDisplay for alloc::vec::IntoIter<T>
+where
+    alloc::vec::IntoIter<T>: IteratorStringAll,
+{}
+impl<T, const N: usize> ExtendedDisplay for core::array::IntoIter<T, N>
+where
+    core::array::IntoIter<T, N>: IteratorStringAll,
+{}
+impl<'a, T> ExtendedDisplay for core::option::Iter<'a, T>
+where
+    core::option::Iter<'a, T>: IteratorStringAll,
+{}
+impl<'a, T> ExtendedDisplay for core::result::Iter<'a, T>
+where
+    core::result::Iter<'a, T>: IteratorStringAll,
+{}
+
+// --- str итераторы ----------------------------------------------------------
+impl<'a> ExtendedDisplay for core::str::Chars<'a>
+where
+    core::str::Chars<'a>: IteratorStringAll,
+{}
+impl<'a> ExtendedDisplay for core::str::Lines<'a>
+where
+    core::str::Lines<'a>: IteratorStringAll,
+{}
+impl<'a> ExtendedDisplay for core::str::Bytes<'a>
+where
+    core::str::Bytes<'a>: IteratorStringAll,
+{}
+impl<'a> ExtendedDisplay for core::str::SplitWhitespace<'a>
+where
+    core::str::SplitWhitespace<'a>: IteratorStringAll,
+{}
+
+// --- Макрос для пользовательских итераторов ---------------------------------
+#[macro_export]
+macro_rules! impl_extended_display {
+    ($($ty:ty),* $(,)?) => {
+        $(impl $crate::ExtendedDisplay for $ty {})*
+    };
+}
+
 pub type FormatRuleFn = fn(&str, usize, usize) -> String;
 
 fn default_format_rule(val: &str, index: usize, len: usize) -> String {
@@ -345,6 +617,7 @@ impl<T, S> VecStringWithStateFnPtr<S> for Vec<T>
 where
     T: core::fmt::Display,
 {
+    #[inline(always)]
     fn vec_string_with_state_fn_ptr(
         &self,
         state: &S,
@@ -365,6 +638,7 @@ where
     I: Iterator<Item = T>,
     T: core::fmt::Display,
 {
+    #[inline(always)]
     fn iter_string_with_state_fn_ptr(
         self,
         state: &S,
@@ -396,6 +670,7 @@ where
     T: core::fmt::Display,
     R: FormatRuleNoStateOwned + Clone,
 {
+    #[inline(always)]
     fn vec_string_rule_owned(self, rule: R) -> String {
         let mut string = String::new();
         let len = self.len();
@@ -418,6 +693,7 @@ where
     T: core::fmt::Display,
     R: FormatRuleMutNoState,
 {
+    #[inline(always)]
     fn vec_string_mut_rule_owned(&self, mut rule: R) -> String {
         let mut string = String::new();
         let len = self.len();
@@ -441,6 +717,7 @@ where
     T: core::fmt::Display,
     R: FormatRuleNoStateOwned + Clone,
 {
+    #[inline(always)]
     fn iter_string_rule_owned(self, rule: R) -> String {
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
         let len = items.len();
@@ -465,6 +742,7 @@ where
     T: core::fmt::Display,
     R: FormatRuleMutNoState,
 {
+    #[inline(always)]
     fn iter_string_mut_rule_owned(self, mut rule: R) -> String {
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
         let len = items.len();
@@ -488,6 +766,7 @@ where
     T: core::fmt::Display,
     R: FormatRule<S>,
 {
+    #[inline(always)]
     fn vec_string_with_state_rule_owned(&self, state: &S, rule: R) -> String {
         let mut result = String::new();
         let len = self.len();
@@ -512,6 +791,7 @@ where
     T: core::fmt::Display,
     R: FormatRule<S>,
 {
+    #[inline(always)]
     fn iter_string_with_state_rule_owned(self, state: &S, rule: R) -> String {
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
         let len = items.len();
@@ -535,6 +815,7 @@ where
     T: core::fmt::Display,
     R: FormatRuleMut<S>,
 {
+    #[inline(always)]
     fn vec_string_with_state_mut_rule_owned(&self, mut initial_state: S, mut rule: R) -> String {
         let mut result = String::new();
         let len = self.len();
@@ -559,6 +840,7 @@ where
     T: core::fmt::Display,
     R: FormatRuleMut<S>,
 {
+    #[inline(always)]
     fn iter_string_with_state_mut_rule_owned(self, mut initial_state: S, mut rule: R) -> String {
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
         let len = items.len();
@@ -586,6 +868,7 @@ where
     T: core::fmt::Display,
     R: FormatRuleNoState<'a>,
 {
+    #[inline(always)]
     fn vec_string_rule_ref(&self, rule: &'a R) -> String {
         let mut string = String::new();
         let len = self.len();
@@ -608,6 +891,7 @@ where
     T: core::fmt::Display,
     R: FormatRuleMutNoState,
 {
+    #[inline(always)]
     fn vec_string_mut_rule_ref(&self, rule: &mut R) -> String {
         let mut string = String::new();
         let len = self.len();
@@ -631,6 +915,7 @@ where
     T: core::fmt::Display,
     R: FormatRuleNoState<'a>,
 {
+    #[inline(always)]
     fn iter_string_rule_ref(self, rule: &'a R) -> String {
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
         let len = items.len();
@@ -655,6 +940,7 @@ where
     T: core::fmt::Display,
     R: FormatRuleMutNoState,
 {
+    #[inline(always)]
     fn iter_string_mut_rule_ref(self, rule: &mut R) -> String {
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
         let len = items.len();
@@ -678,6 +964,7 @@ where
     T: core::fmt::Display,
     R: FormatRule<S>,
 {
+    #[inline(always)]
     fn vec_string_with_state_rule_ref(&self, state: &S, rule: &R) -> String {
         let mut result = String::new();
         let len = self.len();
@@ -702,6 +989,7 @@ where
     T: core::fmt::Display,
     R: FormatRule<S>,
 {
+    #[inline(always)]
     fn iter_string_with_state_rule_ref(self, state: &S, rule: &R) -> String {
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
         let len = items.len();
@@ -725,6 +1013,7 @@ where
     T: core::fmt::Display,
     R: FormatRuleMut<S>,
 {
+    #[inline(always)]
     fn vec_string_with_state_mut_rule_ref(&self, mut initial_state: S, rule: &mut R) -> String {
         let mut result = String::new();
         let len = self.len();
@@ -749,6 +1038,7 @@ where
     T: core::fmt::Display,
     R: FormatRuleMut<S>,
 {
+    #[inline(always)]
     fn iter_string_with_state_mut_rule_ref(self, mut initial_state: S, rule: &mut R) -> String {
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
         let len = items.len();
@@ -1527,5 +1817,25 @@ mod tests {
             .iter()
             .iter_string_with_state_mut_rule_ref(positions, &mut fmt);
         assert_eq!(result, "[hello, orld, st]");
+    }
+
+    // ========================================================================
+    // ТЕСТЫ ExtendedDisplay
+    // ========================================================================
+
+    #[test]
+    fn test_extended_display_vec() {
+        let v = vec![1, 2, 3];
+        fn takes_extended<T: ExtendedDisplay>(_x: T) {}
+        takes_extended(v);
+    }
+
+    #[test]
+    fn test_extended_display_iter() {
+        let v = vec![1, 2, 3];
+        fn takes_extended<T: ExtendedDisplay>(_x: T) {}
+        takes_extended(v.iter());
+        takes_extended(v.iter().map(|x| x * 2));
+        takes_extended(v.into_iter());
     }
 }

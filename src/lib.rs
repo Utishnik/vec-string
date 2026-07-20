@@ -2,6 +2,8 @@
 
 extern crate alloc;
 
+use std::future::Future;
+
 use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -272,6 +274,20 @@ where
 
 pub trait FormatRuleNoStateOwned {
     fn format(self, value: &str, index: usize, length: usize) -> String;
+}
+
+//compio/monoio version
+pub trait FormatRuleNoStateOwnedAsync{
+    fn format(self, value:String, index: usize, length: usize) -> Box<dyn std::future::Future<Output = String > + 'static >;
+}
+
+impl<F: 'static> FormatRuleNoStateOwnedAsync for F
+where 
+    F: AsyncFnOnce(String, usize, usize) -> String ,
+{
+    fn format(self, value: String, index: usize, length: usize) -> Box<dyn std::future::Future<Output = String> + 'static> {
+        Box::new(self(value,index,length))
+    }
 }
 
 impl<F> FormatRuleNoStateOwned for F

@@ -13,8 +13,9 @@ categories = ["util"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-#zero
+rayon = { version = "1.10", optional = true }
 
 [features]
 std = []
 default = ["std"]
+rayon = ["dep:rayon", "std"]

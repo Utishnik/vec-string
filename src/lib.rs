@@ -19,6 +19,7 @@ use alloc::vec::Vec;
 ///   `Fuse`, `Once`, `Repeat`, `Empty`, `Range`, `RangeFrom`,
 ///   `RangeInclusive`, `slice::Iter`, `vec::IntoIter`, `array::IntoIter`,
 ///   `str::Chars`, `str::Lines`, `str::Bytes`, `str::SplitWhitespace` и др.);
+/// * параллельных итераторов из `rayon` (при включенной фиче `rayon`);
 /// * любого пользовательского типа через макрос `impl_extended_display!`.
 ///
 /// Пример generic-границы:
@@ -44,7 +45,8 @@ pub trait VecStringAll:
     + VecStringMutRuleRef<fn(&str, usize, usize) -> String>
     + VecStringWithStateRuleRef<(), fn(&(), &str, usize, usize) -> String>
     + VecStringWithStateMutRuleRef<(), fn(&mut (), &str, usize, usize) -> String>
-{}
+{
+}
 
 impl<T> VecStringAll for Vec<T>
 where
@@ -63,7 +65,8 @@ where
     Vec<T>: VecStringMutRuleRef<fn(&str, usize, usize) -> String>,
     Vec<T>: VecStringWithStateRuleRef<(), fn(&(), &str, usize, usize) -> String>,
     Vec<T>: VecStringWithStateMutRuleRef<(), fn(&mut (), &str, usize, usize) -> String>,
-{}
+{
+}
 
 // --- Helper: все IteratorString* возможности с fn-правилами ------------------
 #[doc(hidden)]
@@ -82,10 +85,10 @@ pub trait IteratorStringAll:
     + IteratorStringMutRuleRef<fn(&str, usize, usize) -> String>
     + IteratorStringWithStateRuleRef<(), fn(&(), &str, usize, usize) -> String>
     + IteratorStringWithStateMutRuleRef<(), fn(&mut (), &str, usize, usize) -> String>
-{}
+{
+}
 
-impl<I> IteratorStringAll for I
-where
+impl<I> IteratorStringAll for I where
     I: IteratorString
         + IteratorStringFn<fn(&str, usize, usize) -> String>
         + IteratorStringFnMut<fn(&str, usize, usize) -> String>
@@ -99,176 +102,126 @@ where
         + IteratorStringRuleRef<'static, fn(&str, usize, usize) -> String>
         + IteratorStringMutRuleRef<fn(&str, usize, usize) -> String>
         + IteratorStringWithStateRuleRef<(), fn(&(), &str, usize, usize) -> String>
-        + IteratorStringWithStateMutRuleRef<(), fn(&mut (), &str, usize, usize) -> String>,
-{}
+        + IteratorStringWithStateMutRuleRef<(), fn(&mut (), &str, usize, usize) -> String>
+{
+}
 
 // --- Vec<T> -----------------------------------------------------------------
 impl<T> ExtendedDisplay for Vec<T> where Vec<T>: VecStringAll {}
 impl<T> ExtendedDisplay for &Vec<T> where Vec<T>: VecStringAll {}
 
 // --- core::iter адаптеры ----------------------------------------------------
-impl<I, F> ExtendedDisplay for core::iter::Map<I, F>
-where
-    core::iter::Map<I, F>: IteratorStringAll,
-{}
-impl<I, P> ExtendedDisplay for core::iter::Filter<I, P>
-where
-    core::iter::Filter<I, P>: IteratorStringAll,
-{}
-impl<I> ExtendedDisplay for core::iter::Take<I>
-where
-    core::iter::Take<I>: IteratorStringAll,
-{}
-impl<I> ExtendedDisplay for core::iter::Skip<I>
-where
-    core::iter::Skip<I>: IteratorStringAll,
-{}
-impl<I> ExtendedDisplay for core::iter::Fuse<I>
-where
-    core::iter::Fuse<I>: IteratorStringAll,
-{}
+impl<I, F> ExtendedDisplay for core::iter::Map<I, F> where core::iter::Map<I, F>: IteratorStringAll {}
+impl<I, P> ExtendedDisplay for core::iter::Filter<I, P> where
+    core::iter::Filter<I, P>: IteratorStringAll
+{
+}
+impl<I> ExtendedDisplay for core::iter::Take<I> where core::iter::Take<I>: IteratorStringAll {}
+impl<I> ExtendedDisplay for core::iter::Skip<I> where core::iter::Skip<I>: IteratorStringAll {}
+impl<I> ExtendedDisplay for core::iter::Fuse<I> where core::iter::Fuse<I>: IteratorStringAll {}
 impl<I> ExtendedDisplay for core::iter::Peekable<I>
 where
     I: Iterator<Item: IntoIterator>,
     core::iter::Peekable<I>: IteratorStringAll,
-{}
-impl<I> ExtendedDisplay for core::iter::Rev<I>
-where
-    core::iter::Rev<I>: IteratorStringAll,
-{}
-impl<I> ExtendedDisplay for core::iter::Cloned<I>
-where
-    core::iter::Cloned<I>: IteratorStringAll,
-{}
-impl<I> ExtendedDisplay for core::iter::Copied<I>
-where
-    core::iter::Copied<I>: IteratorStringAll,
-{}
-impl<I, U> ExtendedDisplay for core::iter::Chain<I, U>
-where
-    core::iter::Chain<I, U>: IteratorStringAll,
-{}
-impl<I, F, U> ExtendedDisplay for core::iter::FlatMap<I, F,U>
+{
+}
+impl<I> ExtendedDisplay for core::iter::Rev<I> where core::iter::Rev<I>: IteratorStringAll {}
+impl<I> ExtendedDisplay for core::iter::Cloned<I> where core::iter::Cloned<I>: IteratorStringAll {}
+impl<I> ExtendedDisplay for core::iter::Copied<I> where core::iter::Copied<I>: IteratorStringAll {}
+impl<I, U> ExtendedDisplay for core::iter::Chain<I, U> where
+    core::iter::Chain<I, U>: IteratorStringAll
+{
+}
+impl<I, F, U> ExtendedDisplay for core::iter::FlatMap<I, F, U>
 where
     F: Iterator<Item: IntoIterator>,
-    core::iter::FlatMap<I, F,U>: IteratorStringAll,
-{}
+    core::iter::FlatMap<I, F, U>: IteratorStringAll,
+{
+}
 impl<I> ExtendedDisplay for core::iter::Flatten<I>
 where
     I: Iterator<Item: IntoIterator>,
     core::iter::Flatten<I>: IteratorStringAll,
-{}
-impl<I> ExtendedDisplay for core::iter::StepBy<I>
-where
-    core::iter::StepBy<I>: IteratorStringAll,
-{}
-impl<I, P> ExtendedDisplay for core::iter::FilterMap<I, P>
-where
-    core::iter::FilterMap<I, P>: IteratorStringAll,
-{}
-impl<I, F> ExtendedDisplay for core::iter::Inspect<I, F>
-where
-    core::iter::Inspect<I, F>: IteratorStringAll,
-{}
-impl<I, St, F> ExtendedDisplay for core::iter::Scan<I, St, F>
-where
-    core::iter::Scan<I, St, F>: IteratorStringAll,
-{}
-impl<I, P> ExtendedDisplay for core::iter::SkipWhile<I, P>
-where
-    core::iter::SkipWhile<I, P>: IteratorStringAll,
-{}
-impl<I, P> ExtendedDisplay for core::iter::TakeWhile<I, P>
-where
-    core::iter::TakeWhile<I, P>: IteratorStringAll,
-{}
-impl<I, F> ExtendedDisplay for core::iter::MapWhile<I, F>
-where
-    core::iter::MapWhile<I, F>: IteratorStringAll,
-{}
-impl<I> ExtendedDisplay for core::iter::Cycle<I>
-where
-    core::iter::Cycle<I>: IteratorStringAll,
-{}
+{
+}
+impl<I> ExtendedDisplay for core::iter::StepBy<I> where core::iter::StepBy<I>: IteratorStringAll {}
+impl<I, P> ExtendedDisplay for core::iter::FilterMap<I, P> where
+    core::iter::FilterMap<I, P>: IteratorStringAll
+{
+}
+impl<I, F> ExtendedDisplay for core::iter::Inspect<I, F> where
+    core::iter::Inspect<I, F>: IteratorStringAll
+{
+}
+impl<I, St, F> ExtendedDisplay for core::iter::Scan<I, St, F> where
+    core::iter::Scan<I, St, F>: IteratorStringAll
+{
+}
+impl<I, P> ExtendedDisplay for core::iter::SkipWhile<I, P> where
+    core::iter::SkipWhile<I, P>: IteratorStringAll
+{
+}
+impl<I, P> ExtendedDisplay for core::iter::TakeWhile<I, P> where
+    core::iter::TakeWhile<I, P>: IteratorStringAll
+{
+}
+impl<I, F> ExtendedDisplay for core::iter::MapWhile<I, F> where
+    core::iter::MapWhile<I, F>: IteratorStringAll
+{
+}
+impl<I> ExtendedDisplay for core::iter::Cycle<I> where core::iter::Cycle<I>: IteratorStringAll {}
 // --- core::iter источники ---------------------------------------------------
-impl<T> ExtendedDisplay for core::iter::Once<T>
-where
-    core::iter::Once<T>: IteratorStringAll,
-{}
-impl<T: Clone> ExtendedDisplay for core::iter::Repeat<T>
-where
-    core::iter::Repeat<T>: IteratorStringAll,
-{}
-impl<F> ExtendedDisplay for core::iter::RepeatWith<F>
-where
-    core::iter::RepeatWith<F>: IteratorStringAll,
-{}
-impl<T> ExtendedDisplay for core::iter::Empty<T>
-where
-    core::iter::Empty<T>: IteratorStringAll,
-{}
-impl<F> ExtendedDisplay for core::iter::FromFn<F>
-where
-    core::iter::FromFn<F>: IteratorStringAll,
-{}
-impl<T, F> ExtendedDisplay for core::iter::Successors<T, F>
-where
-    core::iter::Successors<T, F>: IteratorStringAll,
-{}
+impl<T> ExtendedDisplay for core::iter::Once<T> where core::iter::Once<T>: IteratorStringAll {}
+impl<T: Clone> ExtendedDisplay for core::iter::Repeat<T> where
+    core::iter::Repeat<T>: IteratorStringAll
+{
+}
+impl<F> ExtendedDisplay for core::iter::RepeatWith<F> where
+    core::iter::RepeatWith<F>: IteratorStringAll
+{
+}
+impl<T> ExtendedDisplay for core::iter::Empty<T> where core::iter::Empty<T>: IteratorStringAll {}
+impl<F> ExtendedDisplay for core::iter::FromFn<F> where core::iter::FromFn<F>: IteratorStringAll {}
+impl<T, F> ExtendedDisplay for core::iter::Successors<T, F> where
+    core::iter::Successors<T, F>: IteratorStringAll
+{
+}
 
 // --- Ranges -----------------------------------------------------------------
-impl<T> ExtendedDisplay for core::ops::Range<T>
-where
-    core::ops::Range<T>: IteratorStringAll,
-{}
-impl<T> ExtendedDisplay for core::ops::RangeFrom<T>
-where
-    core::ops::RangeFrom<T>: IteratorStringAll,
-{}
-impl<T> ExtendedDisplay for core::ops::RangeInclusive<T>
-where
-    core::ops::RangeInclusive<T>: IteratorStringAll,
-{}
+impl<T> ExtendedDisplay for core::ops::Range<T> where core::ops::Range<T>: IteratorStringAll {}
+impl<T> ExtendedDisplay for core::ops::RangeFrom<T> where core::ops::RangeFrom<T>: IteratorStringAll {}
+impl<T> ExtendedDisplay for core::ops::RangeInclusive<T> where
+    core::ops::RangeInclusive<T>: IteratorStringAll
+{
+}
 
 // --- slice / vec / array / option / result ----------------------------------
-impl<'a, T> ExtendedDisplay for core::slice::Iter<'a, T>
-where
-    core::slice::Iter<'a, T>: IteratorStringAll,
-{}
-impl<T> ExtendedDisplay for alloc::vec::IntoIter<T>
-where
-    alloc::vec::IntoIter<T>: IteratorStringAll,
-{}
-impl<T, const N: usize> ExtendedDisplay for core::array::IntoIter<T, N>
-where
-    core::array::IntoIter<T, N>: IteratorStringAll,
-{}
-impl<'a, T> ExtendedDisplay for core::option::Iter<'a, T>
-where
-    core::option::Iter<'a, T>: IteratorStringAll,
-{}
-impl<'a, T> ExtendedDisplay for core::result::Iter<'a, T>
-where
-    core::result::Iter<'a, T>: IteratorStringAll,
-{}
+impl<'a, T> ExtendedDisplay for core::slice::Iter<'a, T> where
+    core::slice::Iter<'a, T>: IteratorStringAll
+{
+}
+impl<T> ExtendedDisplay for alloc::vec::IntoIter<T> where alloc::vec::IntoIter<T>: IteratorStringAll {}
+impl<T, const N: usize> ExtendedDisplay for core::array::IntoIter<T, N> where
+    core::array::IntoIter<T, N>: IteratorStringAll
+{
+}
+impl<'a, T> ExtendedDisplay for core::option::Iter<'a, T> where
+    core::option::Iter<'a, T>: IteratorStringAll
+{
+}
+impl<'a, T> ExtendedDisplay for core::result::Iter<'a, T> where
+    core::result::Iter<'a, T>: IteratorStringAll
+{
+}
 
 // --- str итераторы ----------------------------------------------------------
-impl<'a> ExtendedDisplay for core::str::Chars<'a>
-where
-    core::str::Chars<'a>: IteratorStringAll,
-{}
-impl<'a> ExtendedDisplay for core::str::Lines<'a>
-where
-    core::str::Lines<'a>: IteratorStringAll,
-{}
-impl<'a> ExtendedDisplay for core::str::Bytes<'a>
-where
-    core::str::Bytes<'a>: IteratorStringAll,
-{}
-impl<'a> ExtendedDisplay for core::str::SplitWhitespace<'a>
-where
-    core::str::SplitWhitespace<'a>: IteratorStringAll,
-{}
+impl<'a> ExtendedDisplay for core::str::Chars<'a> where core::str::Chars<'a>: IteratorStringAll {}
+impl<'a> ExtendedDisplay for core::str::Lines<'a> where core::str::Lines<'a>: IteratorStringAll {}
+impl<'a> ExtendedDisplay for core::str::Bytes<'a> where core::str::Bytes<'a>: IteratorStringAll {}
+impl<'a> ExtendedDisplay for core::str::SplitWhitespace<'a> where
+    core::str::SplitWhitespace<'a>: IteratorStringAll
+{
+}
 
 // --- Макрос для пользовательских итераторов ---------------------------------
 #[macro_export]
@@ -1049,6 +1002,667 @@ where
         result
     }
 }
+
+// ============================================================================
+// RAYON SUPPORT (requires `rayon` feature, activates `std`)
+// ============================================================================
+
+#[cfg(feature = "rayon")]
+pub trait ParIteratorString {
+    fn par_iter_string(self, format_rule: FormatRuleFn) -> String;
+}
+
+#[cfg(feature = "rayon")]
+impl<I, T> ParIteratorString for I
+where
+    I: rayon::iter::ParallelIterator<Item = T>,
+    T: core::fmt::Display,
+{
+    fn par_iter_string(self, format_rule: FormatRuleFn) -> String {
+        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let len = items.len();
+        let mut result = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            result.push_str(&format_rule(&s, i, len));
+        }
+        result
+    }
+}
+
+#[cfg(feature = "rayon")]
+pub trait ParIteratorStringFn<F>
+where
+    F: Fn(&str, usize, usize) -> String,
+{
+    fn par_iter_string(self, format_rule: F) -> String;
+}
+
+#[cfg(feature = "rayon")]
+impl<I, T, F> ParIteratorStringFn<F> for I
+where
+    I: rayon::iter::ParallelIterator<Item = T>,
+    T: core::fmt::Display,
+    F: Fn(&str, usize, usize) -> String,
+{
+    fn par_iter_string(self, format_rule: F) -> String {
+        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let len = items.len();
+        let mut result = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            result.push_str(&format_rule(&s, i, len));
+        }
+        result
+    }
+}
+
+#[cfg(feature = "rayon")]
+pub trait ParIteratorStringFnMut<F>
+where
+    F: FnMut(&str, usize, usize) -> String,
+{
+    fn par_iter_string(self, format_rule: F) -> String;
+}
+
+#[cfg(feature = "rayon")]
+impl<I, T, F> ParIteratorStringFnMut<F> for I
+where
+    I: rayon::iter::ParallelIterator<Item = T>,
+    T: core::fmt::Display,
+    F: FnMut(&str, usize, usize) -> String,
+{
+    fn par_iter_string(self, mut format_rule: F) -> String {
+        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let len = items.len();
+        let mut result = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            result.push_str(&format_rule(&s, i, len));
+        }
+        result
+    }
+}
+
+#[cfg(feature = "rayon")]
+pub trait ParIteratorStringWithState<S, F>
+where
+    F: FnMut(&mut S, &str, usize, usize) -> String,
+{
+    fn par_iter_string_with_state(self, initial_state: S, format_rule: F) -> String;
+}
+
+#[cfg(feature = "rayon")]
+impl<I, T, S, F> ParIteratorStringWithState<S, F> for I
+where
+    I: rayon::iter::ParallelIterator<Item = T>,
+    T: core::fmt::Display,
+    F: FnMut(&mut S, &str, usize, usize) -> String,
+{
+    fn par_iter_string_with_state(self, mut initial_state: S, mut format_rule: F) -> String {
+        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let len = items.len();
+        let mut result = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            result.push_str(&format_rule(&mut initial_state, &s, i, len));
+        }
+        result
+    }
+}
+
+#[cfg(feature = "rayon")]
+pub trait ParIteratorStringWithStateFn<S, F>
+where
+    F: Fn(&S, &str, usize, usize) -> String,
+{
+    fn par_iter_string_with_state_fn(self, state: &S, format_rule: F) -> String;
+}
+
+#[cfg(feature = "rayon")]
+impl<I, T, S, F> ParIteratorStringWithStateFn<S, F> for I
+where
+    I: rayon::iter::ParallelIterator<Item = T>,
+    T: core::fmt::Display,
+    F: Fn(&S, &str, usize, usize) -> String,
+{
+    fn par_iter_string_with_state_fn(self, state: &S, format_rule: F) -> String {
+        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let len = items.len();
+        let mut result = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            result.push_str(&format_rule(state, &s, i, len));
+        }
+        result
+    }
+}
+
+#[cfg(feature = "rayon")]
+pub trait ParIteratorStringWithStateFnPtr<S> {
+    fn par_iter_string_with_state_fn_ptr(
+        self,
+        state: &S,
+        format_rule: fn(&S, &str, usize, usize) -> String,
+    ) -> String;
+}
+
+#[cfg(feature = "rayon")]
+impl<I, T, S> ParIteratorStringWithStateFnPtr<S> for I
+where
+    I: rayon::iter::ParallelIterator<Item = T>,
+    T: core::fmt::Display,
+{
+    #[inline(always)]
+    fn par_iter_string_with_state_fn_ptr(
+        self,
+        state: &S,
+        format_rule: fn(&S, &str, usize, usize) -> String,
+    ) -> String {
+        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let len = items.len();
+        let mut result = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            result.push_str(&format_rule(state, &s, i, len));
+        }
+        result
+    }
+}
+
+#[cfg(feature = "rayon")]
+pub trait ParIteratorStringRuleOwned<R>
+where
+    R: FormatRuleNoStateOwned,
+{
+    fn par_iter_string_rule_owned(self, rule: R) -> String;
+}
+
+#[cfg(feature = "rayon")]
+impl<I, T, R> ParIteratorStringRuleOwned<R> for I
+where
+    I: rayon::iter::ParallelIterator<Item = T>,
+    T: core::fmt::Display,
+    R: FormatRuleNoStateOwned + Clone,
+{
+    #[inline(always)]
+    fn par_iter_string_rule_owned(self, rule: R) -> String {
+        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let len = items.len();
+        let mut result = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            result.push_str(&rule.clone().format(&s, i, len));
+        }
+        result
+    }
+}
+
+#[cfg(feature = "rayon")]
+pub trait ParIteratorStringMutRuleOwned<R>
+where
+    R: FormatRuleMutNoState,
+{
+    fn par_iter_string_mut_rule_owned(self, rule: R) -> String;
+}
+
+#[cfg(feature = "rayon")]
+impl<I, T, R> ParIteratorStringMutRuleOwned<R> for I
+where
+    I: rayon::iter::ParallelIterator<Item = T>,
+    T: core::fmt::Display,
+    R: FormatRuleMutNoState,
+{
+    #[inline(always)]
+    fn par_iter_string_mut_rule_owned(self, mut rule: R) -> String {
+        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let len = items.len();
+        let mut result = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            result.push_str(&rule.format(&s, i, len));
+        }
+        result
+    }
+}
+
+#[cfg(feature = "rayon")]
+pub trait ParIteratorStringWithStateRuleOwned<S, R>
+where
+    R: FormatRule<S>,
+{
+    fn par_iter_string_with_state_rule_owned(self, state: &S, rule: R) -> String;
+}
+
+#[cfg(feature = "rayon")]
+impl<I, T, S, R> ParIteratorStringWithStateRuleOwned<S, R> for I
+where
+    I: rayon::iter::ParallelIterator<Item = T>,
+    T: core::fmt::Display,
+    R: FormatRule<S>,
+{
+    #[inline(always)]
+    fn par_iter_string_with_state_rule_owned(self, state: &S, rule: R) -> String {
+        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let len = items.len();
+        let mut result = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            result.push_str(&rule.format(state, &s, i, len));
+        }
+        result
+    }
+}
+
+#[cfg(feature = "rayon")]
+pub trait ParIteratorStringWithStateMutRuleOwned<S, R>
+where
+    R: FormatRuleMut<S>,
+{
+    fn par_iter_string_with_state_mut_rule_owned(self, initial_state: S, rule: R) -> String;
+}
+
+#[cfg(feature = "rayon")]
+impl<I, T, S, R> ParIteratorStringWithStateMutRuleOwned<S, R> for I
+where
+    I: rayon::iter::ParallelIterator<Item = T>,
+    T: core::fmt::Display,
+    R: FormatRuleMut<S>,
+{
+    #[inline(always)]
+    fn par_iter_string_with_state_mut_rule_owned(
+        self,
+        mut initial_state: S,
+        mut rule: R,
+    ) -> String {
+        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let len = items.len();
+        let mut result = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            result.push_str(&rule.format(&mut initial_state, &s, i, len));
+        }
+        result
+    }
+}
+
+#[cfg(feature = "rayon")]
+pub trait ParIteratorStringRuleRef<'a, R>
+where
+    R: FormatRuleNoState<'a>,
+{
+    fn par_iter_string_rule_ref(self, rule: &'a R) -> String;
+}
+
+#[cfg(feature = "rayon")]
+impl<'a, I, T, R> ParIteratorStringRuleRef<'a, R> for I
+where
+    I: rayon::iter::ParallelIterator<Item = T>,
+    T: core::fmt::Display,
+    R: FormatRuleNoState<'a>,
+{
+    #[inline(always)]
+    fn par_iter_string_rule_ref(self, rule: &'a R) -> String {
+        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let len = items.len();
+        let mut result = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            result.push_str(&rule.format(&s, i, len));
+        }
+        result
+    }
+}
+
+#[cfg(feature = "rayon")]
+pub trait ParIteratorStringMutRuleRef<R>
+where
+    R: FormatRuleMutNoState,
+{
+    fn par_iter_string_mut_rule_ref(self, rule: &mut R) -> String;
+}
+
+#[cfg(feature = "rayon")]
+impl<I, T, R> ParIteratorStringMutRuleRef<R> for I
+where
+    I: rayon::iter::ParallelIterator<Item = T>,
+    T: core::fmt::Display,
+    R: FormatRuleMutNoState,
+{
+    #[inline(always)]
+    fn par_iter_string_mut_rule_ref(self, rule: &mut R) -> String {
+        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let len = items.len();
+        let mut result = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            result.push_str(&rule.format(&s, i, len));
+        }
+        result
+    }
+}
+
+#[cfg(feature = "rayon")]
+pub trait ParIteratorStringWithStateRuleRef<S, R>
+where
+    R: FormatRule<S>,
+{
+    fn par_iter_string_with_state_rule_ref(self, state: &S, rule: &R) -> String;
+}
+
+#[cfg(feature = "rayon")]
+impl<I, T, S, R> ParIteratorStringWithStateRuleRef<S, R> for I
+where
+    I: rayon::iter::ParallelIterator<Item = T>,
+    T: core::fmt::Display,
+    R: FormatRule<S>,
+{
+    #[inline(always)]
+    fn par_iter_string_with_state_rule_ref(self, state: &S, rule: &R) -> String {
+        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let len = items.len();
+        let mut result = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            result.push_str(&rule.format(state, &s, i, len));
+        }
+        result
+    }
+}
+
+#[cfg(feature = "rayon")]
+pub trait ParIteratorStringWithStateMutRuleRef<S, R>
+where
+    R: FormatRuleMut<S>,
+{
+    fn par_iter_string_with_state_mut_rule_ref(self, initial_state: S, rule: &mut R) -> String;
+}
+
+#[cfg(feature = "rayon")]
+impl<I, T, S, R> ParIteratorStringWithStateMutRuleRef<S, R> for I
+where
+    I: rayon::iter::ParallelIterator<Item = T>,
+    T: core::fmt::Display,
+    R: FormatRuleMut<S>,
+{
+    #[inline(always)]
+    fn par_iter_string_with_state_mut_rule_ref(self, mut initial_state: S, rule: &mut R) -> String {
+        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let len = items.len();
+        let mut result = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            result.push_str(&rule.format(&mut initial_state, &s, i, len));
+        }
+        result
+    }
+}
+
+#[cfg(feature = "rayon")]
+#[doc(hidden)]
+pub trait ParIteratorStringAll:
+    ParIteratorString
+    + ParIteratorStringFn<fn(&str, usize, usize) -> String>
+    + ParIteratorStringFnMut<fn(&str, usize, usize) -> String>
+    + ParIteratorStringWithState<(), fn(&mut (), &str, usize, usize) -> String>
+    + ParIteratorStringWithStateFn<(), fn(&(), &str, usize, usize) -> String>
+    + ParIteratorStringWithStateFnPtr<()>
+    + ParIteratorStringRuleOwned<fn(&str, usize, usize) -> String>
+    + ParIteratorStringMutRuleOwned<fn(&str, usize, usize) -> String>
+    + ParIteratorStringWithStateRuleOwned<(), fn(&(), &str, usize, usize) -> String>
+    + ParIteratorStringWithStateMutRuleOwned<(), fn(&mut (), &str, usize, usize) -> String>
+    + ParIteratorStringRuleRef<'static, fn(&str, usize, usize) -> String>
+    + ParIteratorStringMutRuleRef<fn(&str, usize, usize) -> String>
+    + ParIteratorStringWithStateRuleRef<(), fn(&(), &str, usize, usize) -> String>
+    + ParIteratorStringWithStateMutRuleRef<(), fn(&mut (), &str, usize, usize) -> String>
+{
+}
+
+#[cfg(feature = "rayon")]
+impl<I> ParIteratorStringAll for I where
+    I: rayon::iter::ParallelIterator
+        + ParIteratorString
+        + ParIteratorStringFn<fn(&str, usize, usize) -> String>
+        + ParIteratorStringFnMut<fn(&str, usize, usize) -> String>
+        + ParIteratorStringWithState<(), fn(&mut (), &str, usize, usize) -> String>
+        + ParIteratorStringWithStateFn<(), fn(&(), &str, usize, usize) -> String>
+        + ParIteratorStringWithStateFnPtr<()>
+        + ParIteratorStringRuleOwned<fn(&str, usize, usize) -> String>
+        + ParIteratorStringMutRuleOwned<fn(&str, usize, usize) -> String>
+        + ParIteratorStringWithStateRuleOwned<(), fn(&(), &str, usize, usize) -> String>
+        + ParIteratorStringWithStateMutRuleOwned<(), fn(&mut (), &str, usize, usize) -> String>
+        + ParIteratorStringRuleRef<'static, fn(&str, usize, usize) -> String>
+        + ParIteratorStringMutRuleRef<fn(&str, usize, usize) -> String>
+        + ParIteratorStringWithStateRuleRef<(), fn(&(), &str, usize, usize) -> String>
+        + ParIteratorStringWithStateMutRuleRef<(), fn(&mut (), &str, usize, usize) -> String>
+{
+}
+
+// Реализация маркерного трейта ExtendedDisplay для адаптеров rayon
+#[cfg(feature = "rayon")]
+macro_rules! impl_extended_display_rayon_adapters {
+    () => {
+        impl<I, F> ExtendedDisplay for rayon::iter::Map<I, F> where
+            rayon::iter::Map<I, F>: ParIteratorStringAll
+        {
+        }
+        impl<I, P> ExtendedDisplay for rayon::iter::Filter<I, P> where
+            rayon::iter::Filter<I, P>: ParIteratorStringAll
+        {
+        }
+        impl<I, F> ExtendedDisplay for rayon::iter::FlatMap<I, F> where
+            rayon::iter::FlatMap<I, F>: ParIteratorStringAll
+        {
+        }
+        impl<I> ExtendedDisplay for rayon::iter::Flatten<I> where
+            rayon::iter::Flatten<I>: ParIteratorStringAll
+        {
+        }
+        impl<I, U> ExtendedDisplay for rayon::iter::Chain<I, U> where
+            rayon::iter::Chain<I, U>: ParIteratorStringAll
+        {
+        }
+        impl<I, F> ExtendedDisplay for rayon::iter::Inspect<I, F> where
+            rayon::iter::Inspect<I, F>: ParIteratorStringAll
+        {
+        }
+        impl<I> ExtendedDisplay for rayon::iter::Cloned<I> where
+            rayon::iter::Cloned<I>: ParIteratorStringAll
+        {
+        }
+        impl<I> ExtendedDisplay for rayon::iter::Copied<I> where
+            rayon::iter::Copied<I>: ParIteratorStringAll
+        {
+        }
+        impl<I> ExtendedDisplay for rayon::iter::Take<I> where
+            rayon::iter::Take<I>: ParIteratorStringAll
+        {
+        }
+        impl<I> ExtendedDisplay for rayon::iter::Skip<I> where
+            rayon::iter::Skip<I>: ParIteratorStringAll
+        {
+        }
+        impl<I> ExtendedDisplay for rayon::iter::Rev<I> where
+            rayon::iter::Rev<I>: ParIteratorStringAll
+        {
+        }
+        impl<I> ExtendedDisplay for rayon::iter::StepBy<I> where
+            rayon::iter::StepBy<I>: ParIteratorStringAll
+        {
+        }
+        impl<I, F> ExtendedDisplay for rayon::iter::FilterMap<I, F> where
+            rayon::iter::FilterMap<I, F>: ParIteratorStringAll
+        {
+        }
+        impl<I> ExtendedDisplay for rayon::iter::Chunks<I> where
+            rayon::iter::Chunks<I>: ParIteratorStringAll
+        {
+        }
+        impl<I> ExtendedDisplay for rayon::iter::Windows<I> where
+            rayon::iter::Windows<I>: ParIteratorStringAll
+        {
+        }
+        impl<I, U> ExtendedDisplay for rayon::iter::Zip<I, U> where
+            rayon::iter::Zip<I, U>: ParIteratorStringAll
+        {
+        }
+        impl<I, U> ExtendedDisplay for rayon::iter::Interleave<I, U> where
+            rayon::iter::Interleave<I, U>: ParIteratorStringAll
+        {
+        }
+        impl<I, U> ExtendedDisplay for rayon::iter::InterleaveShortest<I, U> where
+            rayon::iter::InterleaveShortest<I, U>: ParIteratorStringAll
+        {
+        }
+        impl<I, F> ExtendedDisplay for rayon::iter::MapWith<I, F> where
+            rayon::iter::MapWith<I, F>: ParIteratorStringAll
+        {
+        }
+        impl<I, F, Init> ExtendedDisplay for rayon::iter::MapInit<I, F, Init> where
+            rayon::iter::MapInit<I, F, Init>: ParIteratorStringAll
+        {
+        }
+        impl<I, F> ExtendedDisplay for rayon::iter::Fold<I, F> where
+            rayon::iter::Fold<I, F>: ParIteratorStringAll
+        {
+        }
+        impl<I, F, Init> ExtendedDisplay for rayon::iter::FoldWith<I, F, Init> where
+            rayon::iter::FoldWith<I, F, Init>: ParIteratorStringAll
+        {
+        }
+        impl<I, F> ExtendedDisplay for rayon::iter::Update<I, F> where
+            rayon::iter::Update<I, F>: ParIteratorStringAll
+        {
+        }
+        impl<T> ExtendedDisplay for rayon::iter::Empty<T> where
+            rayon::iter::Empty<T>: ParIteratorStringAll
+        {
+        }
+        impl<T> ExtendedDisplay for rayon::iter::Once<T> where
+            rayon::iter::Once<T>: ParIteratorStringAll
+        {
+        }
+        impl<T: Clone> ExtendedDisplay for rayon::iter::Repeat<T> where
+            rayon::iter::Repeat<T>: ParIteratorStringAll
+        {
+        }
+        impl<T> ExtendedDisplay for rayon::iter::RepeatN<T> where
+            rayon::iter::RepeatN<T>: ParIteratorStringAll
+        {
+        }
+        impl<F> ExtendedDisplay for rayon::iter::FromFn<F> where
+            rayon::iter::FromFn<F>: ParIteratorStringAll
+        {
+        }
+        impl<I, F> ExtendedDisplay for rayon::iter::TryFold<I, F> where
+            rayon::iter::TryFold<I, F>: ParIteratorStringAll
+        {
+        }
+        impl<I, F> ExtendedDisplay for rayon::iter::TryReduce<I, F> where
+            rayon::iter::TryReduce<I, F>: ParIteratorStringAll
+        {
+        }
+        impl<I> ExtendedDisplay for rayon::iter::PanicUnwind<I> where
+            rayon::iter::PanicUnwind<I>: ParIteratorStringAll
+        {
+        }
+    };
+}
+
+#[cfg(feature = "rayon")]
+impl_extended_display_rayon_adapters!();
+
+// Реализация маркерного трейта ExtendedDisplay для источников rayon
+#[cfg(feature = "rayon")]
+macro_rules! impl_extended_display_rayon_sources {
+    () => {
+        impl<'a, T> ExtendedDisplay for rayon::slice::Iter<'a, T> where
+            rayon::slice::Iter<'a, T>: ParIteratorStringAll
+        {
+        }
+        impl<'a, T> ExtendedDisplay for rayon::slice::IterMut<'a, T> where
+            rayon::slice::IterMut<'a, T>: ParIteratorStringAll
+        {
+        }
+        impl<T> ExtendedDisplay for rayon::vec::IntoIter<T> where
+            rayon::vec::IntoIter<T>: ParIteratorStringAll
+        {
+        }
+        impl<T, const N: usize> ExtendedDisplay for rayon::array::IntoIter<T, N> where
+            rayon::array::IntoIter<T, N>: ParIteratorStringAll
+        {
+        }
+        impl<T> ExtendedDisplay for rayon::range::Iter<T> where
+            rayon::range::Iter<T>: ParIteratorStringAll
+        {
+        }
+        impl<T> ExtendedDisplay for rayon::range::IterInclusive<T> where
+            rayon::range::IterInclusive<T>: ParIteratorStringAll
+        {
+        }
+        impl<'a> ExtendedDisplay for rayon::str::ParChars<'a> where
+            rayon::str::ParChars<'a>: ParIteratorStringAll
+        {
+        }
+        impl<'a> ExtendedDisplay for rayon::str::ParLines<'a> where
+            rayon::str::ParLines<'a>: ParIteratorStringAll
+        {
+        }
+        impl<'a> ExtendedDisplay for rayon::str::ParSplitWhitespace<'a> where
+            rayon::str::ParSplitWhitespace<'a>: ParIteratorStringAll
+        {
+        }
+        impl<'a> ExtendedDisplay for rayon::str::ParBytes<'a> where
+            rayon::str::ParBytes<'a>: ParIteratorStringAll
+        {
+        }
+        impl<'a> ExtendedDisplay for rayon::str::ParCharsMut<'a> where
+            rayon::str::ParCharsMut<'a>: ParIteratorStringAll
+        {
+        }
+        impl<'a> ExtendedDisplay for rayon::str::ParSplit<'a> where
+            rayon::str::ParSplit<'a>: ParIteratorStringAll
+        {
+        }
+        impl<'a> ExtendedDisplay for rayon::str::ParSplitMut<'a> where
+            rayon::str::ParSplitMut<'a>: ParIteratorStringAll
+        {
+        }
+        impl<'a> ExtendedDisplay for rayon::str::ParSplitInclusive<'a> where
+            rayon::str::ParSplitInclusive<'a>: ParIteratorStringAll
+        {
+        }
+        impl<'a> ExtendedDisplay for rayon::str::ParSplitInclusiveMut<'a> where
+            rayon::str::ParSplitInclusiveMut<'a>: ParIteratorStringAll
+        {
+        }
+        impl<'a> ExtendedDisplay for rayon::str::ParSplitAsciiWhitespace<'a> where
+            rayon::str::ParSplitAsciiWhitespace<'a>: ParIteratorStringAll
+        {
+        }
+        impl<'a> ExtendedDisplay for rayon::str::ParBytesMut<'a> where
+            rayon::str::ParBytesMut<'a>: ParIteratorStringAll
+        {
+        }
+        impl<'a, K, V, S> ExtendedDisplay for rayon::hash_map::Iter<'a, K, V, S> where
+            rayon::hash_map::Iter<'a, K, V, S>: ParIteratorStringAll
+        {
+        }
+        impl<'a, K, V, S> ExtendedDisplay for rayon::hash_map::IterMut<'a, K, V, S> where
+            rayon::hash_map::IterMut<'a, K, V, S>: ParIteratorStringAll
+        {
+        }
+        impl<K, V, S> ExtendedDisplay for rayon::hash_map::IntoIter<K, V, S> where
+            rayon::hash_map::IntoIter<K, V, S>: ParIteratorStringAll
+        {
+        }
+        impl<'a, K, V, S> ExtendedDisplay for rayon::hash_map::Keys<'a, K, V, S> where
+            rayon::hash_map::Keys<'a, K, V, S>: ParIteratorStringAll
+        {
+        }
+        impl<'a, K, V, S> ExtendedDisplay for rayon::hash_map::Values<'a, K, V, S> where
+            rayon::hash_map::Values<'a, K, V, S>: ParIteratorStringAll
+        {
+        }
+        impl<'a, K, V, S> ExtendedDisplay for rayon::hash_map::ValuesMut<'a, K, V, S> where
+            rayon::hash_map::ValuesMut<'a, K, V, S>: ParIteratorStringAll
+        {
+        }
+        impl<'a, K, V, S> ExtendedDisplay for rayon::hash_map::Drain<'a, K, V, S> where
+            rayon::hash_map::Drain<'a, K, V, S>: ParIteratorStringAll
+        {
+        }
+    };
+}
+
+#[cfg(feature = "rayon")]
+impl_extended_display_rayon_sources!();
 
 #[cfg(test)]
 mod tests {
@@ -1837,5 +2451,56 @@ mod tests {
         takes_extended(v.iter());
         takes_extended(v.iter().map(|x| x * 2));
         takes_extended(v.into_iter());
+    }
+
+    // ========================================================================
+    // ТЕСТЫ RAYON
+    // ========================================================================
+
+    #[cfg(feature = "rayon")]
+    #[test]
+    fn test_rayon_par_iter_string() {
+        use rayon::iter::{IntoParallelIterator, ParallelIterator};
+        let numbers = vec![1, 2, 3];
+        let s = numbers.into_par_iter().par_iter_string(DEFAULT_FORMAT_RULE);
+        assert_eq!("[1, 2, 3]", s);
+    }
+
+    #[cfg(feature = "rayon")]
+    #[test]
+    fn test_rayon_par_iter_string_fn() {
+        use rayon::iter::{IntoParallelIterator, ParallelIterator};
+        let v = vec![10, 20, 30];
+        let fmt = |value: &str, index: usize, length: usize| {
+            if length == 0 {
+                return String::new();
+            }
+            let is_last = index == length - 1;
+            if index == 0 {
+                if is_last {
+                    format!("{{{}}}", value)
+                } else {
+                    format!("{{{}", value)
+                }
+            } else if is_last {
+                format!(", {}}}", value)
+            } else {
+                format!(", {}", value)
+            }
+        };
+        let res = v.par_iter().par_iter_string(fmt);
+        assert_eq!(res, "{10, 20, 30}");
+    }
+
+    #[cfg(feature = "rayon")]
+    #[test]
+    fn test_rayon_extended_display() {
+        use rayon::iter::{IntoParallelIterator, ParallelIterator};
+        fn takes_extended<T: ExtendedDisplay>(_x: T) {}
+
+        let v = vec![1, 2, 3];
+        takes_extended(v.par_iter());
+        takes_extended(v.par_iter().map(|x| x * 2));
+        takes_extended(v.into_par_iter());
     }
 }

@@ -3,6 +3,7 @@
 #![feature(allocator_api)]
 #![feature(auto_traits)]
 #![feature(negative_impls)]
+#![feature(async_fn_traits, unboxed_closures)]
 
 extern crate alloc;
 
@@ -122,6 +123,64 @@ where
     }
 }
 
+//not send - compio/monoio version
+pub trait FormatRuleNoStateAsync<'a, 'b>
+where
+    'b: 'a,
+{
+    fn format(
+        &'a self,
+        value: &'b str,
+        index: usize,
+        length: usize,
+    ) -> Box<dyn std::future::Future<Output = String> + 'a>;
+}
+
+impl<'a, 'b, F> FormatRuleNoStateAsync<'a, 'b> for F
+where
+    'b: 'a,
+    F: AsyncFn(&str, usize, usize) -> String,
+{
+    fn format(
+        &'a self,
+        value: &'b str,
+        index: usize,
+        length: usize,
+    ) -> Box<dyn std::future::Future<Output = String> + 'a> {
+        Box::new(self(value, index, length))
+    }
+}
+
+//send - tokio/smol version
+pub trait FormatRuleNoStateAsyncSend<'a, 'b>
+where
+    'b: 'a,
+{
+    fn format(
+        &'a self,
+        value: &'b str,
+        index: usize,
+        length: usize,
+    ) -> Box<dyn std::future::Future<Output = String> + 'a + Send>;
+}
+
+
+impl<'a, 'b, F> FormatRuleNoStateAsyncSend<'a, 'b> for F
+where
+    'b: 'a,
+    F: AsyncFn(&str, usize, usize) -> String + 'a,
+    <F as AsyncFnMut<(&'b str, usize, usize)> >::CallRefFuture<'a>: Send
+{
+    fn format(
+        &'a self,
+        value: &'b str,
+        index: usize,
+        length: usize,
+    ) -> Box<dyn std::future::Future<Output = String> + 'a + Send> {
+        Box::new(self(value, index, length))
+    }
+}
+
 pub trait FormatRuleNoStateOwned {
     fn format(self, value: &str, index: usize, length: usize) -> String;
 }
@@ -135,6 +194,31 @@ where
     }
 }
 
+//not send - compio/monoio version
+pub trait FormatRuleNoStateOwnedAsync {
+    fn format(
+        self,
+        value: String,
+        index: usize,
+        length: usize,
+    ) -> Box<dyn std::future::Future<Output = String>>;
+}
+
+impl<F: > FormatRuleNoStateOwnedAsync for F
+where
+    F: 'static + AsyncFnOnce(String, usize, usize) -> String,
+{
+    fn format(
+        self,
+        value: String,
+        index: usize,
+        length: usize,
+    ) -> Box<dyn std::future::Future<Output = String>> {
+        Box::new(self(value, index, length))
+    }
+}
+
+
 pub trait FormatRuleMutNoState {
     fn format(&mut self, value: &str, index: usize, length: usize) -> String;
 }
@@ -145,6 +229,34 @@ where
 {
     fn format(&mut self, value: &str, index: usize, length: usize) -> String {
         (self)(value, index, length)
+    }
+}
+
+//not send - compio/monoio version
+pub trait FormatRuleMutNoStateAsync<'a, 'b>
+where
+    'b: 'a,
+{
+    fn format(
+        &'a mut self,
+        value: &'b str,
+        index: usize,
+        length: usize,
+    ) -> Box<dyn std::future::Future<Output = String> + 'a>;
+}
+
+impl<'a, 'b, F> FormatRuleMutNoStateAsync<'a, 'b> for F
+where
+    'b: 'a,
+    F: AsyncFnMut(&str, usize, usize) -> String,
+{
+    fn format(
+        &'a mut self,
+        value: &'b str,
+        index: usize,
+        length: usize,
+    ) -> Box<dyn std::future::Future<Output = String> + 'a> {
+        Box::new(self(value, index, length))
     }
 }
 
@@ -481,6 +593,7 @@ where
 {
     fn vec_string_rule_owned(self, rule: R) -> String;
 }
+
 
 impl<T, R> VecStringRuleOwned<R> for Vec<T>
 where

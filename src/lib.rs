@@ -1,15 +1,25 @@
 #![cfg_attr(not(feature = "std"), no_std)]
+#![cfg_attr(
+    any(feature = "dyn_async", feature = "impl_async"),
+    feature(async_fn_traits, unboxed_closures)
+)]
+#![cfg_attr(feature = "impl_async", feature(type_alias_impl_trait))]
+#![cfg_attr(feature = "rayon", feature(allocator_api))]
 #![feature(loop_hints)]
-#![feature(allocator_api)]
 #![feature(auto_traits)]
 #![feature(negative_impls)]
-#![feature(async_fn_traits, unboxed_closures)]
 
 extern crate alloc;
 
+#[cfg(any(feature = "dyn_async", feature = "impl_async"))]
+use alloc::boxed::Box;
 use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
+#[cfg(feature = "rayon")]
+use rayon::prelude::*;
+
+use core::pin::pin;
 
 // ============================================================================
 // РАЗДЕЛЕНИЕ Vec И Iterator ЧЕРЕЗ auto_trait + negative_impls
@@ -21,7 +31,6 @@ use alloc::vec::Vec;
 auto trait NotVec {}
 
 /// Явно запрещаем `Vec<T>` реализовывать `NotVec`.
-/// Это безопасно, т.к. `NotVec` — локальный трейт.
 impl<T, A> !NotVec for Vec<T, A> {}
 
 // ============================================================================
@@ -107,7 +116,7 @@ fn default_format_rule(val: &str, index: usize, len: usize) -> String {
 pub const DEFAULT_FORMAT_RULE: FormatRuleFn = default_format_rule;
 
 // ============================================================================
-// ТРЕЙТЫ ПРАВИЛ ФОРМАТИРОВАНИЯ
+// SYNC: ТРЕЙТЫ ПРАВИЛ ФОРМАТИРОВАНИЯ
 // ============================================================================
 
 pub trait FormatRuleNoState<'a> {
@@ -120,64 +129,6 @@ where
 {
     fn format(&'a self, value: &str, index: usize, length: usize) -> String {
         (self)(value, index, length)
-    }
-}
-
-//not send - compio/monoio version
-pub trait FormatRuleNoStateAsync<'a, 'b>
-where
-    'b: 'a,
-{
-    fn format(
-        &'a self,
-        value: &'b str,
-        index: usize,
-        length: usize,
-    ) -> Box<dyn std::future::Future<Output = String> + 'a>;
-}
-
-impl<'a, 'b, F> FormatRuleNoStateAsync<'a, 'b> for F
-where
-    'b: 'a,
-    F: AsyncFn(&str, usize, usize) -> String,
-{
-    fn format(
-        &'a self,
-        value: &'b str,
-        index: usize,
-        length: usize,
-    ) -> Box<dyn std::future::Future<Output = String> + 'a> {
-        Box::new(self(value, index, length))
-    }
-}
-
-//send - tokio/smol version
-pub trait FormatRuleNoStateAsyncSend<'a, 'b>
-where
-    'b: 'a,
-{
-    fn format(
-        &'a self,
-        value: &'b str,
-        index: usize,
-        length: usize,
-    ) -> Box<dyn std::future::Future<Output = String> + 'a + Send>;
-}
-
-
-impl<'a, 'b, F> FormatRuleNoStateAsyncSend<'a, 'b> for F
-where
-    'b: 'a,
-    F: AsyncFn(&str, usize, usize) -> String + 'a,
-    <F as AsyncFnMut<(&'b str, usize, usize)> >::CallRefFuture<'a>: Send
-{
-    fn format(
-        &'a self,
-        value: &'b str,
-        index: usize,
-        length: usize,
-    ) -> Box<dyn std::future::Future<Output = String> + 'a + Send> {
-        Box::new(self(value, index, length))
     }
 }
 
@@ -194,31 +145,6 @@ where
     }
 }
 
-//not send - compio/monoio version
-pub trait FormatRuleNoStateOwnedAsync {
-    fn format(
-        self,
-        value: String,
-        index: usize,
-        length: usize,
-    ) -> Box<dyn std::future::Future<Output = String>>;
-}
-
-impl<F: > FormatRuleNoStateOwnedAsync for F
-where
-    F: 'static + AsyncFnOnce(String, usize, usize) -> String,
-{
-    fn format(
-        self,
-        value: String,
-        index: usize,
-        length: usize,
-    ) -> Box<dyn std::future::Future<Output = String>> {
-        Box::new(self(value, index, length))
-    }
-}
-
-
 pub trait FormatRuleMutNoState {
     fn format(&mut self, value: &str, index: usize, length: usize) -> String;
 }
@@ -229,34 +155,6 @@ where
 {
     fn format(&mut self, value: &str, index: usize, length: usize) -> String {
         (self)(value, index, length)
-    }
-}
-
-//not send - compio/monoio version
-pub trait FormatRuleMutNoStateAsync<'a, 'b>
-where
-    'b: 'a,
-{
-    fn format(
-        &'a mut self,
-        value: &'b str,
-        index: usize,
-        length: usize,
-    ) -> Box<dyn std::future::Future<Output = String> + 'a>;
-}
-
-impl<'a, 'b, F> FormatRuleMutNoStateAsync<'a, 'b> for F
-where
-    'b: 'a,
-    F: AsyncFnMut(&str, usize, usize) -> String,
-{
-    fn format(
-        &'a mut self,
-        value: &'b str,
-        index: usize,
-        length: usize,
-    ) -> Box<dyn std::future::Future<Output = String> + 'a> {
-        Box::new(self(value, index, length))
     }
 }
 
@@ -287,7 +185,7 @@ where
 }
 
 // ============================================================================
-// СТАРЫЕ ТРЕЙТЫ (ОБРАТНАЯ СОВМЕСТИМОСТЬ)
+// SYNC: VecString* и IteratorString*
 // ============================================================================
 
 pub trait VecString {
@@ -584,7 +482,7 @@ where
 }
 
 // ============================================================================
-// НОВЫЕ ТРЕЙТЫ: ВЕРСИИ С ВЛАДЕНИЕМ (rule: R)
+// SYNC: НОВЫЕ ТРЕЙТЫ — ВЕРСИИ С ВЛАДЕНИЕМ (rule: R)
 // ============================================================================
 
 pub trait VecStringRuleOwned<R>
@@ -593,7 +491,6 @@ where
 {
     fn vec_string_rule_owned(self, rule: R) -> String;
 }
-
 
 impl<T, R> VecStringRuleOwned<R> for Vec<T>
 where
@@ -606,7 +503,7 @@ where
         let len = self.len();
         #[unroll(full)]
         for (i, x) in self.iter().enumerate() {
-            string.push_str(&rule.clone().format(&format!("{}", x), i, len).to_string());
+            string.push_str(&rule.clone().format(&format!("{}", x), i, len));
         }
         string
     }
@@ -791,7 +688,7 @@ where
 }
 
 // ============================================================================
-// НОВЫЕ ТРЕЙТЫ: ВЕРСИИ ПО ССЫЛКЕ (rule: &R)
+// SYNC: НОВЫЕ ТРЕЙТЫ — ВЕРСИИ ПО ССЫЛКЕ (rule: &R)
 // ============================================================================
 
 pub trait VecStringRuleRef<'a, R>
@@ -997,7 +894,7 @@ where
 }
 
 // ============================================================================
-// RAYON SUPPORT (Blanket impls для ParallelIterator)
+// #[cfg(feature = "rayon")] — SYNC ParIterator*
 // ============================================================================
 
 #[cfg(feature = "rayon")]
@@ -1391,7 +1288,6 @@ where
     }
 }
 
-// --- Blanket impl ExtendedDisplay для ParallelIterator ----------------------
 #[cfg(feature = "rayon")]
 impl<I, T> ExtendedDisplay for I
 where
@@ -1414,10 +1310,1722 @@ where
 {
 }
 
+// ============================================================================
+// #[cfg(feature = "dyn_async")] — DYN ASYNC (Box<dyn Future>)
+// ============================================================================
+
+// --- &self, !Send (compio/monoio) ---
+#[cfg(feature = "dyn_async")]
+pub trait FormatRuleNoStateAsync<'a, 'b>
+where
+    'b: 'a,
+{
+    fn format(
+        &'a self,
+        value: &'b str,
+        index: usize,
+        length: usize,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a>;
+}
+
+#[cfg(feature = "dyn_async")]
+impl<'a, 'b, F> FormatRuleNoStateAsync<'a, 'b> for F
+where
+    'b: 'a,
+    F: AsyncFn(&'b str, usize, usize) -> String,
+{
+    fn format(
+        &'a self,
+        value: &'b str,
+        index: usize,
+        length: usize,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a> {
+        Box::new(self(value, index, length))
+    }
+}
+
+// --- &self, Send (tokio/smol) ---
+#[cfg(feature = "dyn_async")]
+pub trait FormatRuleNoStateAsyncSend<'a, 'b>
+where
+    'b: 'a,
+{
+    fn format(
+        &'a self,
+        value: &'b str,
+        index: usize,
+        length: usize,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a + Send>;
+}
+
+#[cfg(feature = "dyn_async")]
+impl<'a, 'b, F> FormatRuleNoStateAsyncSend<'a, 'b> for F
+where
+    'b: 'a,
+    F: AsyncFn(&'b str, usize, usize) -> String + 'a,
+    for<'c> <F as AsyncFnMut<(&'b str, usize, usize)>>::CallRefFuture<'c>: Send,
+{
+    fn format(
+        &'a self,
+        value: &'b str,
+        index: usize,
+        length: usize,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a + Send> {
+        Box::new(self(value, index, length))
+    }
+}
+
+// --- self (owned), !Send ---
+#[cfg(feature = "dyn_async")]
+pub trait FormatRuleNoStateOwnedAsync {
+    fn format(
+        self,
+        value: String,
+        index: usize,
+        length: usize,
+    ) -> Box<dyn core::future::Future<Output = String>>;
+}
+
+#[cfg(feature = "dyn_async")]
+impl<F> FormatRuleNoStateOwnedAsync for F
+where
+    F: 'static + AsyncFnOnce(String, usize, usize) -> String,
+{
+    fn format(
+        self,
+        value: String,
+        index: usize,
+        length: usize,
+    ) -> Box<dyn core::future::Future<Output = String>> {
+        Box::new(self(value, index, length))
+    }
+}
+
+// --- self (owned), Send ---
+#[cfg(feature = "dyn_async")]
+pub trait FormatRuleNoStateOwnedAsyncSend {
+    fn format(
+        self,
+        value: String,
+        index: usize,
+        length: usize,
+    ) -> Box<dyn core::future::Future<Output = String> + Send>;
+}
+
+#[cfg(feature = "dyn_async")]
+impl<F> FormatRuleNoStateOwnedAsyncSend for F
+where
+    F: 'static + AsyncFnOnce(String, usize, usize) -> String + Send,
+    <F as AsyncFnOnce<(String, usize, usize)>>::CallOnceFuture: Send,
+{
+    fn format(
+        self,
+        value: String,
+        index: usize,
+        length: usize,
+    ) -> Box<dyn core::future::Future<Output = String> + Send> {
+        Box::new(self(value, index, length))
+    }
+}
+
+// --- &mut self, !Send ---
+#[cfg(feature = "dyn_async")]
+pub trait FormatRuleMutNoStateAsync<'a, 'b>
+where
+    'b: 'a,
+{
+    fn format(
+        &'a mut self,
+        value: &'b str,
+        index: usize,
+        length: usize,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a>;
+}
+
+#[cfg(feature = "dyn_async")]
+impl<'a, 'b, F> FormatRuleMutNoStateAsync<'a, 'b> for F
+where
+    'b: 'a,
+    F: AsyncFnMut(&'b str, usize, usize) -> String,
+{
+    fn format(
+        &'a mut self,
+        value: &'b str,
+        index: usize,
+        length: usize,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a> {
+        Box::new(self(value, index, length))
+    }
+}
+
+// --- &mut self, Send ---
+#[cfg(feature = "dyn_async")]
+pub trait FormatRuleMutNoStateAsyncSend<'a, 'b>
+where
+    'b: 'a,
+{
+    fn format(
+        &'a mut self,
+        value: &'b str,
+        index: usize,
+        length: usize,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a + Send>;
+}
+
+#[cfg(feature = "dyn_async")]
+impl<'a, 'b, F> FormatRuleMutNoStateAsyncSend<'a, 'b> for F
+where
+    'b: 'a,
+    F: AsyncFnMut(&'b str, usize, usize) -> String + 'a,
+    for<'c> <F as AsyncFnMut<(&'b str, usize, usize)>>::CallRefFuture<'c>: Send,
+{
+    fn format(
+        &'a mut self,
+        value: &'b str,
+        index: usize,
+        length: usize,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a + Send> {
+        Box::new(self(value, index, length))
+    }
+}
+
+// --- &self + State, !Send ---
+#[cfg(feature = "dyn_async")]
+pub trait FormatRuleAsync<S> {
+    fn format<'a>(
+        &'a self,
+        state: &'a S,
+        value: &str,
+        index: usize,
+        length: usize,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a>;
+}
+
+#[cfg(feature = "dyn_async")]
+impl<S, F> FormatRuleAsync<S> for F
+where
+    F: AsyncFn(&S, &str, usize, usize) -> String,
+{
+    fn format<'a>(
+        &'a self,
+        state: &'a S,
+        value: &str,
+        index: usize,
+        length: usize,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a> {
+        Box::new(self(state, value, index, length))
+    }
+}
+
+// --- &self + State, Send ---
+#[cfg(feature = "dyn_async")]
+pub trait FormatRuleAsyncSend<S> {
+    fn format<'a>(
+        &'a self,
+        state: &'a S,
+        value: &str,
+        index: usize,
+        length: usize,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a + Send>;
+}
+
+#[cfg(feature = "dyn_async")]
+impl<S, F> FormatRuleAsyncSend<S> for F
+where
+    S: Sync,
+    F: AsyncFn(&S, &str, usize, usize) -> String,
+    for<'c> <F as AsyncFnMut<(&S, &str, usize, usize)>>::CallRefFuture<'c>: Send,
+{
+    fn format<'a>(
+        &'a self,
+        state: &'a S,
+        value: &str,
+        index: usize,
+        length: usize,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a + Send> {
+        Box::new(self(state, value, index, length))
+    }
+}
+
+// --- &mut self + State, !Send ---
+#[cfg(feature = "dyn_async")]
+pub trait FormatRuleMutAsync<S> {
+    fn format<'a>(
+        &'a mut self,
+        state: &'a mut S,
+        value: &str,
+        index: usize,
+        length: usize,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a>;
+}
+
+#[cfg(feature = "dyn_async")]
+impl<S, F> FormatRuleMutAsync<S> for F
+where
+    F: AsyncFnMut(&mut S, &str, usize, usize) -> String,
+{
+    fn format<'a>(
+        &'a mut self,
+        state: &'a mut S,
+        value: &str,
+        index: usize,
+        length: usize,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a> {
+        Box::new(self(state, value, index, length))
+    }
+}
+
+// --- &mut self + State, Send ---
+#[cfg(feature = "dyn_async")]
+pub trait FormatRuleMutAsyncSend<S> {
+    fn format<'a>(
+        &'a mut self,
+        state: &'a mut S,
+        value: &str,
+        index: usize,
+        length: usize,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a + Send>;
+}
+
+#[cfg(feature = "dyn_async")]
+impl<S, F> FormatRuleMutAsyncSend<S> for F
+where
+    S: Send,
+    F: AsyncFnMut(&mut S, &str, usize, usize) -> String,
+    for<'c> <F as AsyncFnMut<(&mut S, &str, usize, usize)>>::CallRefFuture<'c>: Send,
+{
+    fn format<'a>(
+        &'a mut self,
+        state: &'a mut S,
+        value: &str,
+        index: usize,
+        length: usize,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a + Send> {
+        Box::new(self(state, value, index, length))
+    }
+}
+
+// --- Vec: &self + AsyncFn, !Send ---
+#[cfg(feature = "dyn_async")]
+pub trait VecStringFnAsync<'a, F>
+where
+    F: AsyncFn(&str, usize, usize) -> String,
+{
+    fn vec_string_async(
+        &'a self,
+        format_rule: &'a F,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a>;
+}
+
+#[cfg(feature = "dyn_async")]
+impl<'a, T, F> VecStringFnAsync<'a, F> for Vec<T>
+where
+    T: core::fmt::Display,
+    F: AsyncFn(&str, usize, usize) -> String,
+{
+    fn vec_string_async(
+        &'a self,
+        format_rule: &'a F,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a> {
+        Box::new(async move {
+            let mut string = String::new();
+            let len = self.len();
+            for (i, x) in self.iter().enumerate() {
+                let s = format!("{}", x);
+                string.push_str(&format_rule(&s, i, len).await);
+            }
+            string
+        })
+    }
+}
+
+// --- Vec: &self + AsyncFn, Send ---
+#[cfg(feature = "dyn_async")]
+pub trait VecStringFnAsyncSend<'a, F>
+where
+    F: AsyncFn(&str, usize, usize) -> String,
+{
+    fn vec_string_async(
+        &'a self,
+        format_rule: &'a F,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a + Send>;
+}
+
+#[cfg(feature = "dyn_async")]
+impl<'a, T, F> VecStringFnAsyncSend<'a, F> for Vec<T>
+where
+    T: core::fmt::Display + Sync,
+    F: AsyncFn(&str, usize, usize) -> String + Sync,
+    for<'c> <F as AsyncFnMut<(&str, usize, usize)>>::CallRefFuture<'c>: Send,
+{
+    fn vec_string_async(
+        &'a self,
+        format_rule: &'a F,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a + Send> {
+        Box::new(async move {
+            let mut string = String::new();
+            let len = self.len();
+            for (i, x) in self.iter().enumerate() {
+                let s = format!("{}", x);
+                string.push_str(&format_rule(&s, i, len).await);
+            }
+            string
+        })
+    }
+}
+
+// --- Vec: &self + AsyncFnMut, !Send ---
+#[cfg(feature = "dyn_async")]
+pub trait VecStringFnMutAsync<'a, F>
+where
+    F: AsyncFnMut(&str, usize, usize) -> String,
+{
+    fn vec_string_async(
+        &'a self,
+        format_rule: &'a mut F,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a>;
+}
+
+#[cfg(feature = "dyn_async")]
+impl<'a, T, F> VecStringFnMutAsync<'a, F> for Vec<T>
+where
+    T: core::fmt::Display,
+    F: AsyncFnMut(&str, usize, usize) -> String,
+{
+    fn vec_string_async(
+        &'a self,
+        format_rule: &'a mut F,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a> {
+        Box::new(async move {
+            let mut string = String::new();
+            let len = self.len();
+            for (i, x) in self.iter().enumerate() {
+                let s = format!("{}", x);
+                string.push_str(&format_rule(&s, i, len).await);
+            }
+            string
+        })
+    }
+}
+
+// --- Vec: &self + AsyncFnMut, Send ---
+#[cfg(feature = "dyn_async")]
+pub trait VecStringFnMutAsyncSend<'a, F>
+where
+    F: AsyncFnMut(&str, usize, usize) -> String,
+{
+    fn vec_string_async(
+        &'a self,
+        format_rule: &'a mut F,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a + Send>;
+}
+
+#[cfg(feature = "dyn_async")]
+impl<'a, T, F> VecStringFnMutAsyncSend<'a, F> for Vec<T>
+where
+    T: core::fmt::Display + Sync,
+    F: AsyncFnMut(&str, usize, usize) -> String + Send,
+    for<'c> <F as AsyncFnMut<(&str, usize, usize)>>::CallRefFuture<'c>: Send,
+{
+    fn vec_string_async(
+        &'a self,
+        format_rule: &'a mut F,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a + Send> {
+        Box::new(async move {
+            let mut string = String::new();
+            let len = self.len();
+            for (i, x) in self.iter().enumerate() {
+                let s = format!("{}", x);
+                string.push_str(&format_rule(&s, i, len).await);
+            }
+            string
+        })
+    }
+}
+
+// --- Vec: &self + State + AsyncFnMut, !Send ---
+#[cfg(feature = "dyn_async")]
+pub trait VecStringWithStateAsync<'a, S, F>
+where
+    F: AsyncFnMut(&mut S, &str, usize, usize) -> String,
+{
+    fn vec_string_with_state_async(
+        &'a self,
+        initial_state: S,
+        format_rule: &'a mut F,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a>;
+}
+
+#[cfg(feature = "dyn_async")]
+impl<'a, T, S, F> VecStringWithStateAsync<'a, S, F> for Vec<T>
+where
+    T: core::fmt::Display,
+    F: AsyncFnMut(&mut S, &str, usize, usize) -> String,
+{
+    fn vec_string_with_state_async(
+        &'a self,
+        mut initial_state: S,
+        format_rule: &'a mut F,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a> {
+        Box::new(async move {
+            let mut result = String::new();
+            let len = self.len();
+            for (i, x) in self.iter().enumerate() {
+                let s = format!("{}", x);
+                result.push_str(&format_rule(&mut initial_state, &s, i, len).await);
+            }
+            result
+        })
+    }
+}
+
+// --- Iterator: AsyncFn, !Send ---
+#[cfg(feature = "dyn_async")]
+pub trait IteratorStringFnAsync<F>
+where
+    F: AsyncFn(&str, usize, usize) -> String,
+{
+    fn iter_string_async<'a>(
+        self,
+        format_rule: &'a F,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a>
+    where
+        Self: 'a;
+}
+
+#[cfg(feature = "dyn_async")]
+impl<I, T, F> IteratorStringFnAsync<F> for I
+where
+    I: Iterator<Item = T>,
+    T: core::fmt::Display,
+    F: AsyncFn(&str, usize, usize) -> String,
+{
+    fn iter_string_async<'a>(
+        self,
+        format_rule: &'a F,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a>
+    where
+        Self: 'a,
+    {
+        Box::new(async move {
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let len = items.len();
+            let mut result = String::new();
+            for (i, s) in items.into_iter().enumerate() {
+                result.push_str(&format_rule(&s, i, len).await);
+            }
+            result
+        })
+    }
+}
+
+// --- Iterator: AsyncFn, Send ---
+#[cfg(feature = "dyn_async")]
+pub trait IteratorStringFnAsyncSend<F>
+where
+    F: AsyncFn(&str, usize, usize) -> String,
+{
+    fn iter_string_async<'a>(
+        self,
+        format_rule: &'a F,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a + Send>
+    where
+        Self: 'a;
+}
+
+#[cfg(feature = "dyn_async")]
+impl<I, T, F> IteratorStringFnAsyncSend<F> for I
+where
+    I: Iterator<Item = T> + Send,
+    T: core::fmt::Display + Send,
+    F: AsyncFn(&str, usize, usize) -> String + Sync,
+    for<'c> <F as AsyncFnMut<(&str, usize, usize)>>::CallRefFuture<'c>: Send,
+{
+    fn iter_string_async<'a>(
+        self,
+        format_rule: &'a F,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a + Send>
+    where
+        Self: 'a,
+    {
+        Box::new(async move {
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let len = items.len();
+            let mut result = String::new();
+            for (i, s) in items.into_iter().enumerate() {
+                result.push_str(&format_rule(&s, i, len).await);
+            }
+            result
+        })
+    }
+}
+
+// --- Iterator: AsyncFnMut, !Send ---
+#[cfg(feature = "dyn_async")]
+pub trait IteratorStringFnMutAsync<F>
+where
+    F: AsyncFnMut(&str, usize, usize) -> String,
+{
+    fn iter_string_async<'a>(
+        self,
+        format_rule: &'a mut F,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a>
+    where
+        Self: 'a;
+}
+
+#[cfg(feature = "dyn_async")]
+impl<I, T, F> IteratorStringFnMutAsync<F> for I
+where
+    I: Iterator<Item = T>,
+    T: core::fmt::Display,
+    F: AsyncFnMut(&str, usize, usize) -> String,
+{
+    fn iter_string_async<'a>(
+        self,
+        format_rule: &'a mut F,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a>
+    where
+        Self: 'a,
+    {
+        Box::new(async move {
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let len = items.len();
+            let mut result = String::new();
+            for (i, s) in items.into_iter().enumerate() {
+                result.push_str(&format_rule(&s, i, len).await);
+            }
+            result
+        })
+    }
+}
+
+// --- Iterator: AsyncFnMut, Send ---
+#[cfg(feature = "dyn_async")]
+pub trait IteratorStringFnMutAsyncSend<F>
+where
+    F: AsyncFnMut(&str, usize, usize) -> String,
+{
+    fn iter_string_async<'a>(
+        self,
+        format_rule: &'a mut F,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a + Send>
+    where
+        Self: 'a;
+}
+
+#[cfg(feature = "dyn_async")]
+impl<I, T, F> IteratorStringFnMutAsyncSend<F> for I
+where
+    I: Iterator<Item = T> + Send,
+    T: core::fmt::Display + Send,
+    F: AsyncFnMut(&str, usize, usize) -> String + Send,
+    for<'c> <F as AsyncFnMut<(&str, usize, usize)>>::CallRefFuture<'c>: Send,
+{
+    fn iter_string_async<'a>(
+        self,
+        format_rule: &'a mut F,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a + Send>
+    where
+        Self: 'a,
+    {
+        Box::new(async move {
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let len = items.len();
+            let mut result = String::new();
+            for (i, s) in items.into_iter().enumerate() {
+                result.push_str(&format_rule(&s, i, len).await);
+            }
+            result
+        })
+    }
+}
+
+// --- Iterator: State + AsyncFnMut, !Send ---
+#[cfg(feature = "dyn_async")]
+pub trait IteratorStringWithStateAsync<S, F>
+where
+    F: AsyncFnMut(&mut S, &str, usize, usize) -> String,
+{
+    fn iter_string_with_state_async<'a>(
+        self,
+        initial_state: S,
+        format_rule: &'a mut F,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a>
+    where
+        Self: 'a;
+}
+
+#[cfg(feature = "dyn_async")]
+impl<I, T, S, F> IteratorStringWithStateAsync<S, F> for I
+where
+    I: Iterator<Item = T>,
+    T: core::fmt::Display,
+    F: AsyncFnMut(&mut S, &str, usize, usize) -> String,
+{
+    fn iter_string_with_state_async<'a>(
+        self,
+        mut initial_state: S,
+        format_rule: &'a mut F,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a>
+    where
+        Self: 'a,
+    {
+        Box::new(async move {
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let len = items.len();
+            let mut result = String::new();
+            for (i, s) in items.into_iter().enumerate() {
+                result.push_str(&format_rule(&mut initial_state, &s, i, len).await);
+            }
+            result
+        })
+    }
+}
+
+// ============================================================================
+// #[cfg(feature = "impl_async")] — IMPL ASYNC (через associated type, без Box)
+// ============================================================================
+
+// --- &self, !Send ---
+#[cfg(feature = "impl_async")]
+pub trait FormatRuleNoStateImplAsync<'a, 'b>
+where
+    'b: 'a,
+{
+    type Future: core::future::Future<Output = String> + 'a;
+    fn format(&'a self, value: &'b str, index: usize, length: usize) -> Self::Future;
+}
+
+#[cfg(feature = "impl_async")]
+impl<'a, 'b, F> FormatRuleNoStateImplAsync<'a, 'b> for F
+where
+    'b: 'a,
+    F: AsyncFn(&'b str, usize, usize) -> String,
+{
+    type Future = impl core::future::Future<Output = String> + 'a;
+    fn format(&'a self, value: &'b str, index: usize, length: usize) -> Self::Future {
+        self(value, index, length)
+    }
+}
+
+// --- &self, Send ---
+#[cfg(feature = "impl_async")]
+pub trait FormatRuleNoStateImplAsyncSend<'a, 'b>
+where
+    'b: 'a,
+{
+    type Future: core::future::Future<Output = String> + 'a + Send;
+    fn format(&'a self, value: &'b str, index: usize, length: usize) -> Self::Future;
+}
+
+#[cfg(feature = "impl_async")]
+impl<'a, 'b, F> FormatRuleNoStateImplAsyncSend<'a, 'b> for F
+where
+    'b: 'a,
+    F: AsyncFn(&'b str, usize, usize) -> String,
+    for<'c> <F as AsyncFnMut<(&'b str, usize, usize)>>::CallRefFuture<'c>: Send,
+{
+    type Future = impl core::future::Future<Output = String> + 'a + Send;
+    fn format(&'a self, value: &'b str, index: usize, length: usize) -> Self::Future {
+        self(value, index, length)
+    }
+}
+
+// --- self (owned), !Send ---
+#[cfg(feature = "impl_async")]
+pub trait FormatRuleNoStateOwnedImplAsync {
+    type Future: core::future::Future<Output = String>;
+    fn format(self, value: String, index: usize, length: usize) -> Self::Future;
+}
+
+#[cfg(feature = "impl_async")]
+impl<F> FormatRuleNoStateOwnedImplAsync for F
+where
+    F: 'static + AsyncFnOnce(String, usize, usize) -> String,
+{
+    type Future = impl core::future::Future<Output = String>;
+    fn format(self, value: String, index: usize, length: usize) -> Self::Future {
+        self(value, index, length)
+    }
+}
+
+// --- self (owned), Send ---
+#[cfg(feature = "impl_async")]
+pub trait FormatRuleNoStateOwnedImplAsyncSend {
+    type Future: core::future::Future<Output = String> + Send;
+    fn format(self, value: String, index: usize, length: usize) -> Self::Future;
+}
+
+#[cfg(feature = "impl_async")]
+impl<F> FormatRuleNoStateOwnedImplAsyncSend for F
+where
+    F: 'static + AsyncFnOnce(String, usize, usize) -> String + Send,
+    <F as AsyncFnOnce<(String, usize, usize)>>::CallOnceFuture: Send,
+{
+    type Future = impl core::future::Future<Output = String> + Send;
+    fn format(self, value: String, index: usize, length: usize) -> Self::Future {
+        self(value, index, length)
+    }
+}
+
+// --- &mut self, !Send ---
+#[cfg(feature = "impl_async")]
+pub trait FormatRuleMutNoStateImplAsync<'a, 'b>
+where
+    'b: 'a,
+{
+    type Future: core::future::Future<Output = String> + 'a;
+    fn format(&'a mut self, value: &'b str, index: usize, length: usize) -> Self::Future;
+}
+
+#[cfg(feature = "impl_async")]
+impl<'a, 'b, F> FormatRuleMutNoStateImplAsync<'a, 'b> for F
+where
+    'b: 'a,
+    F: AsyncFnMut(&'b str, usize, usize) -> String,
+{
+    type Future = impl core::future::Future<Output = String> + 'a;
+    fn format(&'a mut self, value: &'b str, index: usize, length: usize) -> Self::Future {
+        self(value, index, length)
+    }
+}
+
+// --- &mut self, Send ---
+#[cfg(feature = "impl_async")]
+pub trait FormatRuleMutNoStateImplAsyncSend<'a, 'b>
+where
+    'b: 'a,
+{
+    type Future: core::future::Future<Output = String> + 'a + Send;
+    fn format(&'a mut self, value: &'b str, index: usize, length: usize) -> Self::Future;
+}
+
+#[cfg(feature = "impl_async")]
+impl<'a, 'b, F> FormatRuleMutNoStateImplAsyncSend<'a, 'b> for F
+where
+    'b: 'a,
+    F: AsyncFnMut(&'b str, usize, usize) -> String,
+    for<'c> <F as AsyncFnMut<(&'b str, usize, usize)>>::CallRefFuture<'c>: Send,
+{
+    type Future = impl core::future::Future<Output = String> + 'a + Send;
+    fn format(&'a mut self, value: &'b str, index: usize, length: usize) -> Self::Future {
+        self(value, index, length)
+    }
+}
+
+// --- &self + State, !Send ---
+#[cfg(feature = "impl_async")]
+pub trait FormatRuleImplAsync<S> {
+    type Future<'a>: core::future::Future<Output = String> + 'a
+    where
+        Self: 'a;
+    fn format<'a>(
+        &'a self,
+        state: &'a S,
+        value: &str,
+        index: usize,
+        length: usize,
+    ) -> Self::Future<'a>;
+}
+
+#[cfg(feature = "impl_async")]
+impl<S, F> FormatRuleImplAsync<S> for F
+where
+    F: AsyncFn(&S, &str, usize, usize) -> String,
+{
+    type Future<'a>
+        = impl core::future::Future<Output = String> + 'a
+    where
+        Self: 'a;
+    fn format<'a>(
+        &'a self,
+        state: &'a S,
+        value: &str,
+        index: usize,
+        length: usize,
+    ) -> Self::Future<'a> {
+        self(state, value, index, length)
+    }
+}
+
+// --- &self + State, Send ---
+#[cfg(feature = "impl_async")]
+pub trait FormatRuleImplAsyncSend<S> {
+    type Future<'a>: core::future::Future<Output = String> + 'a + Send
+    where
+        Self: 'a;
+    fn format<'a>(
+        &'a self,
+        state: &'a S,
+        value: &str,
+        index: usize,
+        length: usize,
+    ) -> Self::Future<'a>;
+}
+
+#[cfg(feature = "impl_async")]
+impl<S, F> FormatRuleImplAsyncSend<S> for F
+where
+    S: Sync,
+    F: AsyncFn(&S, &str, usize, usize) -> String,
+    for<'c> <F as AsyncFnMut<(&S, &str, usize, usize)>>::CallRefFuture<'c>: Send,
+{
+    type Future<'a>
+        = impl core::future::Future<Output = String> + 'a + Send
+    where
+        Self: 'a;
+    fn format<'a>(
+        &'a self,
+        state: &'a S,
+        value: &str,
+        index: usize,
+        length: usize,
+    ) -> Self::Future<'a> {
+        self(state, value, index, length)
+    }
+}
+
+// --- &mut self + State, !Send ---
+#[cfg(feature = "impl_async")]
+pub trait FormatRuleMutImplAsync<S> {
+    type Future<'a>: core::future::Future<Output = String> + 'a
+    where
+        Self: 'a;
+    fn format<'a>(
+        &'a mut self,
+        state: &'a mut S,
+        value: &str,
+        index: usize,
+        length: usize,
+    ) -> Self::Future<'a>;
+}
+
+#[cfg(feature = "impl_async")]
+impl<S, F> FormatRuleMutImplAsync<S> for F
+where
+    F: AsyncFnMut(&mut S, &str, usize, usize) -> String,
+{
+    type Future<'a>
+        = impl core::future::Future<Output = String> + 'a
+    where
+        Self: 'a;
+    fn format<'a>(
+        &'a mut self,
+        state: &'a mut S,
+        value: &str,
+        index: usize,
+        length: usize,
+    ) -> Self::Future<'a> {
+        self(state, value, index, length)
+    }
+}
+
+// --- &mut self + State, Send ---
+#[cfg(feature = "impl_async")]
+pub trait FormatRuleMutImplAsyncSend<S> {
+    type Future<'a>: core::future::Future<Output = String> + 'a + Send
+    where
+        Self: 'a;
+    fn format<'a>(
+        &'a mut self,
+        state: &'a mut S,
+        value: &str,
+        index: usize,
+        length: usize,
+    ) -> Self::Future<'a>;
+}
+
+#[cfg(feature = "impl_async")]
+impl<S, F> FormatRuleMutImplAsyncSend<S> for F
+where
+    S: Send,
+    F: AsyncFnMut(&mut S, &str, usize, usize) -> String,
+    for<'c> <F as AsyncFnMut<(&mut S, &str, usize, usize)>>::CallRefFuture<'c>: Send,
+{
+    type Future<'a>
+        = impl core::future::Future<Output = String> + 'a + Send
+    where
+        Self: 'a;
+    fn format<'a>(
+        &'a mut self,
+        state: &'a mut S,
+        value: &str,
+        index: usize,
+        length: usize,
+    ) -> Self::Future<'a> {
+        self(state, value, index, length)
+    }
+}
+
+// --- Vec: &self + AsyncFn, !Send ---
+#[cfg(feature = "impl_async")]
+pub trait VecStringFnImplAsync<F>
+where
+    F: AsyncFn(&str, usize, usize) -> String,
+{
+    type Future<'a>: core::future::Future<Output = String> + 'a
+    where
+        Self: 'a,
+        F: 'a;
+    fn vec_string_async<'a>(&'a self, format_rule: &'a F) -> Self::Future<'a>;
+}
+
+#[cfg(feature = "impl_async")]
+impl<T, F> VecStringFnImplAsync<F> for Vec<T>
+where
+    T: core::fmt::Display,
+    F: AsyncFn(&str, usize, usize) -> String,
+{
+    type Future<'a>
+        = impl core::future::Future<Output = String> + 'a
+    where
+        Self: 'a,
+        F: 'a;
+    fn vec_string_async<'a>(&'a self, format_rule: &'a F) -> Self::Future<'a> {
+        async move {
+            let mut string = String::new();
+            let len = self.len();
+            for (i, x) in self.iter().enumerate() {
+                let s = format!("{}", x);
+                string.push_str(&format_rule(&s, i, len).await);
+            }
+            string
+        }
+    }
+}
+
+// --- Vec: &self + AsyncFn, Send ---
+#[cfg(feature = "impl_async")]
+pub trait VecStringFnImplAsyncSend<F>
+where
+    F: AsyncFn(&str, usize, usize) -> String,
+{
+    type Future<'a>: core::future::Future<Output = String> + 'a + Send
+    where
+        Self: 'a,
+        F: 'a;
+    fn vec_string_async<'a>(&'a self, format_rule: &'a F) -> Self::Future<'a>;
+}
+
+#[cfg(feature = "impl_async")]
+impl<T, F> VecStringFnImplAsyncSend<F> for Vec<T>
+where
+    T: core::fmt::Display + Sync,
+    F: AsyncFn(&str, usize, usize) -> String + Sync,
+    for<'c> <F as AsyncFnMut<(&str, usize, usize)>>::CallRefFuture<'c>: Send,
+{
+    type Future<'a>
+        = impl core::future::Future<Output = String> + 'a + Send
+    where
+        Self: 'a,
+        F: 'a;
+    fn vec_string_async<'a>(&'a self, format_rule: &'a F) -> Self::Future<'a> {
+        async move {
+            let mut string = String::new();
+            let len = self.len();
+            for (i, x) in self.iter().enumerate() {
+                let s = format!("{}", x);
+                string.push_str(&format_rule(&s, i, len).await);
+            }
+            string
+        }
+    }
+}
+
+// --- Vec: &self + AsyncFnMut, !Send ---
+#[cfg(feature = "impl_async")]
+pub trait VecStringFnMutImplAsync<F>
+where
+    F: AsyncFnMut(&str, usize, usize) -> String,
+{
+    type Future<'a>: core::future::Future<Output = String> + 'a
+    where
+        Self: 'a,
+        F: 'a;
+    fn vec_string_async<'a>(&'a self, format_rule: &'a mut F) -> Self::Future<'a>;
+}
+
+#[cfg(feature = "impl_async")]
+impl<T, F> VecStringFnMutImplAsync<F> for Vec<T>
+where
+    T: core::fmt::Display,
+    F: AsyncFnMut(&str, usize, usize) -> String,
+{
+    type Future<'a>
+        = impl core::future::Future<Output = String> + 'a
+    where
+        Self: 'a,
+        F: 'a;
+    fn vec_string_async<'a>(&'a self, format_rule: &'a mut F) -> Self::Future<'a> {
+        async move {
+            let mut string = String::new();
+            let len = self.len();
+            for (i, x) in self.iter().enumerate() {
+                let s = format!("{}", x);
+                string.push_str(&format_rule(&s, i, len).await);
+            }
+            string
+        }
+    }
+}
+
+// --- Vec: &self + AsyncFnMut, Send ---
+#[cfg(feature = "impl_async")]
+pub trait VecStringFnMutImplAsyncSend<F>
+where
+    F: AsyncFnMut(&str, usize, usize) -> String,
+{
+    type Future<'a>: core::future::Future<Output = String> + 'a + Send
+    where
+        Self: 'a,
+        F: 'a;
+    fn vec_string_async<'a>(&'a self, format_rule: &'a mut F) -> Self::Future<'a>;
+}
+
+#[cfg(feature = "impl_async")]
+impl<T, F> VecStringFnMutImplAsyncSend<F> for Vec<T>
+where
+    T: core::fmt::Display + Sync,
+    F: AsyncFnMut(&str, usize, usize) -> String + Send,
+    for<'c> <F as AsyncFnMut<(&str, usize, usize)>>::CallRefFuture<'c>: Send,
+{
+    type Future<'a>
+        = impl core::future::Future<Output = String> + 'a + Send
+    where
+        Self: 'a,
+        F: 'a;
+    fn vec_string_async<'a>(&'a self, format_rule: &'a mut F) -> Self::Future<'a> {
+        async move {
+            let mut string = String::new();
+            let len = self.len();
+            for (i, x) in self.iter().enumerate() {
+                let s = format!("{}", x);
+                string.push_str(&format_rule(&s, i, len).await);
+            }
+            string
+        }
+    }
+}
+
+// --- Vec: &self + State + AsyncFnMut, !Send ---
+#[cfg(feature = "impl_async")]
+pub trait VecStringWithStateImplAsync<S, F>
+where
+    F: AsyncFnMut(&mut S, &str, usize, usize) -> String,
+{
+    type Future<'a>: core::future::Future<Output = String> + 'a
+    where
+        Self: 'a,
+        F: 'a,
+        S: 'a;
+    fn vec_string_with_state_async<'a>(
+        &'a self,
+        initial_state: S,
+        format_rule: &'a mut F,
+    ) -> Self::Future<'a>;
+}
+
+#[cfg(feature = "impl_async")]
+impl<T, S, F> VecStringWithStateImplAsync<S, F> for Vec<T>
+where
+    T: core::fmt::Display,
+    F: AsyncFnMut(&mut S, &str, usize, usize) -> String,
+{
+    type Future<'a>
+        = impl core::future::Future<Output = String> + 'a
+    where
+        Self: 'a,
+        F: 'a,
+        S: 'a;
+    fn vec_string_with_state_async<'a>(
+        &'a self,
+        mut initial_state: S,
+        format_rule: &'a mut F,
+    ) -> Self::Future<'a> {
+        async move {
+            let mut result = String::new();
+            let len = self.len();
+            for (i, x) in self.iter().enumerate() {
+                let s = format!("{}", x);
+                result.push_str(&format_rule(&mut initial_state, &s, i, len).await);
+            }
+            result
+        }
+    }
+}
+
+// --- Iterator: AsyncFn, !Send ---
+#[cfg(feature = "impl_async")]
+pub trait IteratorStringFnImplAsync<F>
+where
+    F: AsyncFn(&str, usize, usize) -> String,
+{
+    type Future<'a>: core::future::Future<Output = String> + 'a
+    where
+        Self: 'a,
+        F: 'a;
+    fn iter_string_async<'a>(self, format_rule: &'a F) -> Self::Future<'a>;
+}
+
+#[cfg(feature = "impl_async")]
+impl<I, T, F> IteratorStringFnImplAsync<F> for I
+where
+    I: Iterator<Item = T>,
+    T: core::fmt::Display,
+    F: AsyncFn(&str, usize, usize) -> String,
+{
+    type Future<'a>
+        = impl core::future::Future<Output = String> + 'a
+    where
+        Self: 'a,
+        F: 'a;
+    fn iter_string_async<'a>(self, format_rule: &'a F) -> Self::Future<'a> {
+        async move {
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let len = items.len();
+            let mut result = String::new();
+            for (i, s) in items.into_iter().enumerate() {
+                result.push_str(&format_rule(&s, i, len).await);
+            }
+            result
+        }
+    }
+}
+
+// --- Iterator: AsyncFn, Send ---
+#[cfg(feature = "impl_async")]
+pub trait IteratorStringFnImplAsyncSend<F>
+where
+    F: AsyncFn(&str, usize, usize) -> String,
+{
+    type Future<'a>: core::future::Future<Output = String> + 'a + Send
+    where
+        Self: 'a,
+        F: 'a;
+    fn iter_string_async<'a>(self, format_rule: &'a F) -> Self::Future<'a>;
+}
+
+#[cfg(feature = "impl_async")]
+impl<I, T, F> IteratorStringFnImplAsyncSend<F> for I
+where
+    I: Iterator<Item = T> + Send,
+    T: core::fmt::Display + Send,
+    F: AsyncFn(&str, usize, usize) -> String + Sync,
+    for<'c> <F as AsyncFnMut<(&str, usize, usize)>>::CallRefFuture<'c>: Send,
+{
+    type Future<'a>
+        = impl core::future::Future<Output = String> + 'a + Send
+    where
+        Self: 'a,
+        F: 'a;
+    fn iter_string_async<'a>(self, format_rule: &'a F) -> Self::Future<'a> {
+        async move {
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let len = items.len();
+            let mut result = String::new();
+            for (i, s) in items.into_iter().enumerate() {
+                result.push_str(&format_rule(&s, i, len).await);
+            }
+            result
+        }
+    }
+}
+
+// --- Iterator: AsyncFnMut, !Send ---
+#[cfg(feature = "impl_async")]
+pub trait IteratorStringFnMutImplAsync<F>
+where
+    F: AsyncFnMut(&str, usize, usize) -> String,
+{
+    type Future<'a>: core::future::Future<Output = String> + 'a
+    where
+        Self: 'a,
+        F: 'a;
+    fn iter_string_async<'a>(self, format_rule: &'a mut F) -> Self::Future<'a>;
+}
+
+#[cfg(feature = "impl_async")]
+impl<I, T, F> IteratorStringFnMutImplAsync<F> for I
+where
+    I: Iterator<Item = T>,
+    T: core::fmt::Display,
+    F: AsyncFnMut(&str, usize, usize) -> String,
+{
+    type Future<'a>
+        = impl core::future::Future<Output = String> + 'a
+    where
+        Self: 'a,
+        F: 'a;
+    fn iter_string_async<'a>(self, format_rule: &'a mut F) -> Self::Future<'a> {
+        async move {
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let len = items.len();
+            let mut result = String::new();
+            for (i, s) in items.into_iter().enumerate() {
+                result.push_str(&format_rule(&s, i, len).await);
+            }
+            result
+        }
+    }
+}
+
+// --- Iterator: AsyncFnMut, Send ---
+#[cfg(feature = "impl_async")]
+pub trait IteratorStringFnMutImplAsyncSend<F>
+where
+    F: AsyncFnMut(&str, usize, usize) -> String,
+{
+    type Future<'a>: core::future::Future<Output = String> + 'a + Send
+    where
+        Self: 'a,
+        F: 'a;
+    fn iter_string_async<'a>(self, format_rule: &'a mut F) -> Self::Future<'a>;
+}
+
+#[cfg(feature = "impl_async")]
+impl<I, T, F> IteratorStringFnMutImplAsyncSend<F> for I
+where
+    I: Iterator<Item = T> + Send,
+    T: core::fmt::Display + Send,
+    F: AsyncFnMut(&str, usize, usize) -> String + Send,
+    for<'c> <F as AsyncFnMut<(&str, usize, usize)>>::CallRefFuture<'c>: Send,
+{
+    type Future<'a>
+        = impl core::future::Future<Output = String> + 'a + Send
+    where
+        Self: 'a,
+        F: 'a;
+    fn iter_string_async<'a>(self, format_rule: &'a mut F) -> Self::Future<'a> {
+        async move {
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let len = items.len();
+            let mut result = String::new();
+            for (i, s) in items.into_iter().enumerate() {
+                result.push_str(&format_rule(&s, i, len).await);
+            }
+            result
+        }
+    }
+}
+
+// --- Iterator: State + AsyncFnMut, !Send ---
+#[cfg(feature = "impl_async")]
+pub trait IteratorStringWithStateImplAsync<S, F>
+where
+    F: AsyncFnMut(&mut S, &str, usize, usize) -> String,
+{
+    type Future<'a>: core::future::Future<Output = String> + 'a
+    where
+        Self: 'a,
+        F: 'a,
+        S: 'a;
+    fn iter_string_with_state_async<'a>(
+        self,
+        initial_state: S,
+        format_rule: &'a mut F,
+    ) -> Self::Future<'a>;
+}
+
+#[cfg(feature = "impl_async")]
+impl<I, T, S, F> IteratorStringWithStateImplAsync<S, F> for I
+where
+    I: Iterator<Item = T>,
+    T: core::fmt::Display,
+    F: AsyncFnMut(&mut S, &str, usize, usize) -> String,
+{
+    type Future<'a>
+        = impl core::future::Future<Output = String> + 'a
+    where
+        Self: 'a,
+        F: 'a,
+        S: 'a;
+    fn iter_string_with_state_async<'a>(
+        self,
+        mut initial_state: S,
+        format_rule: &'a mut F,
+    ) -> Self::Future<'a> {
+        async move {
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let len = items.len();
+            let mut result = String::new();
+            for (i, s) in items.into_iter().enumerate() {
+                result.push_str(&format_rule(&mut initial_state, &s, i, len).await);
+            }
+            result
+        }
+    }
+}
+
+// ============================================================================
+// #[cfg(all(feature = "rayon", feature = "dyn_async"))] — RAYON DYN ASYNC
+// ============================================================================
+
+#[cfg(all(feature = "rayon", feature = "dyn_async"))]
+pub trait ParIteratorStringFnAsync<F>
+where
+    F: AsyncFn(&str, usize, usize) -> String,
+{
+    fn par_iter_string_async<'a>(
+        self,
+        format_rule: &'a F,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a>
+    where
+        Self: 'a;
+}
+
+#[cfg(all(feature = "rayon", feature = "dyn_async"))]
+impl<I, T, F> ParIteratorStringFnAsync<F> for I
+where
+    I: rayon::iter::ParallelIterator<Item = T>,
+    T: core::fmt::Display,
+    F: AsyncFn(&str, usize, usize) -> String,
+{
+    fn par_iter_string_async<'a>(
+        self,
+        format_rule: &'a F,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a>
+    where
+        Self: 'a,
+    {
+        Box::new(async move {
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let len = items.len();
+            let mut result = String::new();
+            for (i, s) in items.into_iter().enumerate() {
+                result.push_str(&format_rule(&s, i, len).await);
+            }
+            result
+        })
+    }
+}
+
+#[cfg(all(feature = "rayon", feature = "dyn_async"))]
+pub trait ParIteratorStringFnAsyncSend<F>
+where
+    F: AsyncFn(&str, usize, usize) -> String,
+{
+    fn par_iter_string_async<'a>(
+        self,
+        format_rule: &'a F,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a + Send>
+    where
+        Self: 'a;
+}
+
+#[cfg(all(feature = "rayon", feature = "dyn_async"))]
+impl<I, T, F> ParIteratorStringFnAsyncSend<F> for I
+where
+    I: rayon::iter::ParallelIterator<Item = T> + Send,
+    T: core::fmt::Display + Send,
+    F: AsyncFn(&str, usize, usize) -> String + Sync,
+    for<'c> <F as AsyncFnMut<(&str, usize, usize)>>::CallRefFuture<'c>: Send,
+{
+    fn par_iter_string_async<'a>(
+        self,
+        format_rule: &'a F,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a + Send>
+    where
+        Self: 'a,
+    {
+        Box::new(async move {
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let len = items.len();
+            let mut result = String::new();
+            for (i, s) in items.into_iter().enumerate() {
+                result.push_str(&format_rule(&s, i, len).await);
+            }
+            result
+        })
+    }
+}
+
+#[cfg(all(feature = "rayon", feature = "dyn_async"))]
+pub trait ParIteratorStringFnMutAsync<F>
+where
+    F: AsyncFnMut(&str, usize, usize) -> String,
+{
+    fn par_iter_string_async<'a>(
+        self,
+        format_rule: &'a mut F,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a>
+    where
+        Self: 'a;
+}
+
+#[cfg(all(feature = "rayon", feature = "dyn_async"))]
+impl<I, T, F> ParIteratorStringFnMutAsync<F> for I
+where
+    I: rayon::iter::ParallelIterator<Item = T>,
+    T: core::fmt::Display,
+    F: AsyncFnMut(&str, usize, usize) -> String,
+{
+    fn par_iter_string_async<'a>(
+        self,
+        format_rule: &'a mut F,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a>
+    where
+        Self: 'a,
+    {
+        Box::new(async move {
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let len = items.len();
+            let mut result = String::new();
+            for (i, s) in items.into_iter().enumerate() {
+                result.push_str(&format_rule(&s, i, len).await);
+            }
+            result
+        })
+    }
+}
+
+#[cfg(all(feature = "rayon", feature = "dyn_async"))]
+pub trait ParIteratorStringFnMutAsyncSend<F>
+where
+    F: AsyncFnMut(&str, usize, usize) -> String,
+{
+    fn par_iter_string_async<'a>(
+        self,
+        format_rule: &'a mut F,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a + Send>
+    where
+        Self: 'a;
+}
+
+#[cfg(all(feature = "rayon", feature = "dyn_async"))]
+impl<I, T, F> ParIteratorStringFnMutAsyncSend<F> for I
+where
+    I: rayon::iter::ParallelIterator<Item = T> + Send,
+    T: core::fmt::Display + Send,
+    F: AsyncFnMut(&str, usize, usize) -> String + Send,
+    for<'c> <F as AsyncFnMut<(&str, usize, usize)>>::CallRefFuture<'c>: Send,
+{
+    fn par_iter_string_async<'a>(
+        self,
+        format_rule: &'a mut F,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a + Send>
+    where
+        Self: 'a,
+    {
+        Box::new(async move {
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let len = items.len();
+            let mut result = String::new();
+            for (i, s) in items.into_iter().enumerate() {
+                result.push_str(&format_rule(&s, i, len).await);
+            }
+            result
+        })
+    }
+}
+
+// ============================================================================
+// #[cfg(all(feature = "rayon", feature = "impl_async"))] — RAYON IMPL ASYNC
+// ============================================================================
+
+#[cfg(all(feature = "rayon", feature = "impl_async"))]
+pub trait ParIteratorStringFnImplAsync<F>
+where
+    F: AsyncFn(&str, usize, usize) -> String,
+{
+    type Future<'a>: core::future::Future<Output = String> + 'a
+    where
+        Self: 'a,
+        F: 'a;
+    fn par_iter_string_async<'a>(self, format_rule: &'a F) -> Self::Future<'a>;
+}
+
+#[cfg(all(feature = "rayon", feature = "impl_async"))]
+impl<I, T, F> ParIteratorStringFnImplAsync<F> for I
+where
+    I: rayon::iter::ParallelIterator<Item = T>,
+    T: core::fmt::Display,
+    F: AsyncFn(&str, usize, usize) -> String,
+{
+    type Future<'a>
+        = impl core::future::Future<Output = String> + 'a
+    where
+        Self: 'a,
+        F: 'a;
+    fn par_iter_string_async<'a>(self, format_rule: &'a F) -> Self::Future<'a> {
+        async move {
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let len = items.len();
+            let mut result = String::new();
+            for (i, s) in items.into_iter().enumerate() {
+                result.push_str(&format_rule(&s, i, len).await);
+            }
+            result
+        }
+    }
+}
+
+#[cfg(all(feature = "rayon", feature = "impl_async"))]
+pub trait ParIteratorStringFnImplAsyncSend<F>
+where
+    F: AsyncFn(&str, usize, usize) -> String,
+{
+    type Future<'a>: core::future::Future<Output = String> + 'a + Send
+    where
+        Self: 'a,
+        F: 'a;
+    fn par_iter_string_async<'a>(self, format_rule: &'a F) -> Self::Future<'a>;
+}
+
+#[cfg(all(feature = "rayon", feature = "impl_async"))]
+impl<I, T, F> ParIteratorStringFnImplAsyncSend<F> for I
+where
+    I: rayon::iter::ParallelIterator<Item = T> + Send,
+    T: core::fmt::Display + Send,
+    F: AsyncFn(&str, usize, usize) -> String + Sync,
+    for<'c> <F as AsyncFnMut<(&str, usize, usize)>>::CallRefFuture<'c>: Send,
+{
+    type Future<'a>
+        = impl core::future::Future<Output = String> + 'a + Send
+    where
+        Self: 'a,
+        F: 'a;
+    fn par_iter_string_async<'a>(self, format_rule: &'a F) -> Self::Future<'a> {
+        async move {
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let len = items.len();
+            let mut result = String::new();
+            for (i, s) in items.into_iter().enumerate() {
+                result.push_str(&format_rule(&s, i, len).await);
+            }
+            result
+        }
+    }
+}
+
+#[cfg(all(feature = "rayon", feature = "impl_async"))]
+pub trait ParIteratorStringFnMutImplAsync<F>
+where
+    F: AsyncFnMut(&str, usize, usize) -> String,
+{
+    type Future<'a>: core::future::Future<Output = String> + 'a
+    where
+        Self: 'a,
+        F: 'a;
+    fn par_iter_string_async<'a>(self, format_rule: &'a mut F) -> Self::Future<'a>;
+}
+
+#[cfg(all(feature = "rayon", feature = "impl_async"))]
+impl<I, T, F> ParIteratorStringFnMutImplAsync<F> for I
+where
+    I: rayon::iter::ParallelIterator<Item = T>,
+    T: core::fmt::Display,
+    F: AsyncFnMut(&str, usize, usize) -> String,
+{
+    type Future<'a>
+        = impl core::future::Future<Output = String> + 'a
+    where
+        Self: 'a,
+        F: 'a;
+    fn par_iter_string_async<'a>(self, format_rule: &'a mut F) -> Self::Future<'a> {
+        async move {
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let len = items.len();
+            let mut result = String::new();
+            for (i, s) in items.into_iter().enumerate() {
+                result.push_str(&format_rule(&s, i, len).await);
+            }
+            result
+        }
+    }
+}
+
+#[cfg(all(feature = "rayon", feature = "impl_async"))]
+pub trait ParIteratorStringFnMutImplAsyncSend<F>
+where
+    F: AsyncFnMut(&str, usize, usize) -> String,
+{
+    type Future<'a>: core::future::Future<Output = String> + 'a + Send
+    where
+        Self: 'a,
+        F: 'a;
+    fn par_iter_string_async<'a>(self, format_rule: &'a mut F) -> Self::Future<'a>;
+}
+
+#[cfg(all(feature = "rayon", feature = "impl_async"))]
+impl<I, T, F> ParIteratorStringFnMutImplAsyncSend<F> for I
+where
+    I: rayon::iter::ParallelIterator<Item = T> + Send,
+    T: core::fmt::Display + Send,
+    F: AsyncFnMut(&str, usize, usize) -> String + Send,
+    for<'c> <F as AsyncFnMut<(&str, usize, usize)>>::CallRefFuture<'c>: Send,
+{
+    type Future<'a>
+        = Self
+    where
+        Self: 'a,
+        F: 'a,
+        Self: core::future::Future<Output = String> + 'a + Send;
+    fn par_iter_string_async<'a>(self, format_rule: &'a mut F) -> Self::Future<'a> {
+        async move {
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let len = items.len();
+            let mut result = String::new();
+            for (i, s) in items.into_iter().enumerate() {
+                result.push_str(&format_rule(&s, i, len).await);
+            }
+            result
+        }
+    }
+}
+
+// ============================================================================
+// ТЕСТЫ
+// ============================================================================
+
 #[cfg(test)]
 mod tests {
+    #[cfg(any(feature = "dyn_async", feature = "impl_async"))]
+    use core::future::Future;
+
     use super::*;
     use alloc::vec;
+    #[cfg(not(feature = "std"))]
+    use core::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
+    #[cfg(feature = "std")]
+    use pollster::*;
+    #[cfg(feature = "std")]
+    use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
+
+    fn noop_raw_waker() -> RawWaker {
+        fn no_op(_: *const ()) {}
+        fn clone(p: *const ()) -> RawWaker {
+            RawWaker::new(p, &VTABLE)
+        }
+        static VTABLE: RawWakerVTable = RawWakerVTable::new(clone, no_op, no_op, no_op);
+        RawWaker::new(core::ptr::null(), &VTABLE)
+    }
+
+    #[cfg(any(feature = "dyn_async", feature = "impl_async"))]
+    fn block_on<F: core::future::Future>(mut fut: F) -> F::Output {
+        let mut fut = unsafe { core::pin::Pin::new_unchecked(&mut fut) };
+
+        let waker = unsafe { Waker::from_raw(noop_raw_waker()) };
+        let mut cx = Context::from_waker(&waker);
+
+        loop {
+            if let Poll::Ready(val) = fut.as_mut().poll(&mut cx) {
+                return val;
+            }
+        }
+    }
+
+    #[cfg(any(feature = "dyn_async", feature = "impl_async"))]
+    fn block_on_dyn<T>(fut: Box<dyn Future<Output = T>>) -> T {
+        let pin_future = Box::into_pin(fut);
+        let fut = pin_future.as_mut();
+        let waker = unsafe { Waker::from_raw(noop_raw_waker()) };
+        let mut cx = Context::from_waker(&waker);
+    }
+
+    // ========================================================================
+    // SYNC ТЕСТЫ (всегда доступны)
+    // ========================================================================
 
     #[test]
     fn test_vec_string_default() {
@@ -1782,7 +3390,7 @@ mod tests {
     }
 
     // ========================================================================
-    // ТЕСТЫ ДЛЯ НОВЫХ ТРЕЙТОВ: ВЕРСИИ С ВЛАДЕНИЕМ
+    // SYNC: ТЕСТЫ ВЛАДЕНИЕ
     // ========================================================================
 
     #[test]
@@ -1983,7 +3591,7 @@ mod tests {
     }
 
     // ========================================================================
-    // ТЕСТЫ ДЛЯ НОВЫХ ТРЕЙТОВ: ВЕРСИИ ПО ССЫЛКЕ
+    // SYNC: ТЕСТЫ ПО ССЫЛКЕ
     // ========================================================================
 
     #[test]
@@ -2184,7 +3792,7 @@ mod tests {
     }
 
     // ========================================================================
-    // ТЕСТЫ ExtendedDisplay
+    // ExtendedDisplay
     // ========================================================================
 
     #[test]
@@ -2204,7 +3812,7 @@ mod tests {
     }
 
     // ========================================================================
-    // ТЕСТЫ RAYON
+    // #[cfg(feature = "rayon")] — SYNC RAYON ТЕСТЫ
     // ========================================================================
 
     #[cfg(feature = "rayon")]
@@ -2247,10 +3855,210 @@ mod tests {
     fn test_rayon_extended_display() {
         use rayon::iter::{IntoParallelIterator, ParallelIterator};
         fn takes_extended<T: ExtendedDisplay>(_x: T) {}
-
         let v = vec![1, 2, 3];
         takes_extended(v.par_iter());
         takes_extended(v.par_iter().map(|x| x * 2));
         takes_extended(v.into_par_iter());
+    }
+
+    // ========================================================================
+    // #[cfg(feature = "dyn_async")] — DYN ASYNC ТЕСТЫ
+    // ========================================================================
+
+    #[cfg(feature = "dyn_async")]
+    #[test]
+    fn test_vec_string_fn_dyn_async() {
+        let v = vec![1, 2, 3];
+        let fmt = async |value: &str, index: usize, length: usize| -> String {
+            if length == 0 {
+                return String::new();
+            }
+            let is_last = index == length - 1;
+            if index == 0 {
+                if is_last {
+                    format!("<{}>", value)
+                } else {
+                    format!("<{}", value)
+                }
+            } else if is_last {
+                format!(", {}>", value)
+            } else {
+                format!(", {}", value)
+            }
+        };
+        let result = block_on(VecStringFnAsync::vec_string_async(&v, &fmt));
+        assert_eq!(result, "<1, 2, 3>");
+    }
+
+    #[cfg(feature = "dyn_async")]
+    #[test]
+    fn test_iterator_string_fn_dyn_async() {
+        let v = vec![10, 20, 30];
+        let fmt = async |value: &str, index: usize, length: usize| -> String {
+            if length == 0 {
+                return String::new();
+            }
+            let is_last = index == length - 1;
+            if index == 0 {
+                if is_last {
+                    format!("{{{}}}", value)
+                } else {
+                    format!("{{{}", value)
+                }
+            } else if is_last {
+                format!(", {}}}", value)
+            } else {
+                format!(", {}", value)
+            }
+        };
+        let result = block_on(IteratorStringFnAsync::iter_string_async(v.iter(), &fmt));
+        assert_eq!(result, "{10, 20, 30}");
+    }
+
+    #[cfg(feature = "dyn_async")]
+    #[test]
+    fn test_vec_string_fn_mut_dyn_async() {
+        let v = vec!["a", "b", "c"];
+        let mut counter = 0usize;
+        let mut fmt = async |value: &str, _index: usize, _length: usize| -> String {
+            counter += 1;
+            format!("[{}{}]", value, counter)
+        };
+        let result = block_on(VecStringFnMutAsync::vec_string_async(&v, &mut fmt));
+        assert_eq!(result, "[a1][b2][c3]");
+    }
+
+    // ========================================================================
+    // #[cfg(feature = "impl_async")] — IMPL ASYNC ТЕСТЫ
+    // ========================================================================
+
+    #[cfg(feature = "impl_async")]
+    #[test]
+    fn test_vec_string_fn_impl_async() {
+        let v = vec![1, 2, 3];
+        let fmt = async |value: &str, index: usize, length: usize| -> String {
+            if length == 0 {
+                return String::new();
+            }
+            let is_last = index == length - 1;
+            if index == 0 {
+                if is_last {
+                    format!("<{}>", value)
+                } else {
+                    format!("<{}", value)
+                }
+            } else if is_last {
+                format!(", {}>", value)
+            } else {
+                format!(", {}", value)
+            }
+        };
+        let result = block_on(VecStringFnImplAsync::vec_string_async(&v, &fmt));
+        assert_eq!(result, "<1, 2, 3>");
+    }
+
+    #[cfg(feature = "impl_async")]
+    #[test]
+    fn test_iterator_string_fn_impl_async() {
+        let v = vec![10, 20, 30];
+        let fmt = async |value: &str, index: usize, length: usize| -> String {
+            if length == 0 {
+                return String::new();
+            }
+            let is_last = index == length - 1;
+            if index == 0 {
+                if is_last {
+                    format!("{{{}}}", value)
+                } else {
+                    format!("{{{}", value)
+                }
+            } else if is_last {
+                format!(", {}}}", value)
+            } else {
+                format!(", {}", value)
+            }
+        };
+        let result = block_on(IteratorStringFnImplAsync::iter_string_async(v.iter(), &fmt));
+        assert_eq!(result, "{10, 20, 30}");
+    }
+
+    #[cfg(feature = "impl_async")]
+    #[test]
+    fn test_vec_string_fn_mut_impl_async() {
+        let v = vec!["a", "b", "c"];
+        let mut counter = 0usize;
+        let mut fmt = async |value: &str, _index: usize, _length: usize| -> String {
+            counter += 1;
+            format!("[{}{}]", value, counter)
+        };
+        let result = block_on(VecStringFnMutImplAsync::vec_string_async(&v, &mut fmt));
+        assert_eq!(result, "[a1][b2][c3]");
+    }
+
+    // ========================================================================
+    // #[cfg(all(feature = "rayon", feature = "dyn_async"))] — RAYON DYN ASYNC ТЕСТЫ
+    // ========================================================================
+
+    #[cfg(all(feature = "rayon", feature = "dyn_async"))]
+    #[test]
+    fn test_rayon_par_iter_string_fn_dyn_async() {
+        use rayon::iter::{IntoParallelIterator, ParallelIterator};
+        let v = vec![10, 20, 30];
+        let fmt = async |value: &str, index: usize, length: usize| -> String {
+            if length == 0 {
+                return String::new();
+            }
+            let is_last = index == length - 1;
+            if index == 0 {
+                if is_last {
+                    format!("{{{}}}", value)
+                } else {
+                    format!("{{{}", value)
+                }
+            } else if is_last {
+                format!(", {}}}", value)
+            } else {
+                format!(", {}", value)
+            }
+        };
+        let f = ParIteratorStringFnAsync::par_iter_string_async(v.into_par_iter(), &fmt);
+        let result = block_on(ParIteratorStringFnAsync::par_iter_string_async(
+            v.into_par_iter(),
+            &fmt,
+        ));
+        assert_eq!(result, "{10, 20, 30}");
+    }
+
+    // ========================================================================
+    // #[cfg(all(feature = "rayon", feature = "impl_async"))] — RAYON IMPL ASYNC ТЕСТЫ
+    // ========================================================================
+
+    #[cfg(all(feature = "rayon", feature = "impl_async"))]
+    #[test]
+    fn test_rayon_par_iter_string_fn_impl_async() {
+        use rayon::iter::{IntoParallelIterator, ParallelIterator};
+        let v = vec![10, 20, 30];
+        let fmt = async |value: &str, index: usize, length: usize| -> String {
+            if length == 0 {
+                return String::new();
+            }
+            let is_last = index == length - 1;
+            if index == 0 {
+                if is_last {
+                    format!("{{{}}}", value)
+                } else {
+                    format!("{{{}", value)
+                }
+            } else if is_last {
+                format!(", {}}}", value)
+            } else {
+                format!(", {}", value)
+            }
+        };
+        let result = block_on(ParIteratorStringFnImplAsync::par_iter_string_async(
+            v.into_par_iter(),
+            &fmt,
+        ));
+        assert_eq!(result, "{10, 20, 30}");
     }
 }

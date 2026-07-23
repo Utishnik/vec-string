@@ -13,8 +13,12 @@ categories = ["util"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-#zero
+pollster = "1.0.1"
+rayon = { version = "1.10", optional = true }
 
 [features]
 std = []
-default = ["std"]
+dyn_async = []
+rayon = ["dep:rayon", "std"]
+impl_async = []
+default = ["std","impl_async","rayon","dyn_async"]

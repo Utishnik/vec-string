@@ -21,4 +21,4 @@ std = []
 dyn_async = []
 rayon = ["dep:rayon", "std"]
 impl_async = []
-default = ["std","impl_async","rayon","dyn_async"]
+default = ["std","impl_async","rayon","dyn_async"] #test

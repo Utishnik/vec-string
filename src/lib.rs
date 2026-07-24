@@ -2670,8 +2670,7 @@ where
         self,
         format_rule: &'a F,
     ) -> Box<dyn core::future::Future<Output = String> + 'a>
-    where
-        Self: 'a;
+    where Self: 'a;
 }
 
 #[cfg(all(feature = "rayon", feature = "dyn_async"))]
@@ -2685,8 +2684,7 @@ where
         self,
         format_rule: &'a F,
     ) -> Box<dyn core::future::Future<Output = String> + 'a>
-    where
-        Self: 'a,
+    where Self: 'a,
     {
         Box::new(async move {
             let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
@@ -2953,7 +2951,7 @@ where
     I: rayon::iter::ParallelIterator<Item = T> + Send,
     T: core::fmt::Display + Send,
     F: AsyncFnMut(&str, usize, usize) -> String + Send,
-    for<'c> <F as AsyncFnMut<(&str, usize, usize)>>::CallRefFuture<'c>: Send,
+    for<'c> <F as AsyncFnMut<(&'c str, usize, usize)>>::CallRefFuture<'c>: Send,
 {
     type Future<'a>
         = Self
@@ -2992,6 +2990,8 @@ mod tests {
     #[cfg(feature = "std")]
     use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 
+    #[cfg(any(feature = "dyn_async", feature = "impl_async"))]
+    #[cfg(not(feature = "std"))]
     fn noop_raw_waker() -> RawWaker {
         fn no_op(_: *const ()) {}
         fn clone(p: *const ()) -> RawWaker {
@@ -3002,6 +3002,7 @@ mod tests {
     }
 
     #[cfg(any(feature = "dyn_async", feature = "impl_async"))]
+    #[cfg(not(feature = "std"))]
     fn block_on<F: core::future::Future>(mut fut: F) -> F::Output {
         let mut fut = unsafe { core::pin::Pin::new_unchecked(&mut fut) };
 
@@ -3012,15 +3013,41 @@ mod tests {
             if let Poll::Ready(val) = fut.as_mut().poll(&mut cx) {
                 return val;
             }
+            core::hint::spin_loop();
         }
     }
 
     #[cfg(any(feature = "dyn_async", feature = "impl_async"))]
+    #[cfg(not(feature = "std"))]
     fn block_on_dyn<T>(fut: Box<dyn Future<Output = T>>) -> T {
-        let pin_future = Box::into_pin(fut);
-        let fut = pin_future.as_mut();
+        let mut pin_future = Box::into_pin(fut);
+        let mut fut = pin_future.as_mut();
         let waker = unsafe { Waker::from_raw(noop_raw_waker()) };
         let mut cx = Context::from_waker(&waker);
+
+        loop {
+            if let Poll::Ready(val) = fut.as_mut().poll(&mut cx){
+                return val;
+            }
+            core::hint::spin_loop();
+        }
+    }
+
+    #[cfg(any(feature = "dyn_async", feature = "impl_async"))]
+    #[cfg(feature = "std")]
+    fn block_on<F: core::future::Future>(mut fut: F) -> F::Output {
+        let mut fut = unsafe { core::pin::Pin::new_unchecked(&mut fut) };
+        fut.as_mut().block_on()
+    }
+
+    
+    #[cfg(any(feature = "dyn_async", feature = "impl_async"))]
+    #[cfg(feature = "std")]
+    fn block_on_dyn<T>(fut: Box<dyn Future<Output = T>>) -> T {
+        let mut pin_future = Box::into_pin(fut);
+        let mut fut = pin_future.as_mut();
+
+        fut.as_mut().block_on()
     }
 
     // ========================================================================
@@ -4022,10 +4049,7 @@ mod tests {
             }
         };
         let f = ParIteratorStringFnAsync::par_iter_string_async(v.into_par_iter(), &fmt);
-        let result = block_on(ParIteratorStringFnAsync::par_iter_string_async(
-            v.into_par_iter(),
-            &fmt,
-        ));
+        let result = block_on_dyn(f);
         assert_eq!(result, "{10, 20, 30}");
     }
 

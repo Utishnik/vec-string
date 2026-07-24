@@ -4,7 +4,6 @@
     feature(async_fn_traits, unboxed_closures)
 )]
 #![cfg_attr(feature = "rayon", feature(allocator_api))]
-#![feature(loop_hints)]
 #![feature(auto_traits)]
 #![feature(negative_impls)]
 
@@ -20,11 +19,6 @@ use rayon::prelude::*;
 
 auto trait NotVec {}
 impl<T, A> !NotVec for Vec<T, A> {}
-
-#[cfg(feature = "rayon")]
-auto trait NotParIter {}
-#[cfg(feature = "rayon")]
-impl<I, T> !NotParIter for I where I: rayon::iter::ParallelIterator<Item = T> {}
 
 pub trait ExtendedDisplay {}
 
@@ -48,7 +42,6 @@ where
 {
 }
 
-#[cfg(feature = "rayon")]
 impl<I, T> ExtendedDisplay for I
 where
     I: Iterator<Item = T> + NotVec,
@@ -67,47 +60,6 @@ where
     I: IteratorStringMutRuleRef<fn(&str, usize, usize) -> String>,
     I: IteratorStringWithStateRuleRef<(), fn(&(), &str, usize, usize) -> String>,
     I: IteratorStringWithStateMutRuleRef<(), fn(&mut (), &str, usize, usize) -> String>,
-    I: rayon::iter::ParallelIterator<Item = T>,
-    T: core::fmt::Display,
-    I: ParIteratorString,
-    I: ParIteratorStringFn<fn(&str, usize, usize) -> String>,
-    I: ParIteratorStringFnMut<fn(&str, usize, usize) -> String>,
-    I: ParIteratorStringFnPtr,
-    I: ParIteratorStringWithState<(), fn(&mut (), &str, usize, usize) -> String>,
-    I: ParIteratorStringWithStateFn<(), fn(&(), &str, usize, usize) -> String>,
-    I: ParIteratorStringWithStateFnPtr<()>,
-    I: ParIteratorStringRuleOwned<fn(&str, usize, usize) -> String>,
-    I: ParIteratorStringMutRuleOwned<fn(&str, usize, usize) -> String>,
-    I: ParIteratorStringWithStateRuleOwned<(), fn(&(), &str, usize, usize) -> String>,
-    I: ParIteratorStringWithStateMutRuleOwned<(), fn(&mut (), &str, usize, usize) -> String>,
-    I: ParIteratorStringRuleRef<'static, fn(&str, usize, usize) -> String>,
-    I: ParIteratorStringMutRuleRef<fn(&str, usize, usize) -> String>,
-    I: ParIteratorStringWithStateRuleRef<(), fn(&(), &str, usize, usize) -> String>,
-    I: ParIteratorStringWithStateMutRuleRef<(), fn(&mut (), &str, usize, usize) -> String>,
-    I: NotParIter,
-{
-}
-
-#[cfg(not(feature = "rayon"))]
-impl<I, T> ExtendedDisplay for I
-where
-    I: Iterator<Item = T> + NotVec,
-    T: core::fmt::Display,
-    I: IteratorString,
-    I: IteratorStringFn<fn(&str, usize, usize) -> String>,
-    I: IteratorStringFnMut<fn(&str, usize, usize) -> String>,
-    I: IteratorStringWithState<(), fn(&mut (), &str, usize, usize) -> String>,
-    I: IteratorStringWithStateFn<(), fn(&(), &str, usize, usize) -> String>,
-    I: IteratorStringWithStateFnPtr<()>,
-    I: IteratorStringRuleOwned<fn(&str, usize, usize) -> String>,
-    I: IteratorStringMutRuleOwned<fn(&str, usize, usize) -> String>,
-    I: IteratorStringWithStateRuleOwned<(), fn(&(), &str, usize, usize) -> String>,
-    I: IteratorStringWithStateMutRuleOwned<(), fn(&mut (), &str, usize, usize) -> String>,
-    I: IteratorStringRuleRef<'static, fn(&str, usize, usize) -> String>,
-    I: IteratorStringMutRuleRef<fn(&str, usize, usize) -> String>,
-    I: IteratorStringWithStateRuleRef<(), fn(&(), &str, usize, usize) -> String>,
-    I: IteratorStringWithStateMutRuleRef<(), fn(&mut (), &str, usize, usize) -> String>,
-    I: NotParIter,
 {
 }
 
@@ -3848,7 +3800,7 @@ mod tests {
     #[cfg(feature = "rayon")]
     #[test]
     fn test_rayon_par_iter_string() {
-        use rayon::iter::{IntoParallelIterator, ParallelIterator};
+        use rayon::iter::IntoParallelIterator;
         let numbers = vec![1, 2, 3];
         assert_eq!(
             "[1, 2, 3]",
@@ -3859,7 +3811,7 @@ mod tests {
     #[cfg(feature = "rayon")]
     #[test]
     fn test_rayon_par_iter_string_fn() {
-        use rayon::iter::{IntoParallelIterator, ParallelIterator};
+        use rayon::prelude::*;
         let v = vec![10, 20, 30];
         let fmt = |value: &str, index: usize, length: usize| {
             if length == 0 {
@@ -3886,13 +3838,18 @@ mod tests {
 
     #[cfg(feature = "rayon")]
     #[test]
-    fn test_rayon_extended_display() {
-        use rayon::iter::{IntoParallelIterator, ParallelIterator};
-        fn takes_extended<T: ExtendedDisplay>(_x: T) {}
+    fn test_rayon_par_iter_methods() {
+        use rayon::prelude::*;
         let v = vec![1, 2, 3];
-        takes_extended(v.par_iter());
-        takes_extended(v.par_iter().map(|x| x * 2));
-        takes_extended(v.into_par_iter());
+        let s1 = v.par_iter().par_iter_string(DEFAULT_FORMAT_RULE);
+        assert_eq!("[1, 2, 3]", s1);
+        let s2 = v
+            .par_iter()
+            .map(|x| x * 2)
+            .par_iter_string(DEFAULT_FORMAT_RULE);
+        assert_eq!("[2, 4, 6]", s2);
+        let s3 = v.into_par_iter().par_iter_string(DEFAULT_FORMAT_RULE);
+        assert_eq!("[1, 2, 3]", s3);
     }
 
     #[cfg(feature = "dyn_async")]
@@ -4041,7 +3998,7 @@ mod tests {
     #[cfg(all(feature = "rayon", feature = "dyn_async"))]
     #[test]
     fn test_rayon_par_iter_string_fn_dyn_async() {
-        use rayon::iter::{IntoParallelIterator, ParallelIterator};
+        use rayon::iter::IntoParallelIterator;
         let v = vec![10, 20, 30];
         let fmt = async |value: &str, index: usize, length: usize| -> String {
             if length == 0 {
@@ -4072,7 +4029,7 @@ mod tests {
     #[cfg(all(feature = "rayon", feature = "impl_async"))]
     #[test]
     fn test_rayon_par_iter_string_fn_impl_async() {
-        use rayon::iter::{IntoParallelIterator, ParallelIterator};
+        use rayon::iter::IntoParallelIterator;
         let v = vec![10, 20, 30];
         let fmt = async |value: &str, index: usize, length: usize| -> String {
             if length == 0 {

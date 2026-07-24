@@ -1308,6 +1308,312 @@ where
 }
 
 // ============================================================================
+// DYN ASYNC: ТРЕЙТЫ ПРАВИЛ ФОРМАТИРОВАНИЯ
+// ============================================================================
+
+#[cfg(feature = "dyn_async")]
+pub trait FormatRuleNoStateAsync<'a, 'b>
+where
+    'b: 'a,
+{
+    fn format(
+        &'a self,
+        value: &'b str,
+        index: usize,
+        length: usize,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a>;
+}
+#[cfg(feature = "dyn_async")]
+impl<'a, 'b, F> FormatRuleNoStateAsync<'a, 'b> for F
+where
+    'b: 'a,
+    F: Fn(&'b str, usize, usize) -> Box<dyn core::future::Future<Output = String> + 'a>,
+{
+    fn format(
+        &'a self,
+        value: &'b str,
+        index: usize,
+        length: usize,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a> {
+        (self)(value, index, length)
+    }
+}
+
+#[cfg(feature = "dyn_async")]
+pub trait FormatRuleNoStateAsyncSend<'a, 'b>
+where
+    'b: 'a,
+{
+    fn format(
+        &'a self,
+        value: &'b str,
+        index: usize,
+        length: usize,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a + Send>;
+}
+#[cfg(feature = "dyn_async")]
+impl<'a, 'b, F> FormatRuleNoStateAsyncSend<'a, 'b> for F
+where
+    'b: 'a,
+    F: Fn(&'b str, usize, usize) -> Box<dyn core::future::Future<Output = String> + 'a + Send>,
+{
+    fn format(
+        &'a self,
+        value: &'b str,
+        index: usize,
+        length: usize,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a + Send> {
+        (self)(value, index, length)
+    }
+}
+
+#[cfg(feature = "dyn_async")]
+pub trait FormatRuleNoStateOwnedAsync {
+    fn format(
+        self,
+        value: String,
+        index: usize,
+        length: usize,
+    ) -> Box<dyn core::future::Future<Output = String>>;
+}
+#[cfg(feature = "dyn_async")]
+impl<F> FormatRuleNoStateOwnedAsync for F
+where
+    F: FnOnce(String, usize, usize) -> Box<dyn core::future::Future<Output = String>>,
+{
+    fn format(
+        self,
+        value: String,
+        index: usize,
+        length: usize,
+    ) -> Box<dyn core::future::Future<Output = String>> {
+        (self)(value, index, length)
+    }
+}
+
+#[cfg(feature = "dyn_async")]
+pub trait FormatRuleNoStateOwnedAsyncSend {
+    fn format(
+        self,
+        value: String,
+        index: usize,
+        length: usize,
+    ) -> Box<dyn core::future::Future<Output = String> + Send>;
+}
+#[cfg(feature = "dyn_async")]
+impl<F> FormatRuleNoStateOwnedAsyncSend for F
+where
+    F: FnOnce(String, usize, usize) -> Box<dyn core::future::Future<Output = String> + Send>,
+{
+    fn format(
+        self,
+        value: String,
+        index: usize,
+        length: usize,
+    ) -> Box<dyn core::future::Future<Output = String> + Send> {
+        (self)(value, index, length)
+    }
+}
+
+#[cfg(feature = "dyn_async")]
+pub trait FormatRuleMutNoStateAsync<'a, 'b>
+where
+    'b: 'a,
+{
+    fn format(
+        &'a mut self,
+        value: &'b str,
+        index: usize,
+        length: usize,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a>;
+}
+#[cfg(feature = "dyn_async")]
+impl<'a, 'b, F> FormatRuleMutNoStateAsync<'a, 'b> for F
+where
+    'b: 'a,
+    F: FnMut(&'b str, usize, usize) -> Box<dyn core::future::Future<Output = String> + 'a>,
+{
+    fn format(
+        &'a mut self,
+        value: &'b str,
+        index: usize,
+        length: usize,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a> {
+        (self)(value, index, length)
+    }
+}
+
+#[cfg(feature = "dyn_async")]
+pub trait FormatRuleMutNoStateAsyncSend<'a, 'b>
+where
+    'b: 'a,
+{
+    fn format(
+        &'a mut self,
+        value: &'b str,
+        index: usize,
+        length: usize,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a + Send>;
+}
+#[cfg(feature = "dyn_async")]
+impl<'a, 'b, F> FormatRuleMutNoStateAsyncSend<'a, 'b> for F
+where
+    'b: 'a,
+    F: FnMut(&'b str, usize, usize) -> Box<dyn core::future::Future<Output = String> + 'a + Send>,
+{
+    fn format(
+        &'a mut self,
+        value: &'b str,
+        index: usize,
+        length: usize,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a + Send> {
+        (self)(value, index, length)
+    }
+}
+
+#[cfg(feature = "dyn_async")]
+pub trait FormatRuleAsync<'a, S> {
+    fn format(
+        &'a self,
+        state: &'a S,
+        value: &'a str,
+        index: usize,
+        length: usize,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a>;
+}
+#[cfg(feature = "dyn_async")]
+impl<'a, S: 'a, F> FormatRuleAsync<'a, S> for F
+where
+    F: Fn(&'a S, &'a str, usize, usize) -> Box<dyn core::future::Future<Output = String> + 'a>,
+{
+    fn format(
+        &'a self,
+        state: &'a S,
+        value: &'a str,
+        index: usize,
+        length: usize,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a> {
+        (self)(state, value, index, length)
+    }
+}
+
+#[cfg(feature = "dyn_async")]
+pub trait FormatRuleAsyncSend<'a, S> {
+    fn format(
+        &'a self,
+        state: &'a S,
+        value: &'a str,
+        index: usize,
+        length: usize,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a + Send>;
+}
+#[cfg(feature = "dyn_async")]
+impl<'a, S: 'a, F> FormatRuleAsyncSend<'a, S> for F
+where
+    F: Fn(
+        &'a S,
+        &'a str,
+        usize,
+        usize,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a + Send>,
+{
+    fn format(
+        &'a self,
+        state: &'a S,
+        value: &'a str,
+        index: usize,
+        length: usize,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a + Send> {
+        (self)(state, value, index, length)
+    }
+}
+
+#[cfg(feature = "dyn_async")]
+pub trait FormatRuleMutAsync<'a, S> {
+    fn format(
+        &'a mut self,
+        state: &'a mut S,
+        value: &'a str,
+        index: usize,
+        length: usize,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a>;
+}
+#[cfg(feature = "dyn_async")]
+impl<'a, S: 'a, F> FormatRuleMutAsync<'a, S> for F
+where
+    F: FnMut(
+        &'a mut S,
+        &'a str,
+        usize,
+        usize,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a>,
+{
+    fn format(
+        &'a mut self,
+        state: &'a mut S,
+        value: &'a str,
+        index: usize,
+        length: usize,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a> {
+        (self)(state, value, index, length)
+    }
+}
+
+#[cfg(feature = "dyn_async")]
+pub trait FormatRuleMutAsyncSend<'a, S> {
+    fn format(
+        &'a mut self,
+        state: &'a mut S,
+        value: &'a str,
+        index: usize,
+        length: usize,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a + Send>;
+}
+#[cfg(feature = "dyn_async")]
+impl<'a, S: 'a, F> FormatRuleMutAsyncSend<'a, S> for F
+where
+    F: FnMut(
+        &'a mut S,
+        &'a str,
+        usize,
+        usize,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a + Send>,
+{
+    fn format(
+        &'a mut self,
+        state: &'a mut S,
+        value: &'a str,
+        index: usize,
+        length: usize,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a + Send> {
+        (self)(state, value, index, length)
+    }
+}
+
+#[cfg(feature = "dyn_async")]
+pub trait FormatRuleFnPtrAsync {
+    fn format<'a>(
+        &'a self,
+        value: &'a str,
+        index: usize,
+        length: usize,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a>;
+}
+#[cfg(feature = "dyn_async")]
+impl FormatRuleFnPtrAsync
+    for fn(&str, usize, usize) -> Box<dyn core::future::Future<Output = String> + '_>
+{
+    fn format<'a>(
+        &'a self,
+        value: &'a str,
+        index: usize,
+        length: usize,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a> {
+        (self)(value, index, length)
+    }
+}
+
+// ============================================================================
 // DYN ASYNC (Fut: Future, .await напрямую — Fut уже Sized)
 // ============================================================================
 
@@ -1538,6 +1844,370 @@ where
             }
             r
         })
+    }
+}
+
+// ============================================================================
+// IMPL ASYNC: ТРЕЙТЫ ПРАВИЛ ФОРМАТИРОВАНИЯ
+// ============================================================================
+
+#[cfg(feature = "impl_async")]
+pub trait FormatRuleNoStateImplAsync<Fut>
+where
+    Fut: core::future::Future<Output = String>,
+{
+    fn format<'a>(
+        &'a self,
+        value: &'a str,
+        index: usize,
+        length: usize,
+    ) -> impl core::future::Future<Output = String> + 'a
+    where
+        Fut: 'a;
+}
+#[cfg(feature = "impl_async")]
+impl<F, Fut> FormatRuleNoStateImplAsync<Fut> for F
+where
+    F: Fn(&str, usize, usize) -> Fut,
+    Fut: core::future::Future<Output = String>,
+{
+    fn format<'a>(
+        &'a self,
+        value: &'a str,
+        index: usize,
+        length: usize,
+    ) -> impl core::future::Future<Output = String> + 'a
+    where
+        Fut: 'a,
+    {
+        (self)(value, index, length)
+    }
+}
+
+#[cfg(feature = "impl_async")]
+pub trait FormatRuleNoStateImplAsyncSend<Fut>
+where
+    Fut: core::future::Future<Output = String> + Send,
+{
+    fn format<'a>(
+        &'a self,
+        value: &'a str,
+        index: usize,
+        length: usize,
+    ) -> impl core::future::Future<Output = String> + 'a + Send
+    where
+        Fut: 'a;
+}
+#[cfg(feature = "impl_async")]
+impl<F, Fut> FormatRuleNoStateImplAsyncSend<Fut> for F
+where
+    F: Fn(&str, usize, usize) -> Fut,
+    Fut: core::future::Future<Output = String> + Send,
+{
+    fn format<'a>(
+        &'a self,
+        value: &'a str,
+        index: usize,
+        length: usize,
+    ) -> impl core::future::Future<Output = String> + 'a + Send
+    where
+        Fut: 'a,
+    {
+        (self)(value, index, length)
+    }
+}
+
+#[cfg(feature = "impl_async")]
+pub trait FormatRuleNoStateOwnedImplAsync<Fut>
+where
+    Fut: core::future::Future<Output = String>,
+{
+    fn format(
+        self,
+        value: String,
+        index: usize,
+        length: usize,
+    ) -> impl core::future::Future<Output = String>;
+}
+#[cfg(feature = "impl_async")]
+impl<F, Fut> FormatRuleNoStateOwnedImplAsync<Fut> for F
+where
+    F: FnOnce(String, usize, usize) -> Fut,
+    Fut: core::future::Future<Output = String>,
+{
+    fn format(
+        self,
+        value: String,
+        index: usize,
+        length: usize,
+    ) -> impl core::future::Future<Output = String> {
+        (self)(value, index, length)
+    }
+}
+
+#[cfg(feature = "impl_async")]
+pub trait FormatRuleNoStateOwnedImplAsyncSend<Fut>
+where
+    Fut: core::future::Future<Output = String> + Send,
+{
+    fn format(
+        self,
+        value: String,
+        index: usize,
+        length: usize,
+    ) -> impl core::future::Future<Output = String> + Send;
+}
+#[cfg(feature = "impl_async")]
+impl<F, Fut> FormatRuleNoStateOwnedImplAsyncSend<Fut> for F
+where
+    F: FnOnce(String, usize, usize) -> Fut,
+    Fut: core::future::Future<Output = String> + Send,
+{
+    fn format(
+        self,
+        value: String,
+        index: usize,
+        length: usize,
+    ) -> impl core::future::Future<Output = String> + Send {
+        (self)(value, index, length)
+    }
+}
+
+#[cfg(feature = "impl_async")]
+pub trait FormatRuleMutNoStateImplAsync<Fut>
+where
+    Fut: core::future::Future<Output = String>,
+{
+    fn format<'a>(
+        &'a mut self,
+        value: &'a str,
+        index: usize,
+        length: usize,
+    ) -> impl core::future::Future<Output = String> + 'a
+    where
+        Fut: 'a;
+}
+#[cfg(feature = "impl_async")]
+impl<F, Fut> FormatRuleMutNoStateImplAsync<Fut> for F
+where
+    F: FnMut(&str, usize, usize) -> Fut,
+    Fut: core::future::Future<Output = String>,
+{
+    fn format<'a>(
+        &'a mut self,
+        value: &'a str,
+        index: usize,
+        length: usize,
+    ) -> impl core::future::Future<Output = String> + 'a
+    where
+        Fut: 'a,
+    {
+        (self)(value, index, length)
+    }
+}
+
+#[cfg(feature = "impl_async")]
+pub trait FormatRuleMutNoStateImplAsyncSend<Fut>
+where
+    Fut: core::future::Future<Output = String> + Send,
+{
+    fn format<'a>(
+        &'a mut self,
+        value: &'a str,
+        index: usize,
+        length: usize,
+    ) -> impl core::future::Future<Output = String> + 'a + Send
+    where
+        Fut: 'a;
+}
+#[cfg(feature = "impl_async")]
+impl<F, Fut> FormatRuleMutNoStateImplAsyncSend<Fut> for F
+where
+    F: FnMut(&str, usize, usize) -> Fut,
+    Fut: core::future::Future<Output = String> + Send,
+{
+    fn format<'a>(
+        &'a mut self,
+        value: &'a str,
+        index: usize,
+        length: usize,
+    ) -> impl core::future::Future<Output = String> + 'a + Send
+    where
+        Fut: 'a,
+    {
+        (self)(value, index, length)
+    }
+}
+
+#[cfg(feature = "impl_async")]
+pub trait FormatRuleImplAsync<S, Fut>
+where
+    Fut: core::future::Future<Output = String>,
+{
+    fn format<'a>(
+        &'a self,
+        state: &'a S,
+        value: &'a str,
+        index: usize,
+        length: usize,
+    ) -> impl core::future::Future<Output = String> + 'a
+    where
+        Fut: 'a;
+}
+#[cfg(feature = "impl_async")]
+impl<S, F, Fut> FormatRuleImplAsync<S, Fut> for F
+where
+    F: Fn(&S, &str, usize, usize) -> Fut,
+    Fut: core::future::Future<Output = String>,
+{
+    fn format<'a>(
+        &'a self,
+        state: &'a S,
+        value: &'a str,
+        index: usize,
+        length: usize,
+    ) -> impl core::future::Future<Output = String> + 'a
+    where
+        Fut: 'a,
+    {
+        (self)(state, value, index, length)
+    }
+}
+
+#[cfg(feature = "impl_async")]
+pub trait FormatRuleImplAsyncSend<S, Fut>
+where
+    Fut: core::future::Future<Output = String> + Send,
+{
+    fn format<'a>(
+        &'a self,
+        state: &'a S,
+        value: &'a str,
+        index: usize,
+        length: usize,
+    ) -> impl core::future::Future<Output = String> + 'a + Send
+    where
+        Fut: 'a;
+}
+#[cfg(feature = "impl_async")]
+impl<S, F, Fut> FormatRuleImplAsyncSend<S, Fut> for F
+where
+    F: Fn(&S, &str, usize, usize) -> Fut,
+    Fut: core::future::Future<Output = String> + Send,
+{
+    fn format<'a>(
+        &'a self,
+        state: &'a S,
+        value: &'a str,
+        index: usize,
+        length: usize,
+    ) -> impl core::future::Future<Output = String> + 'a + Send
+    where
+        Fut: 'a,
+    {
+        (self)(state, value, index, length)
+    }
+}
+
+#[cfg(feature = "impl_async")]
+pub trait FormatRuleMutImplAsync<S, Fut>
+where
+    Fut: core::future::Future<Output = String>,
+{
+    fn format<'a>(
+        &'a mut self,
+        state: &'a mut S,
+        value: &'a str,
+        index: usize,
+        length: usize,
+    ) -> impl core::future::Future<Output = String> + 'a
+    where
+        Fut: 'a;
+}
+#[cfg(feature = "impl_async")]
+impl<S, F, Fut> FormatRuleMutImplAsync<S, Fut> for F
+where
+    F: FnMut(&mut S, &str, usize, usize) -> Fut,
+    Fut: core::future::Future<Output = String>,
+{
+    fn format<'a>(
+        &'a mut self,
+        state: &'a mut S,
+        value: &'a str,
+        index: usize,
+        length: usize,
+    ) -> impl core::future::Future<Output = String> + 'a
+    where
+        Fut: 'a,
+    {
+        (self)(state, value, index, length)
+    }
+}
+
+#[cfg(feature = "impl_async")]
+pub trait FormatRuleMutImplAsyncSend<S, Fut>
+where
+    Fut: core::future::Future<Output = String> + Send,
+{
+    fn format<'a>(
+        &'a mut self,
+        state: &'a mut S,
+        value: &'a str,
+        index: usize,
+        length: usize,
+    ) -> impl core::future::Future<Output = String> + 'a + Send
+    where
+        Fut: 'a;
+}
+#[cfg(feature = "impl_async")]
+impl<S, F, Fut> FormatRuleMutImplAsyncSend<S, Fut> for F
+where
+    F: FnMut(&mut S, &str, usize, usize) -> Fut,
+    Fut: core::future::Future<Output = String> + Send,
+{
+    fn format<'a>(
+        &'a mut self,
+        state: &'a mut S,
+        value: &'a str,
+        index: usize,
+        length: usize,
+    ) -> impl core::future::Future<Output = String> + 'a + Send
+    where
+        Fut: 'a,
+    {
+        (self)(state, value, index, length)
+    }
+}
+
+#[cfg(feature = "impl_async")]
+pub trait FormatRuleFnPtrImplAsync<Fut>
+where
+    Fut: core::future::Future<Output = String>,
+{
+    fn format<'a>(
+        &'a self,
+        value: &'a str,
+        index: usize,
+        length: usize,
+    ) -> impl core::future::Future<Output = String> + 'a
+    where
+        Fut: 'a;
+}
+#[cfg(feature = "impl_async")]
+impl<Fut> FormatRuleFnPtrImplAsync<Fut> for fn(&str, usize, usize) -> Fut
+where
+    Fut: core::future::Future<Output = String>,
+{
+    fn format<'a>(
+        &'a self,
+        value: &'a str,
+        index: usize,
+        length: usize,
+    ) -> impl core::future::Future<Output = String> + 'a
+    where
+        Fut: 'a,
+    {
+        (self)(value, index, length)
     }
 }
 

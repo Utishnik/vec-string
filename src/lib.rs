@@ -2,53 +2,123 @@
 
 extern crate alloc;
 
+#[cfg(any(feature = "dyn_async", feature = "impl_async"))]
+use alloc::boxed::Box;
 use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
+#[cfg(feature = "rayon")]
+use rayon::prelude::*;
 
 // ============================================================================
-// ОБЩИЙ ТРЕЙТ ExtendedDisplay
+// StableIter
 // ============================================================================
 
-/// Маркерный трейт, объединяющий все возможности форматирования.
-///
-/// Реализован для:
-/// * `Vec<T>` (by value) и `&Vec<T>`;
-/// * большинства стандартных итераторов (`Map`, `Filter`, `Take`, `Skip`,
-///   `Rev`, `Cloned`, `Copied`, `Chain`, `Flatten`, `StepBy`, `Peekable`,
-///   `Fuse`, `Once`, `Repeat`, `Empty`, `Range`, `RangeFrom`,
-///   `RangeInclusive`, `slice::Iter`, `vec::IntoIter`, `array::IntoIter`,
-///   `str::Chars`, `str::Lines`, `str::Bytes`, `str::SplitWhitespace` и др.);
-/// * параллельных итераторов из `rayon` (при включенной фиче `rayon`);
-/// * любого пользовательского типа через макрос `impl_extended_display!`.
-///
-/// Пример generic-границы:
-/// ```rust,ignore
-/// fn dump<T: ExtendedDisplay>(items: T) { ... }
-/// ```
-pub trait ExtendedDisplay {}
+pub trait StableIter: Iterator {}
 
-// --- Helper: все VecString* возможности с fn-правилами -----------------------
-#[doc(hidden)]
-pub trait VecStringAll:
-    VecString
-    + VecStringFn<fn(&str, usize, usize) -> String>
-    + VecStringFnMut<fn(&str, usize, usize) -> String>
-    + VecStringWithState<(), fn(&mut (), &str, usize, usize) -> String>
-    + VecStringWithStateFn<(), fn(&(), &str, usize, usize) -> String>
-    + VecStringWithStateFnPtr<()>
-    + VecStringRuleOwned<fn(&str, usize, usize) -> String>
-    + VecStringMutRuleOwned<fn(&str, usize, usize) -> String>
-    + VecStringWithStateRuleOwned<(), fn(&(), &str, usize, usize) -> String>
-    + VecStringWithStateMutRuleOwned<(), fn(&mut (), &str, usize, usize) -> String>
-    + VecStringRuleRef<'static, fn(&str, usize, usize) -> String>
-    + VecStringMutRuleRef<fn(&str, usize, usize) -> String>
-    + VecStringWithStateRuleRef<(), fn(&(), &str, usize, usize) -> String>
-    + VecStringWithStateMutRuleRef<(), fn(&mut (), &str, usize, usize) -> String>
+impl<'a, T> StableIter for core::slice::Iter<'a, T> {}
+impl<'a, T> StableIter for core::slice::IterMut<'a, T> {}
+impl<T> StableIter for alloc::vec::IntoIter<T> {}
+impl<T, const N: usize> StableIter for core::array::IntoIter<T, N> {}
+impl<I, F, B> StableIter for core::iter::Map<I, F>
+where
+    I: StableIter,
+    F: FnMut(I::Item) -> B,
+{
+}
+impl<I, P> StableIter for core::iter::Filter<I, P>
+where
+    I: StableIter,
+    P: FnMut(&I::Item) -> bool,
+{
+}
+impl<I, F, B> StableIter for core::iter::FilterMap<I, F>
+where
+    I: StableIter,
+    F: FnMut(I::Item) -> Option<B>,
+{
+}
+impl<I> StableIter for core::iter::Take<I> where I: StableIter {}
+impl<I> StableIter for core::iter::Skip<I> where I: StableIter {}
+impl<I, P> StableIter for core::iter::TakeWhile<I, P>
+where
+    I: StableIter,
+    P: FnMut(&I::Item) -> bool,
+{
+}
+impl<I, P> StableIter for core::iter::SkipWhile<I, P>
+where
+    I: StableIter,
+    P: FnMut(&I::Item) -> bool,
+{
+}
+impl<'a, I, T> StableIter for core::iter::Cloned<I>
+where
+    I: StableIter<Item = &'a T>,
+    T: Clone + 'a,
+{
+}
+impl<'a, I, T> StableIter for core::iter::Copied<I>
+where
+    I: StableIter<Item = &'a T>,
+    T: Copy + 'a,
+{
+}
+impl<I, U> StableIter for core::iter::Chain<I, U>
+where
+    I: StableIter,
+    U: StableIter<Item = I::Item>,
+{
+}
+impl<I, U> StableIter for core::iter::Zip<I, U>
+where
+    I: StableIter,
+    U: StableIter,
+{
+}
+impl<I> StableIter for core::iter::Enumerate<I> where I: StableIter {}
+impl<I, U, F> StableIter for core::iter::FlatMap<I, U, F>
+where
+    I: StableIter,
+    F: FnMut(I::Item) -> U,
+    U: IntoIterator,
+{
+}
+impl<I> StableIter for core::iter::Flatten<I>
+where
+    I: StableIter,
+    I::Item: IntoIterator,
+{
+}
+impl<I> StableIter for core::iter::Fuse<I> where I: StableIter {}
+impl<I> StableIter for core::iter::Peekable<I> where I: StableIter {}
+impl<I> StableIter for core::iter::StepBy<I> where I: StableIter {}
+impl<I> StableIter for core::iter::Cycle<I> where I: StableIter + Clone {}
+impl<I> StableIter for core::iter::Rev<I> where I: StableIter + DoubleEndedIterator {}
+impl<T> StableIter for core::iter::Once<T> {}
+impl<T> StableIter for core::iter::Empty<T> {}
+impl<F> StableIter for core::iter::RepeatWith<F> where F: FnMut() {}
+impl<T> StableIter for core::iter::Repeat<T> where T: Clone {}
+impl<I, F> StableIter for core::iter::Inspect<I, F>
+where
+    I: StableIter,
+    F: FnMut(&I::Item),
+{
+}
+impl<I, St, F, B> StableIter for core::iter::Scan<I, St, F>
+where
+    I: StableIter,
+    F: FnMut(&mut St, I::Item) -> Option<B>,
 {
 }
 
-impl<T> VecStringAll for Vec<T>
+// ============================================================================
+// ExtendedDisplay
+// ============================================================================
+
+pub trait ExtendedDisplay {}
+
+impl<T> ExtendedDisplay for Vec<T>
 where
     T: core::fmt::Display,
     Vec<T>: VecString,
@@ -68,167 +138,25 @@ where
 {
 }
 
-// --- Helper: все IteratorString* возможности с fn-правилами ------------------
-#[doc(hidden)]
-pub trait IteratorStringAll:
-    IteratorString
-    + IteratorStringFn<fn(&str, usize, usize) -> String>
-    + IteratorStringFnMut<fn(&str, usize, usize) -> String>
-    + IteratorStringWithState<(), fn(&mut (), &str, usize, usize) -> String>
-    + IteratorStringWithStateFn<(), fn(&(), &str, usize, usize) -> String>
-    + IteratorStringWithStateFnPtr<()>
-    + IteratorStringRuleOwned<fn(&str, usize, usize) -> String>
-    + IteratorStringMutRuleOwned<fn(&str, usize, usize) -> String>
-    + IteratorStringWithStateRuleOwned<(), fn(&(), &str, usize, usize) -> String>
-    + IteratorStringWithStateMutRuleOwned<(), fn(&mut (), &str, usize, usize) -> String>
-    + IteratorStringRuleRef<'static, fn(&str, usize, usize) -> String>
-    + IteratorStringMutRuleRef<fn(&str, usize, usize) -> String>
-    + IteratorStringWithStateRuleRef<(), fn(&(), &str, usize, usize) -> String>
-    + IteratorStringWithStateMutRuleRef<(), fn(&mut (), &str, usize, usize) -> String>
-{
-}
-
-impl<I> IteratorStringAll for I where
-    I: IteratorString
-        + IteratorStringFn<fn(&str, usize, usize) -> String>
-        + IteratorStringFnMut<fn(&str, usize, usize) -> String>
-        + IteratorStringWithState<(), fn(&mut (), &str, usize, usize) -> String>
-        + IteratorStringWithStateFn<(), fn(&(), &str, usize, usize) -> String>
-        + IteratorStringWithStateFnPtr<()>
-        + IteratorStringRuleOwned<fn(&str, usize, usize) -> String>
-        + IteratorStringMutRuleOwned<fn(&str, usize, usize) -> String>
-        + IteratorStringWithStateRuleOwned<(), fn(&(), &str, usize, usize) -> String>
-        + IteratorStringWithStateMutRuleOwned<(), fn(&mut (), &str, usize, usize) -> String>
-        + IteratorStringRuleRef<'static, fn(&str, usize, usize) -> String>
-        + IteratorStringMutRuleRef<fn(&str, usize, usize) -> String>
-        + IteratorStringWithStateRuleRef<(), fn(&(), &str, usize, usize) -> String>
-        + IteratorStringWithStateMutRuleRef<(), fn(&mut (), &str, usize, usize) -> String>
-{
-}
-
-// --- Vec<T> -----------------------------------------------------------------
-impl<T> ExtendedDisplay for Vec<T> where Vec<T>: VecStringAll {}
-impl<T> ExtendedDisplay for &Vec<T> where Vec<T>: VecStringAll {}
-
-// --- core::iter адаптеры ----------------------------------------------------
-impl<I, F> ExtendedDisplay for core::iter::Map<I, F> where core::iter::Map<I, F>: IteratorStringAll {}
-impl<I, P> ExtendedDisplay for core::iter::Filter<I, P> where
-    core::iter::Filter<I, P>: IteratorStringAll
-{
-}
-impl<I> ExtendedDisplay for core::iter::Take<I> where core::iter::Take<I>: IteratorStringAll {}
-impl<I> ExtendedDisplay for core::iter::Skip<I> where core::iter::Skip<I>: IteratorStringAll {}
-impl<I> ExtendedDisplay for core::iter::Fuse<I> where core::iter::Fuse<I>: IteratorStringAll {}
-impl<I> ExtendedDisplay for core::iter::Peekable<I>
+impl<I> ExtendedDisplay for I
 where
-    I: Iterator<Item: IntoIterator>,
-    core::iter::Peekable<I>: IteratorStringAll,
+    I: StableIter,
+    I::Item: core::fmt::Display,
+    I: IteratorString,
+    I: IteratorStringFn<fn(&str, usize, usize) -> String>,
+    I: IteratorStringFnMut<fn(&str, usize, usize) -> String>,
+    I: IteratorStringWithState<(), fn(&mut (), &str, usize, usize) -> String>,
+    I: IteratorStringWithStateFn<(), fn(&(), &str, usize, usize) -> String>,
+    I: IteratorStringWithStateFnPtr<()>,
+    I: IteratorStringRuleOwned<fn(&str, usize, usize) -> String>,
+    I: IteratorStringMutRuleOwned<fn(&str, usize, usize) -> String>,
+    I: IteratorStringWithStateRuleOwned<(), fn(&(), &str, usize, usize) -> String>,
+    I: IteratorStringWithStateMutRuleOwned<(), fn(&mut (), &str, usize, usize) -> String>,
+    I: IteratorStringRuleRef<'static, fn(&str, usize, usize) -> String>,
+    I: IteratorStringMutRuleRef<fn(&str, usize, usize) -> String>,
+    I: IteratorStringWithStateRuleRef<(), fn(&(), &str, usize, usize) -> String>,
+    I: IteratorStringWithStateMutRuleRef<(), fn(&mut (), &str, usize, usize) -> String>,
 {
-}
-impl<I> ExtendedDisplay for core::iter::Rev<I> where core::iter::Rev<I>: IteratorStringAll {}
-impl<I> ExtendedDisplay for core::iter::Cloned<I> where core::iter::Cloned<I>: IteratorStringAll {}
-impl<I> ExtendedDisplay for core::iter::Copied<I> where core::iter::Copied<I>: IteratorStringAll {}
-impl<I, U> ExtendedDisplay for core::iter::Chain<I, U> where
-    core::iter::Chain<I, U>: IteratorStringAll
-{
-}
-impl<I, F, U> ExtendedDisplay for core::iter::FlatMap<I, F, U>
-where
-    F: Iterator<Item: IntoIterator>,
-    core::iter::FlatMap<I, F, U>: IteratorStringAll,
-{
-}
-impl<I> ExtendedDisplay for core::iter::Flatten<I>
-where
-    I: Iterator<Item: IntoIterator>,
-    core::iter::Flatten<I>: IteratorStringAll,
-{
-}
-impl<I> ExtendedDisplay for core::iter::StepBy<I> where core::iter::StepBy<I>: IteratorStringAll {}
-impl<I, P> ExtendedDisplay for core::iter::FilterMap<I, P> where
-    core::iter::FilterMap<I, P>: IteratorStringAll
-{
-}
-impl<I, F> ExtendedDisplay for core::iter::Inspect<I, F> where
-    core::iter::Inspect<I, F>: IteratorStringAll
-{
-}
-impl<I, St, F> ExtendedDisplay for core::iter::Scan<I, St, F> where
-    core::iter::Scan<I, St, F>: IteratorStringAll
-{
-}
-impl<I, P> ExtendedDisplay for core::iter::SkipWhile<I, P> where
-    core::iter::SkipWhile<I, P>: IteratorStringAll
-{
-}
-impl<I, P> ExtendedDisplay for core::iter::TakeWhile<I, P> where
-    core::iter::TakeWhile<I, P>: IteratorStringAll
-{
-}
-impl<I, F> ExtendedDisplay for core::iter::MapWhile<I, F> where
-    core::iter::MapWhile<I, F>: IteratorStringAll
-{
-}
-impl<I> ExtendedDisplay for core::iter::Cycle<I> where core::iter::Cycle<I>: IteratorStringAll {}
-// --- core::iter источники ---------------------------------------------------
-impl<T> ExtendedDisplay for core::iter::Once<T> where core::iter::Once<T>: IteratorStringAll {}
-impl<T: Clone> ExtendedDisplay for core::iter::Repeat<T> where
-    core::iter::Repeat<T>: IteratorStringAll
-{
-}
-impl<F> ExtendedDisplay for core::iter::RepeatWith<F> where
-    core::iter::RepeatWith<F>: IteratorStringAll
-{
-}
-impl<T> ExtendedDisplay for core::iter::Empty<T> where core::iter::Empty<T>: IteratorStringAll {}
-impl<F> ExtendedDisplay for core::iter::FromFn<F> where core::iter::FromFn<F>: IteratorStringAll {}
-impl<T, F> ExtendedDisplay for core::iter::Successors<T, F> where
-    core::iter::Successors<T, F>: IteratorStringAll
-{
-}
-
-// --- Ranges -----------------------------------------------------------------
-impl<T> ExtendedDisplay for core::ops::Range<T> where core::ops::Range<T>: IteratorStringAll {}
-impl<T> ExtendedDisplay for core::ops::RangeFrom<T> where core::ops::RangeFrom<T>: IteratorStringAll {}
-impl<T> ExtendedDisplay for core::ops::RangeInclusive<T> where
-    core::ops::RangeInclusive<T>: IteratorStringAll
-{
-}
-
-// --- slice / vec / array / option / result ----------------------------------
-impl<'a, T> ExtendedDisplay for core::slice::Iter<'a, T> where
-    core::slice::Iter<'a, T>: IteratorStringAll
-{
-}
-impl<T> ExtendedDisplay for alloc::vec::IntoIter<T> where alloc::vec::IntoIter<T>: IteratorStringAll {}
-impl<T, const N: usize> ExtendedDisplay for core::array::IntoIter<T, N> where
-    core::array::IntoIter<T, N>: IteratorStringAll
-{
-}
-impl<'a, T> ExtendedDisplay for core::option::Iter<'a, T> where
-    core::option::Iter<'a, T>: IteratorStringAll
-{
-}
-impl<'a, T> ExtendedDisplay for core::result::Iter<'a, T> where
-    core::result::Iter<'a, T>: IteratorStringAll
-{
-}
-
-// --- str итераторы ----------------------------------------------------------
-impl<'a> ExtendedDisplay for core::str::Chars<'a> where core::str::Chars<'a>: IteratorStringAll {}
-impl<'a> ExtendedDisplay for core::str::Lines<'a> where core::str::Lines<'a>: IteratorStringAll {}
-impl<'a> ExtendedDisplay for core::str::Bytes<'a> where core::str::Bytes<'a>: IteratorStringAll {}
-impl<'a> ExtendedDisplay for core::str::SplitWhitespace<'a> where
-    core::str::SplitWhitespace<'a>: IteratorStringAll
-{
-}
-
-// --- Макрос для пользовательских итераторов ---------------------------------
-#[macro_export]
-macro_rules! impl_extended_display {
-    ($($ty:ty),* $(,)?) => {
-        $(impl $crate::ExtendedDisplay for $ty {})*
-    };
 }
 
 pub type FormatRuleFn = fn(&str, usize, usize) -> String;
@@ -254,13 +182,12 @@ fn default_format_rule(val: &str, index: usize, len: usize) -> String {
 pub const DEFAULT_FORMAT_RULE: FormatRuleFn = default_format_rule;
 
 // ============================================================================
-// ТРЕЙТЫ ПРАВИЛ ФОРМАТИРОВАНИЯ
+// SYNC ТРЕЙТЫ ПРАВИЛ
 // ============================================================================
 
 pub trait FormatRuleNoState<'a> {
     fn format(&'a self, value: &str, index: usize, length: usize) -> String;
 }
-
 impl<'a, F> FormatRuleNoState<'a> for F
 where
     F: Fn(&str, usize, usize) -> String,
@@ -270,123 +197,9 @@ where
     }
 }
 
-//not send - compio/monoio version
-pub trait FormatRuleNoStateAsync<'a, 'b>
-where
-    'b: 'a,
-{
-    fn format(
-        &'a self,
-        value: &'b str,
-        index: usize,
-        length: usize,
-    ) -> Box<dyn std::future::Future<Output = String> + 'a>;
-}
-
-impl<'a, 'b, F> FormatRuleNoStateAsync<'a, 'b> for F
-where
-    'b: 'a,
-    F: AsyncFn(&str, usize, usize) -> String,
-{
-    fn format(
-        &'a self,
-        value: &'b str,
-        index: usize,
-        length: usize,
-    ) -> Box<dyn std::future::Future<Output = String> + 'a> {
-        Box::new(self(value, index, length))
-    }
-}
-
-/* Nighly
-//send - tokio/smol version
-pub trait FormatRuleNoStateAsyncSend<'a, 'b>
-where
-    'b: 'a,
-{
-    fn format(
-        &'a self,
-        value: &'b str,
-        index: usize,
-        length: usize,
-    ) -> Box<dyn std::future::Future<Output = String> + 'a + Send>;
-}
-
-
-impl<'a, 'b, F> FormatRuleNoStateAsyncSend<'a, 'b> for F
-where
-    'b: 'a,
-    F: AsyncFn(&str, usize, usize) -> String,
-    F: Send
-{
-    fn format(
-        &'a self,
-        value: &'b str,
-        index: usize,
-        length: usize,
-    ) -> Box<dyn std::future::Future<Output = String> + 'a + Send> {
-        Box::new(self(value, index, length))
-    }
-}
-
-*/
-
-//not send - compio/monoio version
-pub trait FormatRuleMutNoStateAsync<'a, 'b>
-where
-    'b: 'a,
-{
-    fn format(
-        &'a mut self,
-        value: &'b str,
-        index: usize,
-        length: usize,
-    ) -> Box<dyn std::future::Future<Output = String> + 'a>;
-}
-
-impl<'a, 'b, F> FormatRuleMutNoStateAsync<'a, 'b> for F
-where
-    'b: 'a,
-    F: AsyncFnMut(&str, usize, usize) -> String,
-{
-    fn format(
-        &'a mut self,
-        value: &'b str,
-        index: usize,
-        length: usize,
-    ) -> Box<dyn std::future::Future<Output = String> + 'a> {
-        Box::new(self(value, index, length))
-    }
-}
-
 pub trait FormatRuleNoStateOwned {
     fn format(self, value: &str, index: usize, length: usize) -> String;
 }
-
-//not send - compio/monoio version
-pub trait FormatRuleNoStateOwnedAsync {
-    fn format(
-        self,
-        value: String,
-        index: usize,
-        length: usize,
-    ) -> Box<dyn std::future::Future<Output = String>>;
-}
-
-impl<F: 'static> FormatRuleNoStateOwnedAsync for F
-where
-    F: AsyncFnOnce(String, usize, usize) -> String,
-{
-    fn format(
-        self,
-        value: String,
-        index: usize,
-        length: usize,
-    ) -> Box<dyn std::future::Future<Output = String>> {
-        Box::new(self(value, index, length))
-    }
-}
-
 impl<F> FormatRuleNoStateOwned for F
 where
     F: Fn(&str, usize, usize) -> String,
@@ -399,7 +212,6 @@ where
 pub trait FormatRuleMutNoState {
     fn format(&mut self, value: &str, index: usize, length: usize) -> String;
 }
-
 impl<F> FormatRuleMutNoState for F
 where
     F: FnMut(&str, usize, usize) -> String,
@@ -412,7 +224,6 @@ where
 pub trait FormatRule<S> {
     fn format(&self, state: &S, value: &str, index: usize, length: usize) -> String;
 }
-
 impl<S, F> FormatRule<S> for F
 where
     F: Fn(&S, &str, usize, usize) -> String,
@@ -425,7 +236,6 @@ where
 pub trait FormatRuleMut<S> {
     fn format(&mut self, state: &mut S, value: &str, index: usize, length: usize) -> String;
 }
-
 impl<S, F> FormatRuleMut<S> for F
 where
     F: FnMut(&mut S, &str, usize, usize) -> String,
@@ -436,136 +246,128 @@ where
 }
 
 // ============================================================================
-// СТАРЫЕ ТРЕЙТЫ (ОБРАТНАЯ СОВМЕСТИМОСТЬ)
+// SYNC VecString* / IteratorString*
 // ============================================================================
 
 pub trait VecString {
     fn vec_string(&self, format_rule: FormatRuleFn) -> String;
 }
-
 pub trait VecStringFn<F>
 where
     F: Fn(&str, usize, usize) -> String,
 {
-    fn vec_string(&self, format_rule: F) -> String;
+    fn vec_string_fn(&self, format_rule: F) -> String;
 }
-
 pub trait VecStringFnMut<F>
 where
     F: FnMut(&str, usize, usize) -> String,
 {
-    fn vec_string(&self, format_rule: F) -> String;
+    fn vec_string_fn_mut(&self, format_rule: F) -> String;
 }
 
 impl<T> VecString for Vec<T>
 where
     T: core::fmt::Display,
 {
-    fn vec_string(&self, format_rule: FormatRuleFn) -> String {
-        let mut string = String::new();
-        let len = self.len();
+    fn vec_string(&self, f: FormatRuleFn) -> String {
+        let mut s = String::new();
+        let l = self.len();
         for (i, x) in self.iter().enumerate() {
-            string.push_str(&format_rule(&format!("{}", x), i, len));
+            s.push_str(&f(&format!("{}", x), i, l));
         }
-        string
+        s
     }
 }
-
 impl<T, F> VecStringFn<F> for Vec<T>
 where
     T: core::fmt::Display,
     F: Fn(&str, usize, usize) -> String,
 {
-    fn vec_string(&self, format_rule: F) -> String {
-        let mut string = String::new();
-        let len = self.len();
+    fn vec_string_fn(&self, f: F) -> String {
+        let mut s = String::new();
+        let l = self.len();
         for (i, x) in self.iter().enumerate() {
-            string.push_str(&format_rule(&format!("{}", x), i, len));
+            s.push_str(&f(&format!("{}", x), i, l));
         }
-        string
+        s
     }
 }
-
 impl<T, F> VecStringFnMut<F> for Vec<T>
 where
     T: core::fmt::Display,
     F: FnMut(&str, usize, usize) -> String,
 {
-    fn vec_string(&self, mut format_rule: F) -> String {
-        let mut string = String::new();
-        let len = self.len();
+    fn vec_string_fn_mut(&self, mut f: F) -> String {
+        let mut s = String::new();
+        let l = self.len();
         for (i, x) in self.iter().enumerate() {
-            string.push_str(&format_rule(&format!("{}", x), i, len));
+            s.push_str(&f(&format!("{}", x), i, l));
         }
-        string
+        s
     }
 }
 
 pub trait IteratorString {
     fn iter_string(self, format_rule: FormatRuleFn) -> String;
 }
-
 pub trait IteratorStringFn<F>
 where
     F: Fn(&str, usize, usize) -> String,
 {
-    fn iter_string(self, format_rule: F) -> String;
+    fn iter_string_fn(self, format_rule: F) -> String;
 }
-
 pub trait IteratorStringFnMut<F>
 where
     F: FnMut(&str, usize, usize) -> String,
 {
-    fn iter_string(self, format_rule: F) -> String;
+    fn iter_string_fn_mut(self, format_rule: F) -> String;
 }
 
-impl<I, T> IteratorString for I
+impl<I> IteratorString for I
 where
-    I: Iterator<Item = T>,
-    T: core::fmt::Display,
+    I: StableIter,
+    I::Item: core::fmt::Display,
 {
-    fn iter_string(self, format_rule: FormatRuleFn) -> String {
+    fn iter_string(self, f: FormatRuleFn) -> String {
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
-        let len = items.len();
-        let mut result = String::new();
+        let l = items.len();
+        let mut r = String::new();
         for (i, s) in items.into_iter().enumerate() {
-            result.push_str(&format_rule(&s, i, len));
+            r.push_str(&f(&s, i, l));
         }
-        result
+        r
     }
 }
-
-impl<I, T, F> IteratorStringFn<F> for I
+impl<I, F> IteratorStringFn<F> for I
 where
-    I: Iterator<Item = T>,
-    T: core::fmt::Display,
+    I: StableIter,
+    I::Item: core::fmt::Display,
     F: Fn(&str, usize, usize) -> String,
 {
-    fn iter_string(self, format_rule: F) -> String {
+    fn iter_string_fn(self, f: F) -> String {
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
-        let len = items.len();
-        let mut result = String::new();
+        let l = items.len();
+        let mut r = String::new();
         for (i, s) in items.into_iter().enumerate() {
-            result.push_str(&format_rule(&s, i, len));
+            r.push_str(&f(&s, i, l));
         }
-        result
+        r
     }
 }
-
-impl<I, T, F> IteratorStringFnMut<F> for I
+impl<I, F> IteratorStringFnMut<F> for I
 where
-    I: Iterator<Item = T>,
-    T: core::fmt::Display,
+    I: StableIter,
+    I::Item: core::fmt::Display,
     F: FnMut(&str, usize, usize) -> String,
 {
-    fn iter_string(self, mut format_rule: F) -> String {
+    fn iter_string_fn_mut(self, mut f: F) -> String {
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
-        let len = items.len();
-        let mut result = String::new();
+        let l = items.len();
+        let mut r = String::new();
         for (i, s) in items.into_iter().enumerate() {
-            result.push_str(&format_rule(&s, i, len));
+            r.push_str(&f(&s, i, l));
         }
-        result
+        r
     }
 }
 
@@ -573,14 +375,13 @@ pub trait VecStringWithState<S, F>
 where
     F: FnMut(&mut S, &str, usize, usize) -> String,
 {
-    fn vec_string_with_state(&self, initial_state: S, format_rule: F) -> String;
+    fn vec_string_with_state(&self, st: S, f: F) -> String;
 }
-
 pub trait IteratorStringWithState<S, F>
 where
     F: FnMut(&mut S, &str, usize, usize) -> String,
 {
-    fn iter_string_with_state(self, initial_state: S, format_rule: F) -> String;
+    fn iter_string_with_state(self, st: S, f: F) -> String;
 }
 
 impl<T, S, F> VecStringWithState<S, F> for Vec<T>
@@ -588,31 +389,30 @@ where
     T: core::fmt::Display,
     F: FnMut(&mut S, &str, usize, usize) -> String,
 {
-    fn vec_string_with_state(&self, mut initial_state: S, mut format_rule: F) -> String {
-        let mut result = String::new();
-        let len = self.len();
+    fn vec_string_with_state(&self, mut st: S, mut f: F) -> String {
+        let mut r = String::new();
+        let l = self.len();
         for (i, x) in self.iter().enumerate() {
             let s = format!("{}", x);
-            result.push_str(&format_rule(&mut initial_state, &s, i, len));
+            r.push_str(&f(&mut st, &s, i, l));
         }
-        result
+        r
     }
 }
-
-impl<I, T, S, F> IteratorStringWithState<S, F> for I
+impl<I, S, F> IteratorStringWithState<S, F> for I
 where
-    I: Iterator<Item = T>,
-    T: core::fmt::Display,
+    I: StableIter,
+    I::Item: core::fmt::Display,
     F: FnMut(&mut S, &str, usize, usize) -> String,
 {
-    fn iter_string_with_state(self, mut initial_state: S, mut format_rule: F) -> String {
+    fn iter_string_with_state(self, mut st: S, mut f: F) -> String {
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
-        let len = items.len();
-        let mut result = String::new();
+        let l = items.len();
+        let mut r = String::new();
         for (i, s) in items.into_iter().enumerate() {
-            result.push_str(&format_rule(&mut initial_state, &s, i, len));
+            r.push_str(&f(&mut st, &s, i, l));
         }
-        result
+        r
     }
 }
 
@@ -620,14 +420,13 @@ pub trait VecStringWithStateFn<S, F>
 where
     F: Fn(&S, &str, usize, usize) -> String,
 {
-    fn vec_string_with_state_fn(&self, state: &S, format_rule: F) -> String;
+    fn vec_string_with_state_fn(&self, st: &S, f: F) -> String;
 }
-
 pub trait IteratorStringWithStateFn<S, F>
 where
     F: Fn(&S, &str, usize, usize) -> String,
 {
-    fn iter_string_with_state_fn(self, state: &S, format_rule: F) -> String;
+    fn iter_string_with_state_fn(self, st: &S, f: F) -> String;
 }
 
 impl<T, S, F> VecStringWithStateFn<S, F> for Vec<T>
@@ -635,47 +434,45 @@ where
     T: core::fmt::Display,
     F: Fn(&S, &str, usize, usize) -> String,
 {
-    fn vec_string_with_state_fn(&self, state: &S, format_rule: F) -> String {
-        let mut result = String::new();
-        let len = self.len();
+    fn vec_string_with_state_fn(&self, st: &S, f: F) -> String {
+        let mut r = String::new();
+        let l = self.len();
         for (i, x) in self.iter().enumerate() {
             let s = format!("{}", x);
-            result.push_str(&format_rule(state, &s, i, len));
+            r.push_str(&f(st, &s, i, l));
         }
-        result
+        r
     }
 }
-
-impl<I, T, S, F> IteratorStringWithStateFn<S, F> for I
+impl<I, S, F> IteratorStringWithStateFn<S, F> for I
 where
-    I: Iterator<Item = T>,
-    T: core::fmt::Display,
+    I: StableIter,
+    I::Item: core::fmt::Display,
     F: Fn(&S, &str, usize, usize) -> String,
 {
-    fn iter_string_with_state_fn(self, state: &S, format_rule: F) -> String {
+    fn iter_string_with_state_fn(self, st: &S, f: F) -> String {
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
-        let len = items.len();
-        let mut result = String::new();
+        let l = items.len();
+        let mut r = String::new();
         for (i, s) in items.into_iter().enumerate() {
-            result.push_str(&format_rule(state, &s, i, len));
+            r.push_str(&f(st, &s, i, l));
         }
-        result
+        r
     }
 }
 
 pub trait VecStringWithStateFnPtr<S> {
     fn vec_string_with_state_fn_ptr(
         &self,
-        state: &S,
-        format_rule: fn(&S, &str, usize, usize) -> String,
+        st: &S,
+        f: fn(&S, &str, usize, usize) -> String,
     ) -> String;
 }
-
 pub trait IteratorStringWithStateFnPtr<S> {
     fn iter_string_with_state_fn_ptr(
         self,
-        state: &S,
-        format_rule: fn(&S, &str, usize, usize) -> String,
+        st: &S,
+        f: fn(&S, &str, usize, usize) -> String,
     ) -> String;
 }
 
@@ -683,45 +480,42 @@ impl<T, S> VecStringWithStateFnPtr<S> for Vec<T>
 where
     T: core::fmt::Display,
 {
-    #[inline(always)]
     fn vec_string_with_state_fn_ptr(
         &self,
-        state: &S,
-        format_rule: fn(&S, &str, usize, usize) -> String,
+        st: &S,
+        f: fn(&S, &str, usize, usize) -> String,
     ) -> String {
-        let mut result = String::new();
-        let len = self.len();
+        let mut r = String::new();
+        let l = self.len();
         for (i, x) in self.iter().enumerate() {
             let s = format!("{}", x);
-            result.push_str(&format_rule(state, &s, i, len));
+            r.push_str(&f(st, &s, i, l));
         }
-        result
+        r
     }
 }
-
-impl<I, T, S> IteratorStringWithStateFnPtr<S> for I
+impl<I, S> IteratorStringWithStateFnPtr<S> for I
 where
-    I: Iterator<Item = T>,
-    T: core::fmt::Display,
+    I: StableIter,
+    I::Item: core::fmt::Display,
 {
-    #[inline(always)]
     fn iter_string_with_state_fn_ptr(
         self,
-        state: &S,
-        format_rule: fn(&S, &str, usize, usize) -> String,
+        st: &S,
+        f: fn(&S, &str, usize, usize) -> String,
     ) -> String {
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
-        let len = items.len();
-        let mut result = String::new();
+        let l = items.len();
+        let mut r = String::new();
         for (i, s) in items.into_iter().enumerate() {
-            result.push_str(&format_rule(state, &s, i, len));
+            r.push_str(&f(st, &s, i, l));
         }
-        result
+        r
     }
 }
 
 // ============================================================================
-// НОВЫЕ ТРЕЙТЫ: ВЕРСИИ С ВЛАДЕНИЕМ (rule: R)
+// SYNC RuleOwned / MutRuleOwned / RuleRef / MutRuleRef
 // ============================================================================
 
 pub trait VecStringRuleOwned<R>
@@ -730,20 +524,18 @@ where
 {
     fn vec_string_rule_owned(self, rule: R) -> String;
 }
-
 impl<T, R> VecStringRuleOwned<R> for Vec<T>
 where
     T: core::fmt::Display,
     R: FormatRuleNoStateOwned + Clone,
 {
-    #[inline(always)]
     fn vec_string_rule_owned(self, rule: R) -> String {
-        let mut string = String::new();
-        let len = self.len();
+        let mut s = String::new();
+        let l = self.len();
         for (i, x) in self.iter().enumerate() {
-            string.push_str(&rule.clone().format(&format!("{}", x), i, len).to_string());
+            s.push_str(&rule.clone().format(&format!("{}", x), i, l));
         }
-        string
+        s
     }
 }
 
@@ -753,20 +545,18 @@ where
 {
     fn vec_string_mut_rule_owned(&self, rule: R) -> String;
 }
-
 impl<T, R> VecStringMutRuleOwned<R> for Vec<T>
 where
     T: core::fmt::Display,
     R: FormatRuleMutNoState,
 {
-    #[inline(always)]
     fn vec_string_mut_rule_owned(&self, mut rule: R) -> String {
-        let mut string = String::new();
-        let len = self.len();
+        let mut s = String::new();
+        let l = self.len();
         for (i, x) in self.iter().enumerate() {
-            string.push_str(&rule.format(&format!("{}", x), i, len));
+            s.push_str(&rule.format(&format!("{}", x), i, l));
         }
-        string
+        s
     }
 }
 
@@ -776,22 +566,20 @@ where
 {
     fn iter_string_rule_owned(self, rule: R) -> String;
 }
-
-impl<I, T, R> IteratorStringRuleOwned<R> for I
+impl<I, R> IteratorStringRuleOwned<R> for I
 where
-    I: Iterator<Item = T>,
-    T: core::fmt::Display,
+    I: StableIter,
+    I::Item: core::fmt::Display,
     R: FormatRuleNoStateOwned + Clone,
 {
-    #[inline(always)]
     fn iter_string_rule_owned(self, rule: R) -> String {
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
-        let len = items.len();
-        let mut result = String::new();
+        let l = items.len();
+        let mut r = String::new();
         for (i, s) in items.into_iter().enumerate() {
-            result.push_str(&rule.clone().format(&s, i, len));
+            r.push_str(&rule.clone().format(&s, i, l));
         }
-        result
+        r
     }
 }
 
@@ -801,22 +589,20 @@ where
 {
     fn iter_string_mut_rule_owned(self, rule: R) -> String;
 }
-
-impl<I, T, R> IteratorStringMutRuleOwned<R> for I
+impl<I, R> IteratorStringMutRuleOwned<R> for I
 where
-    I: Iterator<Item = T>,
-    T: core::fmt::Display,
+    I: StableIter,
+    I::Item: core::fmt::Display,
     R: FormatRuleMutNoState,
 {
-    #[inline(always)]
     fn iter_string_mut_rule_owned(self, mut rule: R) -> String {
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
-        let len = items.len();
-        let mut result = String::new();
+        let l = items.len();
+        let mut r = String::new();
         for (i, s) in items.into_iter().enumerate() {
-            result.push_str(&rule.format(&s, i, len));
+            r.push_str(&rule.format(&s, i, l));
         }
-        result
+        r
     }
 }
 
@@ -824,23 +610,21 @@ pub trait VecStringWithStateRuleOwned<S, R>
 where
     R: FormatRule<S>,
 {
-    fn vec_string_with_state_rule_owned(&self, state: &S, rule: R) -> String;
+    fn vec_string_with_state_rule_owned(&self, st: &S, rule: R) -> String;
 }
-
 impl<T, S, R> VecStringWithStateRuleOwned<S, R> for Vec<T>
 where
     T: core::fmt::Display,
     R: FormatRule<S>,
 {
-    #[inline(always)]
-    fn vec_string_with_state_rule_owned(&self, state: &S, rule: R) -> String {
-        let mut result = String::new();
-        let len = self.len();
+    fn vec_string_with_state_rule_owned(&self, st: &S, rule: R) -> String {
+        let mut r = String::new();
+        let l = self.len();
         for (i, x) in self.iter().enumerate() {
             let s = format!("{}", x);
-            result.push_str(&rule.format(state, &s, i, len));
+            r.push_str(&rule.format(st, &s, i, l));
         }
-        result
+        r
     }
 }
 
@@ -848,24 +632,22 @@ pub trait IteratorStringWithStateRuleOwned<S, R>
 where
     R: FormatRule<S>,
 {
-    fn iter_string_with_state_rule_owned(self, state: &S, rule: R) -> String;
+    fn iter_string_with_state_rule_owned(self, st: &S, rule: R) -> String;
 }
-
-impl<I, T, S, R> IteratorStringWithStateRuleOwned<S, R> for I
+impl<I, S, R> IteratorStringWithStateRuleOwned<S, R> for I
 where
-    I: Iterator<Item = T>,
-    T: core::fmt::Display,
+    I: StableIter,
+    I::Item: core::fmt::Display,
     R: FormatRule<S>,
 {
-    #[inline(always)]
-    fn iter_string_with_state_rule_owned(self, state: &S, rule: R) -> String {
+    fn iter_string_with_state_rule_owned(self, st: &S, rule: R) -> String {
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
-        let len = items.len();
-        let mut result = String::new();
+        let l = items.len();
+        let mut r = String::new();
         for (i, s) in items.into_iter().enumerate() {
-            result.push_str(&rule.format(state, &s, i, len));
+            r.push_str(&rule.format(st, &s, i, l));
         }
-        result
+        r
     }
 }
 
@@ -873,23 +655,21 @@ pub trait VecStringWithStateMutRuleOwned<S, R>
 where
     R: FormatRuleMut<S>,
 {
-    fn vec_string_with_state_mut_rule_owned(&self, initial_state: S, rule: R) -> String;
+    fn vec_string_with_state_mut_rule_owned(&self, st: S, rule: R) -> String;
 }
-
 impl<T, S, R> VecStringWithStateMutRuleOwned<S, R> for Vec<T>
 where
     T: core::fmt::Display,
     R: FormatRuleMut<S>,
 {
-    #[inline(always)]
-    fn vec_string_with_state_mut_rule_owned(&self, mut initial_state: S, mut rule: R) -> String {
-        let mut result = String::new();
-        let len = self.len();
+    fn vec_string_with_state_mut_rule_owned(&self, mut st: S, mut rule: R) -> String {
+        let mut r = String::new();
+        let l = self.len();
         for (i, x) in self.iter().enumerate() {
             let s = format!("{}", x);
-            result.push_str(&rule.format(&mut initial_state, &s, i, len));
+            r.push_str(&rule.format(&mut st, &s, i, l));
         }
-        result
+        r
     }
 }
 
@@ -897,30 +677,24 @@ pub trait IteratorStringWithStateMutRuleOwned<S, R>
 where
     R: FormatRuleMut<S>,
 {
-    fn iter_string_with_state_mut_rule_owned(self, initial_state: S, rule: R) -> String;
+    fn iter_string_with_state_mut_rule_owned(self, st: S, rule: R) -> String;
 }
-
-impl<I, T, S, R> IteratorStringWithStateMutRuleOwned<S, R> for I
+impl<I, S, R> IteratorStringWithStateMutRuleOwned<S, R> for I
 where
-    I: Iterator<Item = T>,
-    T: core::fmt::Display,
+    I: StableIter,
+    I::Item: core::fmt::Display,
     R: FormatRuleMut<S>,
 {
-    #[inline(always)]
-    fn iter_string_with_state_mut_rule_owned(self, mut initial_state: S, mut rule: R) -> String {
+    fn iter_string_with_state_mut_rule_owned(self, mut st: S, mut rule: R) -> String {
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
-        let len = items.len();
-        let mut result = String::new();
+        let l = items.len();
+        let mut r = String::new();
         for (i, s) in items.into_iter().enumerate() {
-            result.push_str(&rule.format(&mut initial_state, &s, i, len));
+            r.push_str(&rule.format(&mut st, &s, i, l));
         }
-        result
+        r
     }
 }
-
-// ============================================================================
-// НОВЫЕ ТРЕЙТЫ: ВЕРСИИ ПО ССЫЛКЕ (rule: &R)
-// ============================================================================
 
 pub trait VecStringRuleRef<'a, R>
 where
@@ -928,20 +702,18 @@ where
 {
     fn vec_string_rule_ref(&self, rule: &'a R) -> String;
 }
-
 impl<'a, T, R> VecStringRuleRef<'a, R> for Vec<T>
 where
     T: core::fmt::Display,
     R: FormatRuleNoState<'a>,
 {
-    #[inline(always)]
     fn vec_string_rule_ref(&self, rule: &'a R) -> String {
-        let mut string = String::new();
-        let len = self.len();
+        let mut s = String::new();
+        let l = self.len();
         for (i, x) in self.iter().enumerate() {
-            string.push_str(&rule.format(&format!("{}", x), i, len));
+            s.push_str(&rule.format(&format!("{}", x), i, l));
         }
-        string
+        s
     }
 }
 
@@ -951,20 +723,18 @@ where
 {
     fn vec_string_mut_rule_ref(&self, rule: &mut R) -> String;
 }
-
 impl<T, R> VecStringMutRuleRef<R> for Vec<T>
 where
     T: core::fmt::Display,
     R: FormatRuleMutNoState,
 {
-    #[inline(always)]
     fn vec_string_mut_rule_ref(&self, rule: &mut R) -> String {
-        let mut string = String::new();
-        let len = self.len();
+        let mut s = String::new();
+        let l = self.len();
         for (i, x) in self.iter().enumerate() {
-            string.push_str(&rule.format(&format!("{}", x), i, len));
+            s.push_str(&rule.format(&format!("{}", x), i, l));
         }
-        string
+        s
     }
 }
 
@@ -974,22 +744,20 @@ where
 {
     fn iter_string_rule_ref(self, rule: &'a R) -> String;
 }
-
-impl<'a, I, T, R> IteratorStringRuleRef<'a, R> for I
+impl<'a, I, R> IteratorStringRuleRef<'a, R> for I
 where
-    I: Iterator<Item = T>,
-    T: core::fmt::Display,
+    I: StableIter,
+    I::Item: core::fmt::Display,
     R: FormatRuleNoState<'a>,
 {
-    #[inline(always)]
     fn iter_string_rule_ref(self, rule: &'a R) -> String {
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
-        let len = items.len();
-        let mut result = String::new();
+        let l = items.len();
+        let mut r = String::new();
         for (i, s) in items.into_iter().enumerate() {
-            result.push_str(&rule.format(&s, i, len));
+            r.push_str(&rule.format(&s, i, l));
         }
-        result
+        r
     }
 }
 
@@ -999,22 +767,20 @@ where
 {
     fn iter_string_mut_rule_ref(self, rule: &mut R) -> String;
 }
-
-impl<I, T, R> IteratorStringMutRuleRef<R> for I
+impl<I, R> IteratorStringMutRuleRef<R> for I
 where
-    I: Iterator<Item = T>,
-    T: core::fmt::Display,
+    I: StableIter,
+    I::Item: core::fmt::Display,
     R: FormatRuleMutNoState,
 {
-    #[inline(always)]
     fn iter_string_mut_rule_ref(self, rule: &mut R) -> String {
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
-        let len = items.len();
-        let mut result = String::new();
+        let l = items.len();
+        let mut r = String::new();
         for (i, s) in items.into_iter().enumerate() {
-            result.push_str(&rule.format(&s, i, len));
+            r.push_str(&rule.format(&s, i, l));
         }
-        result
+        r
     }
 }
 
@@ -1022,23 +788,21 @@ pub trait VecStringWithStateRuleRef<S, R>
 where
     R: FormatRule<S>,
 {
-    fn vec_string_with_state_rule_ref(&self, state: &S, rule: &R) -> String;
+    fn vec_string_with_state_rule_ref(&self, st: &S, rule: &R) -> String;
 }
-
 impl<T, S, R> VecStringWithStateRuleRef<S, R> for Vec<T>
 where
     T: core::fmt::Display,
     R: FormatRule<S>,
 {
-    #[inline(always)]
-    fn vec_string_with_state_rule_ref(&self, state: &S, rule: &R) -> String {
-        let mut result = String::new();
-        let len = self.len();
+    fn vec_string_with_state_rule_ref(&self, st: &S, rule: &R) -> String {
+        let mut r = String::new();
+        let l = self.len();
         for (i, x) in self.iter().enumerate() {
             let s = format!("{}", x);
-            result.push_str(&rule.format(state, &s, i, len));
+            r.push_str(&rule.format(st, &s, i, l));
         }
-        result
+        r
     }
 }
 
@@ -1046,24 +810,22 @@ pub trait IteratorStringWithStateRuleRef<S, R>
 where
     R: FormatRule<S>,
 {
-    fn iter_string_with_state_rule_ref(self, state: &S, rule: &R) -> String;
+    fn iter_string_with_state_rule_ref(self, st: &S, rule: &R) -> String;
 }
-
-impl<I, T, S, R> IteratorStringWithStateRuleRef<S, R> for I
+impl<I, S, R> IteratorStringWithStateRuleRef<S, R> for I
 where
-    I: Iterator<Item = T>,
-    T: core::fmt::Display,
+    I: StableIter,
+    I::Item: core::fmt::Display,
     R: FormatRule<S>,
 {
-    #[inline(always)]
-    fn iter_string_with_state_rule_ref(self, state: &S, rule: &R) -> String {
+    fn iter_string_with_state_rule_ref(self, st: &S, rule: &R) -> String {
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
-        let len = items.len();
-        let mut result = String::new();
+        let l = items.len();
+        let mut r = String::new();
         for (i, s) in items.into_iter().enumerate() {
-            result.push_str(&rule.format(state, &s, i, len));
+            r.push_str(&rule.format(st, &s, i, l));
         }
-        result
+        r
     }
 }
 
@@ -1071,23 +833,21 @@ pub trait VecStringWithStateMutRuleRef<S, R>
 where
     R: FormatRuleMut<S>,
 {
-    fn vec_string_with_state_mut_rule_ref(&self, initial_state: S, rule: &mut R) -> String;
+    fn vec_string_with_state_mut_rule_ref(&self, st: S, rule: &mut R) -> String;
 }
-
 impl<T, S, R> VecStringWithStateMutRuleRef<S, R> for Vec<T>
 where
     T: core::fmt::Display,
     R: FormatRuleMut<S>,
 {
-    #[inline(always)]
-    fn vec_string_with_state_mut_rule_ref(&self, mut initial_state: S, rule: &mut R) -> String {
-        let mut result = String::new();
-        let len = self.len();
+    fn vec_string_with_state_mut_rule_ref(&self, mut st: S, rule: &mut R) -> String {
+        let mut r = String::new();
+        let l = self.len();
         for (i, x) in self.iter().enumerate() {
             let s = format!("{}", x);
-            result.push_str(&rule.format(&mut initial_state, &s, i, len));
+            r.push_str(&rule.format(&mut st, &s, i, l));
         }
-        result
+        r
     }
 }
 
@@ -1095,50 +855,53 @@ pub trait IteratorStringWithStateMutRuleRef<S, R>
 where
     R: FormatRuleMut<S>,
 {
-    fn iter_string_with_state_mut_rule_ref(self, initial_state: S, rule: &mut R) -> String;
+    fn iter_string_with_state_mut_rule_ref(self, st: S, rule: &mut R) -> String;
 }
-
-impl<I, T, S, R> IteratorStringWithStateMutRuleRef<S, R> for I
+impl<I, S, R> IteratorStringWithStateMutRuleRef<S, R> for I
 where
-    I: Iterator<Item = T>,
-    T: core::fmt::Display,
+    I: StableIter,
+    I::Item: core::fmt::Display,
     R: FormatRuleMut<S>,
 {
-    #[inline(always)]
-    fn iter_string_with_state_mut_rule_ref(self, mut initial_state: S, rule: &mut R) -> String {
+    fn iter_string_with_state_mut_rule_ref(self, mut st: S, rule: &mut R) -> String {
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
-        let len = items.len();
-        let mut result = String::new();
+        let l = items.len();
+        let mut r = String::new();
         for (i, s) in items.into_iter().enumerate() {
-            result.push_str(&rule.format(&mut initial_state, &s, i, len));
+            r.push_str(&rule.format(&mut st, &s, i, l));
         }
-        result
+        r
     }
 }
 
 // ============================================================================
-// RAYON SUPPORT (requires `rayon` feature, activates `std`)
+// RAYON SYNC
 // ============================================================================
 
 #[cfg(feature = "rayon")]
 pub trait ParIteratorString {
-    fn par_iter_string(self, format_rule: FormatRuleFn) -> String;
+    fn par_iter_string(self, f: FormatRuleFn) -> String;
 }
-
 #[cfg(feature = "rayon")]
 impl<I, T> ParIteratorString for I
 where
     I: rayon::iter::ParallelIterator<Item = T>,
     T: core::fmt::Display,
 {
-    fn par_iter_string(self, format_rule: FormatRuleFn) -> String {
+    fn par_iter_string(self, f: FormatRuleFn) -> String {
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
-        let len = items.len();
-        let mut result = String::new();
-        for (i, s) in items.into_iter().enumerate() {
-            result.push_str(&format_rule(&s, i, len));
-        }
-        result
+        let l = items.len();
+        items
+            .into_par_iter()
+            .enumerate()
+            .map(|(i, s)| f(&s, i, l))
+            .reduce(
+                || String::new(),
+                |mut a, c| {
+                    a.push_str(&c);
+                    a
+                },
+            )
     }
 }
 
@@ -1147,24 +910,29 @@ pub trait ParIteratorStringFn<F>
 where
     F: Fn(&str, usize, usize) -> String,
 {
-    fn par_iter_string(self, format_rule: F) -> String;
+    fn par_iter_string_fn(self, f: F) -> String;
 }
-
 #[cfg(feature = "rayon")]
 impl<I, T, F> ParIteratorStringFn<F> for I
 where
     I: rayon::iter::ParallelIterator<Item = T>,
     T: core::fmt::Display,
-    F: Fn(&str, usize, usize) -> String,
+    F: Fn(&str, usize, usize) -> String + Sync,
 {
-    fn par_iter_string(self, format_rule: F) -> String {
+    fn par_iter_string_fn(self, f: F) -> String {
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
-        let len = items.len();
-        let mut result = String::new();
-        for (i, s) in items.into_iter().enumerate() {
-            result.push_str(&format_rule(&s, i, len));
-        }
-        result
+        let l = items.len();
+        items
+            .into_par_iter()
+            .enumerate()
+            .map(|(i, s)| f(&s, i, l))
+            .reduce(
+                || String::new(),
+                |mut a, c| {
+                    a.push_str(&c);
+                    a
+                },
+            )
     }
 }
 
@@ -1173,9 +941,8 @@ pub trait ParIteratorStringFnMut<F>
 where
     F: FnMut(&str, usize, usize) -> String,
 {
-    fn par_iter_string(self, format_rule: F) -> String;
+    fn par_iter_string_fn_mut(self, f: F) -> String;
 }
-
 #[cfg(feature = "rayon")]
 impl<I, T, F> ParIteratorStringFnMut<F> for I
 where
@@ -1183,14 +950,41 @@ where
     T: core::fmt::Display,
     F: FnMut(&str, usize, usize) -> String,
 {
-    fn par_iter_string(self, mut format_rule: F) -> String {
+    fn par_iter_string_fn_mut(self, mut f: F) -> String {
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
-        let len = items.len();
-        let mut result = String::new();
+        let l = items.len();
+        let mut r = String::new();
         for (i, s) in items.into_iter().enumerate() {
-            result.push_str(&format_rule(&s, i, len));
+            r.push_str(&f(&s, i, l));
         }
-        result
+        r
+    }
+}
+
+#[cfg(feature = "rayon")]
+pub trait ParIteratorStringFnPtr {
+    fn par_iter_string_fn_ptr(self, f: FormatRuleFn) -> String;
+}
+#[cfg(feature = "rayon")]
+impl<I, T> ParIteratorStringFnPtr for I
+where
+    I: rayon::iter::ParallelIterator<Item = T>,
+    T: core::fmt::Display,
+{
+    fn par_iter_string_fn_ptr(self, f: FormatRuleFn) -> String {
+        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let l = items.len();
+        items
+            .into_par_iter()
+            .enumerate()
+            .map(|(i, s)| f(&s, i, l))
+            .reduce(
+                || String::new(),
+                |mut a, c| {
+                    a.push_str(&c);
+                    a
+                },
+            )
     }
 }
 
@@ -1199,9 +993,8 @@ pub trait ParIteratorStringWithState<S, F>
 where
     F: FnMut(&mut S, &str, usize, usize) -> String,
 {
-    fn par_iter_string_with_state(self, initial_state: S, format_rule: F) -> String;
+    fn par_iter_string_with_state(self, st: S, f: F) -> String;
 }
-
 #[cfg(feature = "rayon")]
 impl<I, T, S, F> ParIteratorStringWithState<S, F> for I
 where
@@ -1209,14 +1002,14 @@ where
     T: core::fmt::Display,
     F: FnMut(&mut S, &str, usize, usize) -> String,
 {
-    fn par_iter_string_with_state(self, mut initial_state: S, mut format_rule: F) -> String {
+    fn par_iter_string_with_state(self, mut st: S, mut f: F) -> String {
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
-        let len = items.len();
-        let mut result = String::new();
+        let l = items.len();
+        let mut r = String::new();
         for (i, s) in items.into_iter().enumerate() {
-            result.push_str(&format_rule(&mut initial_state, &s, i, len));
+            r.push_str(&f(&mut st, &s, i, l));
         }
-        result
+        r
     }
 }
 
@@ -1225,24 +1018,30 @@ pub trait ParIteratorStringWithStateFn<S, F>
 where
     F: Fn(&S, &str, usize, usize) -> String,
 {
-    fn par_iter_string_with_state_fn(self, state: &S, format_rule: F) -> String;
+    fn par_iter_string_with_state_fn(self, st: &S, f: F) -> String;
 }
-
 #[cfg(feature = "rayon")]
 impl<I, T, S, F> ParIteratorStringWithStateFn<S, F> for I
 where
     I: rayon::iter::ParallelIterator<Item = T>,
     T: core::fmt::Display,
-    F: Fn(&S, &str, usize, usize) -> String,
+    S: Sync,
+    F: Fn(&S, &str, usize, usize) -> String + Sync,
 {
-    fn par_iter_string_with_state_fn(self, state: &S, format_rule: F) -> String {
+    fn par_iter_string_with_state_fn(self, st: &S, f: F) -> String {
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
-        let len = items.len();
-        let mut result = String::new();
-        for (i, s) in items.into_iter().enumerate() {
-            result.push_str(&format_rule(state, &s, i, len));
-        }
-        result
+        let l = items.len();
+        items
+            .into_par_iter()
+            .enumerate()
+            .map(|(i, s)| f(st, &s, i, l))
+            .reduce(
+                || String::new(),
+                |mut a, c| {
+                    a.push_str(&c);
+                    a
+                },
+            )
     }
 }
 
@@ -1250,30 +1049,35 @@ where
 pub trait ParIteratorStringWithStateFnPtr<S> {
     fn par_iter_string_with_state_fn_ptr(
         self,
-        state: &S,
-        format_rule: fn(&S, &str, usize, usize) -> String,
+        st: &S,
+        f: fn(&S, &str, usize, usize) -> String,
     ) -> String;
 }
-
 #[cfg(feature = "rayon")]
 impl<I, T, S> ParIteratorStringWithStateFnPtr<S> for I
 where
     I: rayon::iter::ParallelIterator<Item = T>,
     T: core::fmt::Display,
+    S: Sync,
 {
-    #[inline(always)]
     fn par_iter_string_with_state_fn_ptr(
         self,
-        state: &S,
-        format_rule: fn(&S, &str, usize, usize) -> String,
+        st: &S,
+        f: fn(&S, &str, usize, usize) -> String,
     ) -> String {
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
-        let len = items.len();
-        let mut result = String::new();
-        for (i, s) in items.into_iter().enumerate() {
-            result.push_str(&format_rule(state, &s, i, len));
-        }
-        result
+        let l = items.len();
+        items
+            .into_par_iter()
+            .enumerate()
+            .map(|(i, s)| f(st, &s, i, l))
+            .reduce(
+                || String::new(),
+                |mut a, c| {
+                    a.push_str(&c);
+                    a
+                },
+            )
     }
 }
 
@@ -1284,23 +1088,27 @@ where
 {
     fn par_iter_string_rule_owned(self, rule: R) -> String;
 }
-
 #[cfg(feature = "rayon")]
 impl<I, T, R> ParIteratorStringRuleOwned<R> for I
 where
     I: rayon::iter::ParallelIterator<Item = T>,
     T: core::fmt::Display,
-    R: FormatRuleNoStateOwned + Clone,
+    R: FormatRuleNoStateOwned + Clone + Sync,
 {
-    #[inline(always)]
     fn par_iter_string_rule_owned(self, rule: R) -> String {
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
-        let len = items.len();
-        let mut result = String::new();
-        for (i, s) in items.into_iter().enumerate() {
-            result.push_str(&rule.clone().format(&s, i, len));
-        }
-        result
+        let l = items.len();
+        items
+            .into_par_iter()
+            .enumerate()
+            .map(|(i, s)| rule.clone().format(&s, i, l))
+            .reduce(
+                || String::new(),
+                |mut a, c| {
+                    a.push_str(&c);
+                    a
+                },
+            )
     }
 }
 
@@ -1311,7 +1119,6 @@ where
 {
     fn par_iter_string_mut_rule_owned(self, rule: R) -> String;
 }
-
 #[cfg(feature = "rayon")]
 impl<I, T, R> ParIteratorStringMutRuleOwned<R> for I
 where
@@ -1319,15 +1126,14 @@ where
     T: core::fmt::Display,
     R: FormatRuleMutNoState,
 {
-    #[inline(always)]
     fn par_iter_string_mut_rule_owned(self, mut rule: R) -> String {
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
-        let len = items.len();
-        let mut result = String::new();
+        let l = items.len();
+        let mut r = String::new();
         for (i, s) in items.into_iter().enumerate() {
-            result.push_str(&rule.format(&s, i, len));
+            r.push_str(&rule.format(&s, i, l));
         }
-        result
+        r
     }
 }
 
@@ -1336,25 +1142,30 @@ pub trait ParIteratorStringWithStateRuleOwned<S, R>
 where
     R: FormatRule<S>,
 {
-    fn par_iter_string_with_state_rule_owned(self, state: &S, rule: R) -> String;
+    fn par_iter_string_with_state_rule_owned(self, st: &S, rule: R) -> String;
 }
-
 #[cfg(feature = "rayon")]
 impl<I, T, S, R> ParIteratorStringWithStateRuleOwned<S, R> for I
 where
     I: rayon::iter::ParallelIterator<Item = T>,
     T: core::fmt::Display,
-    R: FormatRule<S>,
+    S: Sync,
+    R: FormatRule<S> + Sync,
 {
-    #[inline(always)]
-    fn par_iter_string_with_state_rule_owned(self, state: &S, rule: R) -> String {
+    fn par_iter_string_with_state_rule_owned(self, st: &S, rule: R) -> String {
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
-        let len = items.len();
-        let mut result = String::new();
-        for (i, s) in items.into_iter().enumerate() {
-            result.push_str(&rule.format(state, &s, i, len));
-        }
-        result
+        let l = items.len();
+        items
+            .into_par_iter()
+            .enumerate()
+            .map(|(i, s)| rule.format(st, &s, i, l))
+            .reduce(
+                || String::new(),
+                |mut a, c| {
+                    a.push_str(&c);
+                    a
+                },
+            )
     }
 }
 
@@ -1363,9 +1174,8 @@ pub trait ParIteratorStringWithStateMutRuleOwned<S, R>
 where
     R: FormatRuleMut<S>,
 {
-    fn par_iter_string_with_state_mut_rule_owned(self, initial_state: S, rule: R) -> String;
+    fn par_iter_string_with_state_mut_rule_owned(self, st: S, rule: R) -> String;
 }
-
 #[cfg(feature = "rayon")]
 impl<I, T, S, R> ParIteratorStringWithStateMutRuleOwned<S, R> for I
 where
@@ -1373,19 +1183,14 @@ where
     T: core::fmt::Display,
     R: FormatRuleMut<S>,
 {
-    #[inline(always)]
-    fn par_iter_string_with_state_mut_rule_owned(
-        self,
-        mut initial_state: S,
-        mut rule: R,
-    ) -> String {
+    fn par_iter_string_with_state_mut_rule_owned(self, mut st: S, mut rule: R) -> String {
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
-        let len = items.len();
-        let mut result = String::new();
+        let l = items.len();
+        let mut r = String::new();
         for (i, s) in items.into_iter().enumerate() {
-            result.push_str(&rule.format(&mut initial_state, &s, i, len));
+            r.push_str(&rule.format(&mut st, &s, i, l));
         }
-        result
+        r
     }
 }
 
@@ -1396,23 +1201,27 @@ where
 {
     fn par_iter_string_rule_ref(self, rule: &'a R) -> String;
 }
-
 #[cfg(feature = "rayon")]
 impl<'a, I, T, R> ParIteratorStringRuleRef<'a, R> for I
 where
     I: rayon::iter::ParallelIterator<Item = T>,
     T: core::fmt::Display,
-    R: FormatRuleNoState<'a>,
+    R: FormatRuleNoState<'a> + Sync,
 {
-    #[inline(always)]
     fn par_iter_string_rule_ref(self, rule: &'a R) -> String {
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
-        let len = items.len();
-        let mut result = String::new();
-        for (i, s) in items.into_iter().enumerate() {
-            result.push_str(&rule.format(&s, i, len));
-        }
-        result
+        let l = items.len();
+        items
+            .into_par_iter()
+            .enumerate()
+            .map(|(i, s)| rule.format(&s, i, l))
+            .reduce(
+                || String::new(),
+                |mut a, c| {
+                    a.push_str(&c);
+                    a
+                },
+            )
     }
 }
 
@@ -1423,7 +1232,6 @@ where
 {
     fn par_iter_string_mut_rule_ref(self, rule: &mut R) -> String;
 }
-
 #[cfg(feature = "rayon")]
 impl<I, T, R> ParIteratorStringMutRuleRef<R> for I
 where
@@ -1431,15 +1239,14 @@ where
     T: core::fmt::Display,
     R: FormatRuleMutNoState,
 {
-    #[inline(always)]
     fn par_iter_string_mut_rule_ref(self, rule: &mut R) -> String {
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
-        let len = items.len();
-        let mut result = String::new();
+        let l = items.len();
+        let mut r = String::new();
         for (i, s) in items.into_iter().enumerate() {
-            result.push_str(&rule.format(&s, i, len));
+            r.push_str(&rule.format(&s, i, l));
         }
-        result
+        r
     }
 }
 
@@ -1448,25 +1255,30 @@ pub trait ParIteratorStringWithStateRuleRef<S, R>
 where
     R: FormatRule<S>,
 {
-    fn par_iter_string_with_state_rule_ref(self, state: &S, rule: &R) -> String;
+    fn par_iter_string_with_state_rule_ref(self, st: &S, rule: &R) -> String;
 }
-
 #[cfg(feature = "rayon")]
 impl<I, T, S, R> ParIteratorStringWithStateRuleRef<S, R> for I
 where
     I: rayon::iter::ParallelIterator<Item = T>,
     T: core::fmt::Display,
-    R: FormatRule<S>,
+    S: Sync,
+    R: FormatRule<S> + Sync,
 {
-    #[inline(always)]
-    fn par_iter_string_with_state_rule_ref(self, state: &S, rule: &R) -> String {
+    fn par_iter_string_with_state_rule_ref(self, st: &S, rule: &R) -> String {
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
-        let len = items.len();
-        let mut result = String::new();
-        for (i, s) in items.into_iter().enumerate() {
-            result.push_str(&rule.format(state, &s, i, len));
-        }
-        result
+        let l = items.len();
+        items
+            .into_par_iter()
+            .enumerate()
+            .map(|(i, s)| rule.format(st, &s, i, l))
+            .reduce(
+                || String::new(),
+                |mut a, c| {
+                    a.push_str(&c);
+                    a
+                },
+            )
     }
 }
 
@@ -1475,9 +1287,8 @@ pub trait ParIteratorStringWithStateMutRuleRef<S, R>
 where
     R: FormatRuleMut<S>,
 {
-    fn par_iter_string_with_state_mut_rule_ref(self, initial_state: S, rule: &mut R) -> String;
+    fn par_iter_string_with_state_mut_rule_ref(self, st: S, rule: &mut R) -> String;
 }
-
 #[cfg(feature = "rayon")]
 impl<I, T, S, R> ParIteratorStringWithStateMutRuleRef<S, R> for I
 where
@@ -1485,302 +1296,820 @@ where
     T: core::fmt::Display,
     R: FormatRuleMut<S>,
 {
-    #[inline(always)]
-    fn par_iter_string_with_state_mut_rule_ref(self, mut initial_state: S, rule: &mut R) -> String {
+    fn par_iter_string_with_state_mut_rule_ref(self, mut st: S, rule: &mut R) -> String {
         let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
-        let len = items.len();
-        let mut result = String::new();
+        let l = items.len();
+        let mut r = String::new();
         for (i, s) in items.into_iter().enumerate() {
-            result.push_str(&rule.format(&mut initial_state, &s, i, len));
+            r.push_str(&rule.format(&mut st, &s, i, l));
         }
-        result
+        r
     }
 }
 
-#[cfg(feature = "rayon")]
-#[doc(hidden)]
-pub trait ParIteratorStringAll:
-    ParIteratorString
-    + ParIteratorStringFn<fn(&str, usize, usize) -> String>
-    + ParIteratorStringFnMut<fn(&str, usize, usize) -> String>
-    + ParIteratorStringWithState<(), fn(&mut (), &str, usize, usize) -> String>
-    + ParIteratorStringWithStateFn<(), fn(&(), &str, usize, usize) -> String>
-    + ParIteratorStringWithStateFnPtr<()>
-    + ParIteratorStringRuleOwned<fn(&str, usize, usize) -> String>
-    + ParIteratorStringMutRuleOwned<fn(&str, usize, usize) -> String>
-    + ParIteratorStringWithStateRuleOwned<(), fn(&(), &str, usize, usize) -> String>
-    + ParIteratorStringWithStateMutRuleOwned<(), fn(&mut (), &str, usize, usize) -> String>
-    + ParIteratorStringRuleRef<'static, fn(&str, usize, usize) -> String>
-    + ParIteratorStringMutRuleRef<fn(&str, usize, usize) -> String>
-    + ParIteratorStringWithStateRuleRef<(), fn(&(), &str, usize, usize) -> String>
-    + ParIteratorStringWithStateMutRuleRef<(), fn(&mut (), &str, usize, usize) -> String>
+// ============================================================================
+// DYN ASYNC (Fut: Future, .await напрямую — Fut уже Sized)
+// ============================================================================
+
+#[cfg(feature = "dyn_async")]
+pub trait VecStringFnAsync<'a, F, Fut>
+where
+    F: Fn(&str, usize, usize) -> Fut,
+    Fut: core::future::Future<Output = String> + 'a,
 {
+    fn vec_string_async_fn(
+        &'a self,
+        f: &'a F,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a>;
 }
-
-#[cfg(feature = "rayon")]
-impl<I> ParIteratorStringAll for I where
-    I: rayon::iter::ParallelIterator
-        + ParIteratorString
-        + ParIteratorStringFn<fn(&str, usize, usize) -> String>
-        + ParIteratorStringFnMut<fn(&str, usize, usize) -> String>
-        + ParIteratorStringWithState<(), fn(&mut (), &str, usize, usize) -> String>
-        + ParIteratorStringWithStateFn<(), fn(&(), &str, usize, usize) -> String>
-        + ParIteratorStringWithStateFnPtr<()>
-        + ParIteratorStringRuleOwned<fn(&str, usize, usize) -> String>
-        + ParIteratorStringMutRuleOwned<fn(&str, usize, usize) -> String>
-        + ParIteratorStringWithStateRuleOwned<(), fn(&(), &str, usize, usize) -> String>
-        + ParIteratorStringWithStateMutRuleOwned<(), fn(&mut (), &str, usize, usize) -> String>
-        + ParIteratorStringRuleRef<'static, fn(&str, usize, usize) -> String>
-        + ParIteratorStringMutRuleRef<fn(&str, usize, usize) -> String>
-        + ParIteratorStringWithStateRuleRef<(), fn(&(), &str, usize, usize) -> String>
-        + ParIteratorStringWithStateMutRuleRef<(), fn(&mut (), &str, usize, usize) -> String>
+#[cfg(feature = "dyn_async")]
+impl<'a, T, F, Fut> VecStringFnAsync<'a, F, Fut> for Vec<T>
+where
+    T: core::fmt::Display,
+    F: Fn(&str, usize, usize) -> Fut,
+    Fut: core::future::Future<Output = String> + 'a,
 {
+    fn vec_string_async_fn(
+        &'a self,
+        f: &'a F,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a> {
+        Box::new(async move {
+            let l = self.len();
+            let mut r = String::new();
+            r.reserve(l.saturating_mul(16));
+            for (i, x) in self.iter().enumerate() {
+                let s = format!("{}", x);
+                r.push_str(&f(&s, i, l).await);
+            }
+            r
+        })
+    }
 }
 
-// Реализация маркерного трейта ExtendedDisplay для адаптеров rayon
-#[cfg(feature = "rayon")]
-macro_rules! impl_extended_display_rayon_adapters {
-    () => {
-        impl<I, F> ExtendedDisplay for rayon::iter::Map<I, F> where
-            rayon::iter::Map<I, F>: ParIteratorStringAll
-        {
-        }
-        impl<I, P> ExtendedDisplay for rayon::iter::Filter<I, P> where
-            rayon::iter::Filter<I, P>: ParIteratorStringAll
-        {
-        }
-        impl<I, F> ExtendedDisplay for rayon::iter::FlatMap<I, F> where
-            rayon::iter::FlatMap<I, F>: ParIteratorStringAll
-        {
-        }
-        impl<I> ExtendedDisplay for rayon::iter::Flatten<I> where
-            rayon::iter::Flatten<I>: ParIteratorStringAll
-        {
-        }
-        impl<I, U> ExtendedDisplay for rayon::iter::Chain<I, U> where
-            rayon::iter::Chain<I, U>: ParIteratorStringAll
-        {
-        }
-        impl<I, F> ExtendedDisplay for rayon::iter::Inspect<I, F> where
-            rayon::iter::Inspect<I, F>: ParIteratorStringAll
-        {
-        }
-        impl<I> ExtendedDisplay for rayon::iter::Cloned<I> where
-            rayon::iter::Cloned<I>: ParIteratorStringAll
-        {
-        }
-        impl<I> ExtendedDisplay for rayon::iter::Copied<I> where
-            rayon::iter::Copied<I>: ParIteratorStringAll
-        {
-        }
-        impl<I> ExtendedDisplay for rayon::iter::Take<I> where
-            rayon::iter::Take<I>: ParIteratorStringAll
-        {
-        }
-        impl<I> ExtendedDisplay for rayon::iter::Skip<I> where
-            rayon::iter::Skip<I>: ParIteratorStringAll
-        {
-        }
-        impl<I> ExtendedDisplay for rayon::iter::Rev<I> where
-            rayon::iter::Rev<I>: ParIteratorStringAll
-        {
-        }
-        impl<I> ExtendedDisplay for rayon::iter::StepBy<I> where
-            rayon::iter::StepBy<I>: ParIteratorStringAll
-        {
-        }
-        impl<I, F> ExtendedDisplay for rayon::iter::FilterMap<I, F> where
-            rayon::iter::FilterMap<I, F>: ParIteratorStringAll
-        {
-        }
-        impl<I> ExtendedDisplay for rayon::iter::Chunks<I> where
-            rayon::iter::Chunks<I>: ParIteratorStringAll
-        {
-        }
-        impl<I> ExtendedDisplay for rayon::iter::Windows<I> where
-            rayon::iter::Windows<I>: ParIteratorStringAll
-        {
-        }
-        impl<I, U> ExtendedDisplay for rayon::iter::Zip<I, U> where
-            rayon::iter::Zip<I, U>: ParIteratorStringAll
-        {
-        }
-        impl<I, U> ExtendedDisplay for rayon::iter::Interleave<I, U> where
-            rayon::iter::Interleave<I, U>: ParIteratorStringAll
-        {
-        }
-        impl<I, U> ExtendedDisplay for rayon::iter::InterleaveShortest<I, U> where
-            rayon::iter::InterleaveShortest<I, U>: ParIteratorStringAll
-        {
-        }
-        impl<I, F> ExtendedDisplay for rayon::iter::MapWith<I, F> where
-            rayon::iter::MapWith<I, F>: ParIteratorStringAll
-        {
-        }
-        impl<I, F, Init> ExtendedDisplay for rayon::iter::MapInit<I, F, Init> where
-            rayon::iter::MapInit<I, F, Init>: ParIteratorStringAll
-        {
-        }
-        impl<I, F> ExtendedDisplay for rayon::iter::Fold<I, F> where
-            rayon::iter::Fold<I, F>: ParIteratorStringAll
-        {
-        }
-        impl<I, F, Init> ExtendedDisplay for rayon::iter::FoldWith<I, F, Init> where
-            rayon::iter::FoldWith<I, F, Init>: ParIteratorStringAll
-        {
-        }
-        impl<I, F> ExtendedDisplay for rayon::iter::Update<I, F> where
-            rayon::iter::Update<I, F>: ParIteratorStringAll
-        {
-        }
-        impl<T> ExtendedDisplay for rayon::iter::Empty<T> where
-            rayon::iter::Empty<T>: ParIteratorStringAll
-        {
-        }
-        impl<T> ExtendedDisplay for rayon::iter::Once<T> where
-            rayon::iter::Once<T>: ParIteratorStringAll
-        {
-        }
-        impl<T: Clone> ExtendedDisplay for rayon::iter::Repeat<T> where
-            rayon::iter::Repeat<T>: ParIteratorStringAll
-        {
-        }
-        impl<T> ExtendedDisplay for rayon::iter::RepeatN<T> where
-            rayon::iter::RepeatN<T>: ParIteratorStringAll
-        {
-        }
-        impl<F> ExtendedDisplay for rayon::iter::FromFn<F> where
-            rayon::iter::FromFn<F>: ParIteratorStringAll
-        {
-        }
-        impl<I, F> ExtendedDisplay for rayon::iter::TryFold<I, F> where
-            rayon::iter::TryFold<I, F>: ParIteratorStringAll
-        {
-        }
-        impl<I, F> ExtendedDisplay for rayon::iter::TryReduce<I, F> where
-            rayon::iter::TryReduce<I, F>: ParIteratorStringAll
-        {
-        }
-        impl<I> ExtendedDisplay for rayon::iter::PanicUnwind<I> where
-            rayon::iter::PanicUnwind<I>: ParIteratorStringAll
-        {
-        }
-    };
+#[cfg(feature = "dyn_async")]
+pub trait VecStringFnMutAsync<'a, F, Fut>
+where
+    F: FnMut(&str, usize, usize) -> Fut,
+    Fut: core::future::Future<Output = String> + 'a,
+{
+    fn vec_string_async_fn_mut(
+        &'a self,
+        f: &'a mut F,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a>;
+}
+#[cfg(feature = "dyn_async")]
+impl<'a, T, F, Fut> VecStringFnMutAsync<'a, F, Fut> for Vec<T>
+where
+    T: core::fmt::Display,
+    F: FnMut(&str, usize, usize) -> Fut,
+    Fut: core::future::Future<Output = String> + 'a,
+{
+    fn vec_string_async_fn_mut(
+        &'a self,
+        f: &'a mut F,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a> {
+        Box::new(async move {
+            let l = self.len();
+            let mut r = String::new();
+            r.reserve(l.saturating_mul(16));
+            for (i, x) in self.iter().enumerate() {
+                let s = format!("{}", x);
+                r.push_str(&f(&s, i, l).await);
+            }
+            r
+        })
+    }
 }
 
-#[cfg(feature = "rayon")]
-impl_extended_display_rayon_adapters!();
-
-// Реализация маркерного трейта ExtendedDisplay для источников rayon
-#[cfg(feature = "rayon")]
-macro_rules! impl_extended_display_rayon_sources {
-    () => {
-        impl<'a, T> ExtendedDisplay for rayon::slice::Iter<'a, T> where
-            rayon::slice::Iter<'a, T>: ParIteratorStringAll
-        {
-        }
-        impl<'a, T> ExtendedDisplay for rayon::slice::IterMut<'a, T> where
-            rayon::slice::IterMut<'a, T>: ParIteratorStringAll
-        {
-        }
-        impl<T> ExtendedDisplay for rayon::vec::IntoIter<T> where
-            rayon::vec::IntoIter<T>: ParIteratorStringAll
-        {
-        }
-        impl<T, const N: usize> ExtendedDisplay for rayon::array::IntoIter<T, N> where
-            rayon::array::IntoIter<T, N>: ParIteratorStringAll
-        {
-        }
-        impl<T> ExtendedDisplay for rayon::range::Iter<T> where
-            rayon::range::Iter<T>: ParIteratorStringAll
-        {
-        }
-        impl<T> ExtendedDisplay for rayon::range::IterInclusive<T> where
-            rayon::range::IterInclusive<T>: ParIteratorStringAll
-        {
-        }
-        impl<'a> ExtendedDisplay for rayon::str::ParChars<'a> where
-            rayon::str::ParChars<'a>: ParIteratorStringAll
-        {
-        }
-        impl<'a> ExtendedDisplay for rayon::str::ParLines<'a> where
-            rayon::str::ParLines<'a>: ParIteratorStringAll
-        {
-        }
-        impl<'a> ExtendedDisplay for rayon::str::ParSplitWhitespace<'a> where
-            rayon::str::ParSplitWhitespace<'a>: ParIteratorStringAll
-        {
-        }
-        impl<'a> ExtendedDisplay for rayon::str::ParBytes<'a> where
-            rayon::str::ParBytes<'a>: ParIteratorStringAll
-        {
-        }
-        impl<'a> ExtendedDisplay for rayon::str::ParCharsMut<'a> where
-            rayon::str::ParCharsMut<'a>: ParIteratorStringAll
-        {
-        }
-        impl<'a> ExtendedDisplay for rayon::str::ParSplit<'a> where
-            rayon::str::ParSplit<'a>: ParIteratorStringAll
-        {
-        }
-        impl<'a> ExtendedDisplay for rayon::str::ParSplitMut<'a> where
-            rayon::str::ParSplitMut<'a>: ParIteratorStringAll
-        {
-        }
-        impl<'a> ExtendedDisplay for rayon::str::ParSplitInclusive<'a> where
-            rayon::str::ParSplitInclusive<'a>: ParIteratorStringAll
-        {
-        }
-        impl<'a> ExtendedDisplay for rayon::str::ParSplitInclusiveMut<'a> where
-            rayon::str::ParSplitInclusiveMut<'a>: ParIteratorStringAll
-        {
-        }
-        impl<'a> ExtendedDisplay for rayon::str::ParSplitAsciiWhitespace<'a> where
-            rayon::str::ParSplitAsciiWhitespace<'a>: ParIteratorStringAll
-        {
-        }
-        impl<'a> ExtendedDisplay for rayon::str::ParBytesMut<'a> where
-            rayon::str::ParBytesMut<'a>: ParIteratorStringAll
-        {
-        }
-        impl<'a, K, V, S> ExtendedDisplay for rayon::hash_map::Iter<'a, K, V, S> where
-            rayon::hash_map::Iter<'a, K, V, S>: ParIteratorStringAll
-        {
-        }
-        impl<'a, K, V, S> ExtendedDisplay for rayon::hash_map::IterMut<'a, K, V, S> where
-            rayon::hash_map::IterMut<'a, K, V, S>: ParIteratorStringAll
-        {
-        }
-        impl<K, V, S> ExtendedDisplay for rayon::hash_map::IntoIter<K, V, S> where
-            rayon::hash_map::IntoIter<K, V, S>: ParIteratorStringAll
-        {
-        }
-        impl<'a, K, V, S> ExtendedDisplay for rayon::hash_map::Keys<'a, K, V, S> where
-            rayon::hash_map::Keys<'a, K, V, S>: ParIteratorStringAll
-        {
-        }
-        impl<'a, K, V, S> ExtendedDisplay for rayon::hash_map::Values<'a, K, V, S> where
-            rayon::hash_map::Values<'a, K, V, S>: ParIteratorStringAll
-        {
-        }
-        impl<'a, K, V, S> ExtendedDisplay for rayon::hash_map::ValuesMut<'a, K, V, S> where
-            rayon::hash_map::ValuesMut<'a, K, V, S>: ParIteratorStringAll
-        {
-        }
-        impl<'a, K, V, S> ExtendedDisplay for rayon::hash_map::Drain<'a, K, V, S> where
-            rayon::hash_map::Drain<'a, K, V, S>: ParIteratorStringAll
-        {
-        }
-    };
+#[cfg(feature = "dyn_async")]
+pub trait IteratorStringFnAsync<'a, F, Fut>
+where
+    F: Fn(&str, usize, usize) -> Fut,
+    Fut: core::future::Future<Output = String> + 'a,
+{
+    fn iter_string_async_fn(self, f: &'a F) -> Box<dyn core::future::Future<Output = String> + 'a>
+    where
+        Self: 'a;
+}
+#[cfg(feature = "dyn_async")]
+impl<'a, I, F, Fut> IteratorStringFnAsync<'a, F, Fut> for I
+where
+    I: StableIter,
+    I::Item: core::fmt::Display,
+    F: Fn(&str, usize, usize) -> Fut,
+    Fut: core::future::Future<Output = String> + 'a,
+{
+    fn iter_string_async_fn(self, f: &'a F) -> Box<dyn core::future::Future<Output = String> + 'a>
+    where
+        Self: 'a,
+    {
+        Box::new(async move {
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let l = items.len();
+            let mut r = String::new();
+            r.reserve(l.saturating_mul(16));
+            for (i, s) in items.into_iter().enumerate() {
+                r.push_str(&f(&s, i, l).await);
+            }
+            r
+        })
+    }
 }
 
-#[cfg(feature = "rayon")]
-impl_extended_display_rayon_sources!();
+#[cfg(feature = "dyn_async")]
+pub trait IteratorStringFnMutAsync<'a, F, Fut>
+where
+    F: FnMut(&str, usize, usize) -> Fut,
+    Fut: core::future::Future<Output = String> + 'a,
+{
+    fn iter_string_async_fn_mut(
+        self,
+        f: &'a mut F,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a>
+    where
+        Self: 'a;
+}
+#[cfg(feature = "dyn_async")]
+impl<'a, I, F, Fut> IteratorStringFnMutAsync<'a, F, Fut> for I
+where
+    I: StableIter,
+    I::Item: core::fmt::Display,
+    F: FnMut(&str, usize, usize) -> Fut,
+    Fut: core::future::Future<Output = String> + 'a,
+{
+    fn iter_string_async_fn_mut(
+        self,
+        f: &'a mut F,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a>
+    where
+        Self: 'a,
+    {
+        Box::new(async move {
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let l = items.len();
+            let mut r = String::new();
+            r.reserve(l.saturating_mul(16));
+            for (i, s) in items.into_iter().enumerate() {
+                r.push_str(&f(&s, i, l).await);
+            }
+            r
+        })
+    }
+}
+
+#[cfg(feature = "dyn_async")]
+pub trait VecStringWithStateAsync<'a, S, F, Fut>
+where
+    F: FnMut(&mut S, &str, usize, usize) -> Fut,
+    Fut: core::future::Future<Output = String> + 'a,
+    S: 'a,
+{
+    fn vec_string_with_state_async(
+        &'a self,
+        st: S,
+        f: &'a mut F,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a>;
+}
+#[cfg(feature = "dyn_async")]
+impl<'a, T, S, F, Fut> VecStringWithStateAsync<'a, S, F, Fut> for Vec<T>
+where
+    T: core::fmt::Display,
+    S: 'a,
+    F: FnMut(&mut S, &str, usize, usize) -> Fut,
+    Fut: core::future::Future<Output = String> + 'a,
+{
+    fn vec_string_with_state_async(
+        &'a self,
+        mut st: S,
+        f: &'a mut F,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a> {
+        Box::new(async move {
+            let l = self.len();
+            let mut r = String::new();
+            r.reserve(l.saturating_mul(16));
+            for (i, x) in self.iter().enumerate() {
+                let s = format!("{}", x);
+                r.push_str(&f(&mut st, &s, i, l).await);
+            }
+            r
+        })
+    }
+}
+
+#[cfg(feature = "dyn_async")]
+pub trait IteratorStringWithStateAsync<'a, S, F, Fut>
+where
+    F: FnMut(&mut S, &str, usize, usize) -> Fut,
+    Fut: core::future::Future<Output = String> + 'a,
+    S: 'a,
+{
+    fn iter_string_with_state_async(
+        self,
+        st: S,
+        f: &'a mut F,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a>
+    where
+        Self: 'a;
+}
+#[cfg(feature = "dyn_async")]
+impl<'a, I, S, F, Fut> IteratorStringWithStateAsync<'a, S, F, Fut> for I
+where
+    I: StableIter,
+    I::Item: core::fmt::Display,
+    S: 'a,
+    F: FnMut(&mut S, &str, usize, usize) -> Fut,
+    Fut: core::future::Future<Output = String> + 'a,
+{
+    fn iter_string_with_state_async(
+        self,
+        mut st: S,
+        f: &'a mut F,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a>
+    where
+        Self: 'a,
+    {
+        Box::new(async move {
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let l = items.len();
+            let mut r = String::new();
+            r.reserve(l.saturating_mul(16));
+            for (i, s) in items.into_iter().enumerate() {
+                r.push_str(&f(&mut st, &s, i, l).await);
+            }
+            r
+        })
+    }
+}
+
+// ============================================================================
+// IMPL ASYNC (RPITIT, Fut: Future)
+// ============================================================================
+
+#[cfg(feature = "impl_async")]
+pub trait VecStringFnImplAsync<F, Fut>
+where
+    F: Fn(&str, usize, usize) -> Fut,
+    Fut: core::future::Future<Output = String>,
+{
+    fn vec_string_async_fn<'a>(
+        &'a self,
+        f: &'a F,
+    ) -> impl core::future::Future<Output = String> + 'a
+    where
+        Self: 'a,
+        F: 'a,
+        Fut: 'a;
+}
+#[cfg(feature = "impl_async")]
+impl<T, F, Fut> VecStringFnImplAsync<F, Fut> for Vec<T>
+where
+    T: core::fmt::Display,
+    F: Fn(&str, usize, usize) -> Fut,
+    Fut: core::future::Future<Output = String>,
+{
+    fn vec_string_async_fn<'a>(
+        &'a self,
+        f: &'a F,
+    ) -> impl core::future::Future<Output = String> + 'a
+    where
+        Self: 'a,
+        F: 'a,
+        Fut: 'a,
+    {
+        async move {
+            let l = self.len();
+            let mut r = String::new();
+            r.reserve(l.saturating_mul(16));
+            for (i, x) in self.iter().enumerate() {
+                let s = format!("{}", x);
+                r.push_str(&f(&s, i, l).await);
+            }
+            r
+        }
+    }
+}
+
+#[cfg(feature = "impl_async")]
+pub trait VecStringFnMutImplAsync<F, Fut>
+where
+    F: FnMut(&str, usize, usize) -> Fut,
+    Fut: core::future::Future<Output = String>,
+{
+    fn vec_string_async_fn_mut<'a>(
+        &'a self,
+        f: &'a mut F,
+    ) -> impl core::future::Future<Output = String> + 'a
+    where
+        Self: 'a,
+        F: 'a,
+        Fut: 'a;
+}
+#[cfg(feature = "impl_async")]
+impl<T, F, Fut> VecStringFnMutImplAsync<F, Fut> for Vec<T>
+where
+    T: core::fmt::Display,
+    F: FnMut(&str, usize, usize) -> Fut,
+    Fut: core::future::Future<Output = String>,
+{
+    fn vec_string_async_fn_mut<'a>(
+        &'a self,
+        f: &'a mut F,
+    ) -> impl core::future::Future<Output = String> + 'a
+    where
+        Self: 'a,
+        F: 'a,
+        Fut: 'a,
+    {
+        async move {
+            let l = self.len();
+            let mut r = String::new();
+            r.reserve(l.saturating_mul(16));
+            for (i, x) in self.iter().enumerate() {
+                let s = format!("{}", x);
+                r.push_str(&f(&s, i, l).await);
+            }
+            r
+        }
+    }
+}
+
+#[cfg(feature = "impl_async")]
+pub trait IteratorStringFnImplAsync<F, Fut>
+where
+    F: Fn(&str, usize, usize) -> Fut,
+    Fut: core::future::Future<Output = String>,
+{
+    fn iter_string_async_fn<'a>(self, f: &'a F) -> impl core::future::Future<Output = String> + 'a
+    where
+        Self: 'a,
+        F: 'a,
+        Fut: 'a;
+}
+#[cfg(feature = "impl_async")]
+impl<I, F, Fut> IteratorStringFnImplAsync<F, Fut> for I
+where
+    I: StableIter,
+    I::Item: core::fmt::Display,
+    F: Fn(&str, usize, usize) -> Fut,
+    Fut: core::future::Future<Output = String>,
+{
+    fn iter_string_async_fn<'a>(self, f: &'a F) -> impl core::future::Future<Output = String> + 'a
+    where
+        Self: 'a,
+        F: 'a,
+        Fut: 'a,
+    {
+        async move {
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let l = items.len();
+            let mut r = String::new();
+            r.reserve(l.saturating_mul(16));
+            for (i, s) in items.into_iter().enumerate() {
+                r.push_str(&f(&s, i, l).await);
+            }
+            r
+        }
+    }
+}
+
+#[cfg(feature = "impl_async")]
+pub trait IteratorStringFnMutImplAsync<F, Fut>
+where
+    F: FnMut(&str, usize, usize) -> Fut,
+    Fut: core::future::Future<Output = String>,
+{
+    fn iter_string_async_fn_mut<'a>(
+        self,
+        f: &'a mut F,
+    ) -> impl core::future::Future<Output = String> + 'a
+    where
+        Self: 'a,
+        F: 'a,
+        Fut: 'a;
+}
+#[cfg(feature = "impl_async")]
+impl<I, F, Fut> IteratorStringFnMutImplAsync<F, Fut> for I
+where
+    I: StableIter,
+    I::Item: core::fmt::Display,
+    F: FnMut(&str, usize, usize) -> Fut,
+    Fut: core::future::Future<Output = String>,
+{
+    fn iter_string_async_fn_mut<'a>(
+        self,
+        f: &'a mut F,
+    ) -> impl core::future::Future<Output = String> + 'a
+    where
+        Self: 'a,
+        F: 'a,
+        Fut: 'a,
+    {
+        async move {
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let l = items.len();
+            let mut r = String::new();
+            r.reserve(l.saturating_mul(16));
+            for (i, s) in items.into_iter().enumerate() {
+                r.push_str(&f(&s, i, l).await);
+            }
+            r
+        }
+    }
+}
+
+#[cfg(feature = "impl_async")]
+pub trait VecStringWithStateImplAsync<S, F, Fut>
+where
+    F: FnMut(&mut S, &str, usize, usize) -> Fut,
+    Fut: core::future::Future<Output = String>,
+{
+    fn vec_string_with_state_async<'a>(
+        &'a self,
+        st: S,
+        f: &'a mut F,
+    ) -> impl core::future::Future<Output = String> + 'a
+    where
+        Self: 'a,
+        F: 'a,
+        S: 'a,
+        Fut: 'a;
+}
+#[cfg(feature = "impl_async")]
+impl<T, S, F, Fut> VecStringWithStateImplAsync<S, F, Fut> for Vec<T>
+where
+    T: core::fmt::Display,
+    F: FnMut(&mut S, &str, usize, usize) -> Fut,
+    Fut: core::future::Future<Output = String>,
+{
+    fn vec_string_with_state_async<'a>(
+        &'a self,
+        mut st: S,
+        f: &'a mut F,
+    ) -> impl core::future::Future<Output = String> + 'a
+    where
+        Self: 'a,
+        F: 'a,
+        S: 'a,
+        Fut: 'a,
+    {
+        async move {
+            let l = self.len();
+            let mut r = String::new();
+            r.reserve(l.saturating_mul(16));
+            for (i, x) in self.iter().enumerate() {
+                let s = format!("{}", x);
+                r.push_str(&f(&mut st, &s, i, l).await);
+            }
+            r
+        }
+    }
+}
+
+#[cfg(feature = "impl_async")]
+pub trait IteratorStringWithStateImplAsync<S, F, Fut>
+where
+    F: FnMut(&mut S, &str, usize, usize) -> Fut,
+    Fut: core::future::Future<Output = String>,
+{
+    fn iter_string_with_state_async<'a>(
+        self,
+        st: S,
+        f: &'a mut F,
+    ) -> impl core::future::Future<Output = String> + 'a
+    where
+        Self: 'a,
+        F: 'a,
+        S: 'a,
+        Fut: 'a;
+}
+#[cfg(feature = "impl_async")]
+impl<I, S, F, Fut> IteratorStringWithStateImplAsync<S, F, Fut> for I
+where
+    I: StableIter,
+    I::Item: core::fmt::Display,
+    F: FnMut(&mut S, &str, usize, usize) -> Fut,
+    Fut: core::future::Future<Output = String>,
+{
+    fn iter_string_with_state_async<'a>(
+        self,
+        mut st: S,
+        f: &'a mut F,
+    ) -> impl core::future::Future<Output = String> + 'a
+    where
+        Self: 'a,
+        F: 'a,
+        S: 'a,
+        Fut: 'a,
+    {
+        async move {
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let l = items.len();
+            let mut r = String::new();
+            r.reserve(l.saturating_mul(16));
+            for (i, s) in items.into_iter().enumerate() {
+                r.push_str(&f(&mut st, &s, i, l).await);
+            }
+            r
+        }
+    }
+}
+
+// ============================================================================
+// RAYON + DYN ASYNC
+// ============================================================================
+
+#[cfg(all(feature = "rayon", feature = "dyn_async"))]
+pub trait ParIteratorStringFnAsync<'a, F, Fut>
+where
+    F: Fn(&str, usize, usize) -> Fut + Sync,
+    Fut: core::future::Future<Output = String> + 'a,
+{
+    fn par_iter_string_async_fn(
+        self,
+        f: &'a F,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a>
+    where
+        Self: 'a;
+}
+#[cfg(all(feature = "rayon", feature = "dyn_async"))]
+impl<'a, I, T, F, Fut> ParIteratorStringFnAsync<'a, F, Fut> for I
+where
+    I: rayon::iter::ParallelIterator<Item = T>,
+    T: core::fmt::Display,
+    F: Fn(&str, usize, usize) -> Fut + Sync,
+    Fut: core::future::Future<Output = String> + 'a,
+{
+    fn par_iter_string_async_fn(
+        self,
+        f: &'a F,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a>
+    where
+        Self: 'a,
+    {
+        Box::new(async move {
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let l = items.len();
+            let mut r = String::new();
+            r.reserve(l.saturating_mul(16));
+            for (i, s) in items.into_iter().enumerate() {
+                r.push_str(&f(&s, i, l).await);
+            }
+            r
+        })
+    }
+}
+
+#[cfg(all(feature = "rayon", feature = "dyn_async"))]
+pub trait ParIteratorStringFnMutAsync<'a, F, Fut>
+where
+    F: FnMut(&str, usize, usize) -> Fut,
+    Fut: core::future::Future<Output = String> + 'a,
+{
+    fn par_iter_string_async_fn_mut(
+        self,
+        f: &'a mut F,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a>
+    where
+        Self: 'a;
+}
+#[cfg(all(feature = "rayon", feature = "dyn_async"))]
+impl<'a, I, T, F, Fut> ParIteratorStringFnMutAsync<'a, F, Fut> for I
+where
+    I: rayon::iter::ParallelIterator<Item = T>,
+    T: core::fmt::Display,
+    F: FnMut(&str, usize, usize) -> Fut,
+    Fut: core::future::Future<Output = String> + 'a,
+{
+    fn par_iter_string_async_fn_mut(
+        self,
+        f: &'a mut F,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a>
+    where
+        Self: 'a,
+    {
+        Box::new(async move {
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let l = items.len();
+            let mut r = String::new();
+            r.reserve(l.saturating_mul(16));
+            for (i, s) in items.into_iter().enumerate() {
+                r.push_str(&f(&s, i, l).await);
+            }
+            r
+        })
+    }
+}
+
+#[cfg(all(feature = "rayon", feature = "dyn_async"))]
+pub trait ParIteratorStringFnPtrAsync {
+    fn par_iter_string_async_fn_ptr<'a>(
+        self,
+        f: FormatRuleFn,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a>
+    where
+        Self: 'a;
+}
+#[cfg(all(feature = "rayon", feature = "dyn_async"))]
+impl<I, T> ParIteratorStringFnPtrAsync for I
+where
+    I: rayon::iter::ParallelIterator<Item = T>,
+    T: core::fmt::Display,
+{
+    fn par_iter_string_async_fn_ptr<'a>(
+        self,
+        f: FormatRuleFn,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a>
+    where
+        Self: 'a,
+    {
+        Box::new(async move {
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let l = items.len();
+            let mut r = String::new();
+            r.reserve(l.saturating_mul(16));
+            for (i, s) in items.into_iter().enumerate() {
+                r.push_str(&f(&s, i, l));
+            }
+            r
+        })
+    }
+}
+
+// ============================================================================
+// RAYON + IMPL ASYNC
+// ============================================================================
+
+#[cfg(all(feature = "rayon", feature = "impl_async"))]
+pub trait ParIteratorStringFnImplAsync<F, Fut>
+where
+    F: Fn(&str, usize, usize) -> Fut + Sync,
+    Fut: core::future::Future<Output = String>,
+{
+    fn par_iter_string_async_fn<'a>(
+        self,
+        f: &'a F,
+    ) -> impl core::future::Future<Output = String> + 'a
+    where
+        Self: 'a,
+        F: 'a,
+        Fut: 'a;
+}
+#[cfg(all(feature = "rayon", feature = "impl_async"))]
+impl<I, T, F, Fut> ParIteratorStringFnImplAsync<F, Fut> for I
+where
+    I: rayon::iter::ParallelIterator<Item = T>,
+    T: core::fmt::Display,
+    F: Fn(&str, usize, usize) -> Fut + Sync,
+    Fut: core::future::Future<Output = String>,
+{
+    fn par_iter_string_async_fn<'a>(
+        self,
+        f: &'a F,
+    ) -> impl core::future::Future<Output = String> + 'a
+    where
+        Self: 'a,
+        F: 'a,
+        Fut: 'a,
+    {
+        async move {
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let l = items.len();
+            let mut r = String::new();
+            r.reserve(l.saturating_mul(16));
+            for (i, s) in items.into_iter().enumerate() {
+                r.push_str(&f(&s, i, l).await);
+            }
+            r
+        }
+    }
+}
+
+#[cfg(all(feature = "rayon", feature = "impl_async"))]
+pub trait ParIteratorStringFnMutImplAsync<F, Fut>
+where
+    F: FnMut(&str, usize, usize) -> Fut,
+    Fut: core::future::Future<Output = String>,
+{
+    fn par_iter_string_async_fn_mut<'a>(
+        self,
+        f: &'a mut F,
+    ) -> impl core::future::Future<Output = String> + 'a
+    where
+        Self: 'a,
+        F: 'a,
+        Fut: 'a;
+}
+#[cfg(all(feature = "rayon", feature = "impl_async"))]
+impl<I, T, F, Fut> ParIteratorStringFnMutImplAsync<F, Fut> for I
+where
+    I: rayon::iter::ParallelIterator<Item = T>,
+    T: core::fmt::Display,
+    F: FnMut(&str, usize, usize) -> Fut,
+    Fut: core::future::Future<Output = String>,
+{
+    fn par_iter_string_async_fn_mut<'a>(
+        self,
+        f: &'a mut F,
+    ) -> impl core::future::Future<Output = String> + 'a
+    where
+        Self: 'a,
+        F: 'a,
+        Fut: 'a,
+    {
+        async move {
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let l = items.len();
+            let mut r = String::new();
+            r.reserve(l.saturating_mul(16));
+            for (i, s) in items.into_iter().enumerate() {
+                r.push_str(&f(&s, i, l).await);
+            }
+            r
+        }
+    }
+}
+
+#[cfg(all(feature = "rayon", feature = "impl_async"))]
+pub trait ParIteratorStringFnPtrImplAsync {
+    fn par_iter_string_async_fn_ptr<'a>(
+        self,
+        f: FormatRuleFn,
+    ) -> impl core::future::Future<Output = String> + 'a
+    where
+        Self: 'a;
+}
+#[cfg(all(feature = "rayon", feature = "impl_async"))]
+impl<I, T> ParIteratorStringFnPtrImplAsync for I
+where
+    I: rayon::iter::ParallelIterator<Item = T>,
+    T: core::fmt::Display,
+{
+    fn par_iter_string_async_fn_ptr<'a>(
+        self,
+        f: FormatRuleFn,
+    ) -> impl core::future::Future<Output = String> + 'a
+    where
+        Self: 'a,
+    {
+        async move {
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let l = items.len();
+            let mut r = String::new();
+            r.reserve(l.saturating_mul(16));
+            for (i, s) in items.into_iter().enumerate() {
+                r.push_str(&f(&s, i, l));
+            }
+            r
+        }
+    }
+}
+
+// ============================================================================
+// ТЕСТЫ
+// ============================================================================
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use alloc::vec;
+
+    #[cfg(any(feature = "dyn_async", feature = "impl_async"))]
+    fn noop_raw_waker() -> core::task::RawWaker {
+        fn no_op(_: *const ()) {}
+        fn clone(p: *const ()) -> core::task::RawWaker {
+            core::task::RawWaker::new(p, &VTABLE)
+        }
+        static VTABLE: core::task::RawWakerVTable =
+            core::task::RawWakerVTable::new(clone, no_op, no_op, no_op);
+        core::task::RawWaker::new(core::ptr::null(), &VTABLE)
+    }
+
+    #[cfg(any(feature = "dyn_async", feature = "impl_async"))]
+    fn block_on<F: core::future::Future>(mut fut: F) -> F::Output {
+        let mut fut = unsafe { core::pin::Pin::new_unchecked(&mut fut) };
+        let waker = unsafe { core::task::Waker::from_raw(noop_raw_waker()) };
+        let mut cx = core::task::Context::from_waker(&waker);
+        loop {
+            if let core::task::Poll::Ready(val) = fut.as_mut().poll(&mut cx) {
+                return val;
+            }
+            core::hint::spin_loop();
+        }
+    }
+
+    #[cfg(feature = "dyn_async")]
+    fn block_on_dyn<'a, T>(fut: Box<dyn core::future::Future<Output = T> + 'a>) -> T {
+        let mut pin_future = Box::into_pin(fut);
+        let mut fut = pin_future.as_mut();
+        let waker = unsafe { core::task::Waker::from_raw(noop_raw_waker()) };
+        let mut cx = core::task::Context::from_waker(&waker);
+        loop {
+            if let core::task::Poll::Ready(val) = fut.as_mut().poll(&mut cx) {
+                return val;
+            }
+            core::hint::spin_loop();
+        }
+    }
 
     #[test]
     fn test_vec_string_default() {
@@ -1808,29 +2137,35 @@ mod tests {
 
     #[test]
     fn test_iterator_string() {
-        let numbers = vec![1, 2, 3];
-        let s = IteratorString::iter_string(numbers.iter().map(|x| x * 10), DEFAULT_FORMAT_RULE);
-        assert_eq!("[10, 20, 30]", s);
+        let n = vec![1, 2, 3];
+        assert_eq!(
+            "[10, 20, 30]",
+            IteratorString::iter_string(n.iter().map(|x| x * 10), DEFAULT_FORMAT_RULE)
+        );
     }
 
     #[test]
     fn test_iterator_string_empty() {
-        let numbers: Vec<i32> = vec![];
-        let s = IteratorString::iter_string(numbers.iter().map(|x| x * 10), DEFAULT_FORMAT_RULE);
-        assert_eq!("", s);
+        let n: Vec<i32> = vec![];
+        assert_eq!(
+            "",
+            IteratorString::iter_string(n.iter().map(|x| x * 10), DEFAULT_FORMAT_RULE)
+        );
     }
 
     #[test]
     fn test_iterator_string_single() {
-        let numbers = vec![42];
-        let s = IteratorString::iter_string(numbers.iter().map(|x| x * 10), DEFAULT_FORMAT_RULE);
-        assert_eq!("[420]", s);
+        let n = vec![42];
+        assert_eq!(
+            "[420]",
+            IteratorString::iter_string(n.iter().map(|x| x * 10), DEFAULT_FORMAT_RULE)
+        );
     }
 
     #[test]
     fn test_vec_string_fn() {
         let v = vec!["a", "bb", "ccc"];
-        let res = VecStringFn::vec_string(&v, |val, idx, total| {
+        let res = VecStringFn::vec_string_fn(&v, |val, idx, total| {
             if total == 0 {
                 return String::new();
             }
@@ -1853,7 +2188,7 @@ mod tests {
     #[test]
     fn test_vec_string_fn_single() {
         let v = vec!["only"];
-        let res = VecStringFn::vec_string(&v, |val, idx, total| {
+        let res = VecStringFn::vec_string_fn(&v, |val, idx, total| {
             if total == 0 {
                 return String::new();
             }
@@ -1877,7 +2212,7 @@ mod tests {
     fn test_vec_string_fn_mut() {
         let v = vec!["x", "y", "z"];
         let mut counter = 0;
-        let res = VecStringFnMut::vec_string(&v, |val, _idx, _total| {
+        let res = VecStringFnMut::vec_string_fn_mut(&v, |val, _idx, _total| {
             counter += 1;
             format!("{}{}", val, counter)
         });
@@ -1889,7 +2224,7 @@ mod tests {
     fn test_vec_string_fn_mut_empty() {
         let v: Vec<&str> = vec![];
         let mut counter = 0;
-        let res = VecStringFnMut::vec_string(&v, |val, _idx, _total| {
+        let res = VecStringFnMut::vec_string_fn_mut(&v, |val, _idx, _total| {
             counter += 1;
             format!("{}{}", val, counter)
         });
@@ -1900,7 +2235,7 @@ mod tests {
     #[test]
     fn test_iterator_string_fn() {
         let v = vec![1, 2, 3];
-        let res = IteratorStringFn::iter_string(v.iter(), |val, idx, total| {
+        let res = IteratorStringFn::iter_string_fn(v.iter(), |val, idx, total| {
             if total == 0 {
                 return String::new();
             }
@@ -1924,7 +2259,7 @@ mod tests {
     fn test_iterator_string_fn_mut() {
         let v = vec![10, 20, 30];
         let mut sum = 0;
-        let res = IteratorStringFnMut::iter_string(v.iter(), |val, idx, total| {
+        let res = IteratorStringFnMut::iter_string_fn_mut(v.iter(), |val, idx, total| {
             let num: i32 = val.parse().unwrap_or(0);
             sum += num;
             if total == 0 {
@@ -2124,29 +2459,31 @@ mod tests {
     fn test_vec_string_with_state_fn_ptr() {
         let data = vec!["a", "b", "c"];
         let prefix = ">>".to_string();
-        let result = data.vec_string_with_state_fn_ptr(&prefix, format_with_prefix);
-        assert_eq!(result, "[>>a, >>b, >>c]");
+        assert_eq!(
+            "[>>a, >>b, >>c]",
+            data.vec_string_with_state_fn_ptr(&prefix, format_with_prefix)
+        );
     }
 
     #[test]
     fn test_iterator_string_with_state_fn_ptr() {
         let data = vec!["x", "y"].into_iter();
         let prefix = "##".to_string();
-        let result = data.iter_string_with_state_fn_ptr(&prefix, format_with_prefix);
-        assert_eq!(result, "[##x, ##y]");
+        assert_eq!(
+            "[##x, ##y]",
+            data.iter_string_with_state_fn_ptr(&prefix, format_with_prefix)
+        );
     }
 
     #[test]
     fn test_vec_string_with_state_fn_ptr_empty() {
         let data: Vec<&str> = vec![];
         let prefix = ">>".to_string();
-        let result = data.vec_string_with_state_fn_ptr(&prefix, format_with_prefix);
-        assert_eq!(result, "");
+        assert_eq!(
+            "",
+            data.vec_string_with_state_fn_ptr(&prefix, format_with_prefix)
+        );
     }
-
-    // ========================================================================
-    // ТЕСТЫ ДЛЯ НОВЫХ ТРЕЙТОВ: ВЕРСИИ С ВЛАДЕНИЕМ
-    // ========================================================================
 
     #[test]
     fn test_vec_string_rule_owned() {
@@ -2168,8 +2505,7 @@ mod tests {
                 format!(", {}", value)
             }
         };
-        let res = v.vec_string_rule_owned(fmt);
-        assert_eq!(res, "<1, 2, 3>");
+        assert_eq!("<1, 2, 3>", v.vec_string_rule_owned(fmt));
     }
 
     #[test]
@@ -2180,8 +2516,7 @@ mod tests {
             counter += 1;
             format!("[{}{}]", value, counter)
         };
-        let res = v.vec_string_mut_rule_owned(fmt);
-        assert_eq!(res, "[a1][b2][c3]");
+        assert_eq!("[a1][b2][c3]", v.vec_string_mut_rule_owned(fmt));
         assert_eq!(counter, 3);
     }
 
@@ -2205,8 +2540,7 @@ mod tests {
                 format!(", {}", value)
             }
         };
-        let res = v.iter().iter_string_rule_owned(fmt);
-        assert_eq!(res, "{10, 20, 30}");
+        assert_eq!("{10, 20, 30}", v.iter().iter_string_rule_owned(fmt));
     }
 
     #[test]
@@ -2226,8 +2560,10 @@ mod tests {
                 format!("{}, ", value)
             }
         };
-        let res = v.iter().iter_string_mut_rule_owned(fmt);
-        assert_eq!(res, "1, 2, 3 (total=6)");
+        assert_eq!(
+            "1, 2, 3 (total=6)",
+            v.iter().iter_string_mut_rule_owned(fmt)
+        );
         assert_eq!(sum, 6);
     }
 
@@ -2252,8 +2588,10 @@ mod tests {
                 format!(", {}{}", state, value)
             }
         };
-        let result = data.vec_string_with_state_rule_owned(&prefix, fmt);
-        assert_eq!(result, "[>>hello, >>world]");
+        assert_eq!(
+            "[>>hello, >>world]",
+            data.vec_string_with_state_rule_owned(&prefix, fmt)
+        );
     }
 
     #[test]
@@ -2279,8 +2617,10 @@ mod tests {
                 format!(", {}", formatted)
             }
         };
-        let result = data.iter_string_with_state_rule_owned(&multiplier, fmt);
-        assert_eq!(result, "[10, 20, 30]");
+        assert_eq!(
+            "[10, 20, 30]",
+            data.iter_string_with_state_rule_owned(&multiplier, fmt)
+        );
     }
 
     #[test]
@@ -2307,8 +2647,10 @@ mod tests {
                 format!(", sum={}: {}", state, value)
             }
         };
-        let result = data.vec_string_with_state_mut_rule_owned(sum, fmt);
-        assert_eq!(result, "(sum=1: 1, sum=3: 2, sum=6: 3)");
+        assert_eq!(
+            "(sum=1: 1, sum=3: 2, sum=6: 3)",
+            data.vec_string_with_state_mut_rule_owned(sum, fmt)
+        );
     }
 
     #[test]
@@ -2339,15 +2681,12 @@ mod tests {
                     format!(", {}", short)
                 }
             };
-        let result = data
-            .iter()
-            .iter_string_with_state_mut_rule_owned(positions, fmt);
-        assert_eq!(result, "[hello, orld, st]");
+        assert_eq!(
+            "[hello, orld, st]",
+            data.iter()
+                .iter_string_with_state_mut_rule_owned(positions, fmt)
+        );
     }
-
-    // ========================================================================
-    // ТЕСТЫ ДЛЯ НОВЫХ ТРЕЙТОВ: ВЕРСИИ ПО ССЫЛКЕ
-    // ========================================================================
 
     #[test]
     fn test_vec_string_rule_ref() {
@@ -2369,8 +2708,7 @@ mod tests {
                 format!(", {}", value)
             }
         };
-        let res = v.vec_string_rule_ref(&fmt);
-        assert_eq!(res, "<1, 2, 3>");
+        assert_eq!("<1, 2, 3>", v.vec_string_rule_ref(&fmt));
     }
 
     #[test]
@@ -2381,8 +2719,7 @@ mod tests {
             counter += 1;
             format!("[{}{}]", value, counter)
         };
-        let res = v.vec_string_mut_rule_ref(&mut fmt);
-        assert_eq!(res, "[a1][b2][c3]");
+        assert_eq!("[a1][b2][c3]", v.vec_string_mut_rule_ref(&mut fmt));
         assert_eq!(counter, 3);
     }
 
@@ -2406,8 +2743,7 @@ mod tests {
                 format!(", {}", value)
             }
         };
-        let res = v.iter().iter_string_rule_ref(&fmt);
-        assert_eq!(res, "{10, 20, 30}");
+        assert_eq!("{10, 20, 30}", v.iter().iter_string_rule_ref(&fmt));
     }
 
     #[test]
@@ -2427,8 +2763,10 @@ mod tests {
                 format!("{}, ", value)
             }
         };
-        let res = v.iter().iter_string_mut_rule_ref(&mut fmt);
-        assert_eq!(res, "1, 2, 3 (total=6)");
+        assert_eq!(
+            "1, 2, 3 (total=6)",
+            v.iter().iter_string_mut_rule_ref(&mut fmt)
+        );
         assert_eq!(sum, 6);
     }
 
@@ -2453,8 +2791,10 @@ mod tests {
                 format!(", {}{}", state, value)
             }
         };
-        let result = data.vec_string_with_state_rule_ref(&prefix, &fmt);
-        assert_eq!(result, "[>>hello, >>world]");
+        assert_eq!(
+            "[>>hello, >>world]",
+            data.vec_string_with_state_rule_ref(&prefix, &fmt)
+        );
     }
 
     #[test]
@@ -2480,8 +2820,10 @@ mod tests {
                 format!(", {}", formatted)
             }
         };
-        let result = data.iter_string_with_state_rule_ref(&multiplier, &fmt);
-        assert_eq!(result, "[10, 20, 30]");
+        assert_eq!(
+            "[10, 20, 30]",
+            data.iter_string_with_state_rule_ref(&multiplier, &fmt)
+        );
     }
 
     #[test]
@@ -2508,8 +2850,10 @@ mod tests {
                 format!(", sum={}: {}", state, value)
             }
         };
-        let result = data.vec_string_with_state_mut_rule_ref(sum, &mut fmt);
-        assert_eq!(result, "(sum=1: 1, sum=3: 2, sum=6: 3)");
+        assert_eq!(
+            "(sum=1: 1, sum=3: 2, sum=6: 3)",
+            data.vec_string_with_state_mut_rule_ref(sum, &mut fmt)
+        );
     }
 
     #[test]
@@ -2540,15 +2884,12 @@ mod tests {
                 format!(", {}", short)
             }
         };
-        let result = data
-            .iter()
-            .iter_string_with_state_mut_rule_ref(positions, &mut fmt);
-        assert_eq!(result, "[hello, orld, st]");
+        assert_eq!(
+            "[hello, orld, st]",
+            data.iter()
+                .iter_string_with_state_mut_rule_ref(positions, &mut fmt)
+        );
     }
-
-    // ========================================================================
-    // ТЕСТЫ ExtendedDisplay
-    // ========================================================================
 
     #[test]
     fn test_extended_display_vec() {
@@ -2566,23 +2907,21 @@ mod tests {
         takes_extended(v.into_iter());
     }
 
-    // ========================================================================
-    // ТЕСТЫ RAYON
-    // ========================================================================
-
     #[cfg(feature = "rayon")]
     #[test]
     fn test_rayon_par_iter_string() {
-        use rayon::iter::{IntoParallelIterator, ParallelIterator};
+        use rayon::iter::IntoParallelIterator;
         let numbers = vec![1, 2, 3];
-        let s = numbers.into_par_iter().par_iter_string(DEFAULT_FORMAT_RULE);
-        assert_eq!("[1, 2, 3]", s);
+        assert_eq!(
+            "[1, 2, 3]",
+            ParIteratorString::par_iter_string(numbers.into_par_iter(), DEFAULT_FORMAT_RULE)
+        );
     }
 
     #[cfg(feature = "rayon")]
     #[test]
     fn test_rayon_par_iter_string_fn() {
-        use rayon::iter::{IntoParallelIterator, ParallelIterator};
+        use rayon::prelude::*;
         let v = vec![10, 20, 30];
         let fmt = |value: &str, index: usize, length: usize| {
             if length == 0 {
@@ -2601,19 +2940,252 @@ mod tests {
                 format!(", {}", value)
             }
         };
-        let res = v.par_iter().par_iter_string(fmt);
-        assert_eq!(res, "{10, 20, 30}");
+        assert_eq!(
+            "{10, 20, 30}",
+            ParIteratorStringFn::par_iter_string_fn(v.par_iter(), fmt)
+        );
     }
 
     #[cfg(feature = "rayon")]
     #[test]
-    fn test_rayon_extended_display() {
-        use rayon::iter::{IntoParallelIterator, ParallelIterator};
-        fn takes_extended<T: ExtendedDisplay>(_x: T) {}
-
+    fn test_rayon_par_iter_methods() {
+        use rayon::prelude::*;
         let v = vec![1, 2, 3];
-        takes_extended(v.par_iter());
-        takes_extended(v.par_iter().map(|x| x * 2));
-        takes_extended(v.into_par_iter());
+        let s1 = v.par_iter().par_iter_string(DEFAULT_FORMAT_RULE);
+        assert_eq!("[1, 2, 3]", s1);
+        let s2 = v
+            .par_iter()
+            .map(|x| x * 2)
+            .par_iter_string(DEFAULT_FORMAT_RULE);
+        assert_eq!("[2, 4, 6]", s2);
+        let s3 = v.into_par_iter().par_iter_string(DEFAULT_FORMAT_RULE);
+        assert_eq!("[1, 2, 3]", s3);
+    }
+
+    #[cfg(feature = "dyn_async")]
+    #[test]
+    fn test_vec_string_fn_dyn_async() {
+        let v = vec![1, 2, 3];
+        let fmt = |value: &str, index: usize, length: usize| {
+            let value = value.to_string();
+            async move {
+                if length == 0 {
+                    return String::new();
+                }
+                let is_last = index == length - 1;
+                if index == 0 {
+                    if is_last {
+                        format!("<{}>", value)
+                    } else {
+                        format!("<{}", value)
+                    }
+                } else if is_last {
+                    format!(", {}>", value)
+                } else {
+                    format!(", {}", value)
+                }
+            }
+        };
+        assert_eq!(
+            "<1, 2, 3>",
+            block_on_dyn(VecStringFnAsync::vec_string_async_fn(&v, &fmt))
+        );
+    }
+
+    #[cfg(feature = "dyn_async")]
+    #[test]
+    fn test_iterator_string_fn_dyn_async() {
+        let v = vec![10, 20, 30];
+        let fmt = |value: &str, index: usize, length: usize| {
+            let value = value.to_string();
+            async move {
+                if length == 0 {
+                    return String::new();
+                }
+                let is_last = index == length - 1;
+                if index == 0 {
+                    if is_last {
+                        format!("{{{}}}", value)
+                    } else {
+                        format!("{{{}", value)
+                    }
+                } else if is_last {
+                    format!(", {}}}", value)
+                } else {
+                    format!(", {}", value)
+                }
+            }
+        };
+        assert_eq!(
+            "{10, 20, 30}",
+            block_on_dyn(IteratorStringFnAsync::iter_string_async_fn(v.iter(), &fmt))
+        );
+    }
+
+    #[cfg(feature = "dyn_async")]
+    #[test]
+    fn test_vec_string_fn_mut_dyn_async() {
+        let v = vec!["a", "b", "c"];
+        let mut counter = 0usize;
+        let mut fmt = |value: &str, _index: usize, _length: usize| {
+            let value = value.to_string();
+            counter += 1;
+            let c = counter;
+            async move { format!("[{}{}]", value, c) }
+        };
+        assert_eq!(
+            "[a1][b2][c3]",
+            block_on_dyn(VecStringFnMutAsync::vec_string_async_fn_mut(&v, &mut fmt))
+        );
+    }
+
+    #[cfg(feature = "impl_async")]
+    #[test]
+    fn test_vec_string_fn_impl_async() {
+        let v = vec![1, 2, 3];
+        let fmt = |value: &str, index: usize, length: usize| {
+            let value = value.to_string();
+            async move {
+                if length == 0 {
+                    return String::new();
+                }
+                let is_last = index == length - 1;
+                if index == 0 {
+                    if is_last {
+                        format!("<{}>", value)
+                    } else {
+                        format!("<{}", value)
+                    }
+                } else if is_last {
+                    format!(", {}>", value)
+                } else {
+                    format!(", {}", value)
+                }
+            }
+        };
+        assert_eq!(
+            "<1, 2, 3>",
+            block_on(VecStringFnImplAsync::vec_string_async_fn(&v, &fmt))
+        );
+    }
+
+    #[cfg(feature = "impl_async")]
+    #[test]
+    fn test_iterator_string_fn_impl_async() {
+        let v = vec![10, 20, 30];
+        let fmt = |value: &str, index: usize, length: usize| {
+            let value = value.to_string();
+            async move {
+                if length == 0 {
+                    return String::new();
+                }
+                let is_last = index == length - 1;
+                if index == 0 {
+                    if is_last {
+                        format!("{{{}}}", value)
+                    } else {
+                        format!("{{{}", value)
+                    }
+                } else if is_last {
+                    format!(", {}}}", value)
+                } else {
+                    format!(", {}", value)
+                }
+            }
+        };
+        assert_eq!(
+            "{10, 20, 30}",
+            block_on(IteratorStringFnImplAsync::iter_string_async_fn(
+                v.iter(),
+                &fmt
+            ))
+        );
+    }
+
+    #[cfg(feature = "impl_async")]
+    #[test]
+    fn test_vec_string_fn_mut_impl_async() {
+        let v = vec!["a", "b", "c"];
+        let mut counter = 0usize;
+        let mut fmt = |value: &str, _index: usize, _length: usize| {
+            let value = value.to_string();
+            counter += 1;
+            let c = counter;
+            async move { format!("[{}{}]", value, c) }
+        };
+        assert_eq!(
+            "[a1][b2][c3]",
+            block_on(VecStringFnMutImplAsync::vec_string_async_fn_mut(
+                &v, &mut fmt
+            ))
+        );
+    }
+
+    #[cfg(all(feature = "rayon", feature = "dyn_async"))]
+    #[test]
+    fn test_rayon_par_iter_string_fn_dyn_async() {
+        use rayon::iter::IntoParallelIterator;
+        let v = vec![10, 20, 30];
+        let fmt = |value: &str, index: usize, length: usize| {
+            let value = value.to_string();
+            async move {
+                if length == 0 {
+                    return String::new();
+                }
+                let is_last = index == length - 1;
+                if index == 0 {
+                    if is_last {
+                        format!("{{{}}}", value)
+                    } else {
+                        format!("{{{}", value)
+                    }
+                } else if is_last {
+                    format!(", {}}}", value)
+                } else {
+                    format!(", {}", value)
+                }
+            }
+        };
+        assert_eq!(
+            "{10, 20, 30}",
+            block_on_dyn(ParIteratorStringFnAsync::par_iter_string_async_fn(
+                v.into_par_iter(),
+                &fmt
+            ))
+        );
+    }
+
+    #[cfg(all(feature = "rayon", feature = "impl_async"))]
+    #[test]
+    fn test_rayon_par_iter_string_fn_impl_async() {
+        use rayon::iter::IntoParallelIterator;
+        let v = vec![10, 20, 30];
+        let fmt = |value: &str, index: usize, length: usize| {
+            let value = value.to_string();
+            async move {
+                if length == 0 {
+                    return String::new();
+                }
+                let is_last = index == length - 1;
+                if index == 0 {
+                    if is_last {
+                        format!("{{{}}}", value)
+                    } else {
+                        format!("{{{}", value)
+                    }
+                } else if is_last {
+                    format!(", {}}}", value)
+                } else {
+                    format!(", {}", value)
+                }
+            }
+        };
+        assert_eq!(
+            "{10, 20, 30}",
+            block_on(ParIteratorStringFnImplAsync::par_iter_string_async_fn(
+                v.into_par_iter(),
+                &fmt
+            ))
+        );
     }
 }

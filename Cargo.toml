@@ -16,6 +16,8 @@ categories = ["util"]
 rayon = { version = "1.10", optional = true }
 
 [features]
+default = ["std","rayon","dyn_async","impl_async"]
 std = []
-default = ["std"]
-rayon = ["dep:rayon", "std"]
+rayon = ["dep:rayon"]
+dyn_async = []
+impl_async = []

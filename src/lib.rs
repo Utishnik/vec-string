@@ -169,7 +169,7 @@ where
         let mut string = String::new();
         let len = self.len();
         for (i, x) in self.iter().enumerate() {
-            string.push_str(&format_rule(&format!("{}", x), i, len));
+            string.push_str(&format_rule(&alloc::format!("{}", x), i, len));
         }
         string
     }
@@ -184,7 +184,7 @@ where
         let mut string = String::new();
         let len = self.len();
         for (i, x) in self.iter().enumerate() {
-            string.push_str(&format_rule(&format!("{}", x), i, len));
+            string.push_str(&format_rule(&alloc::format!("{}", x), i, len));
         }
         string
     }
@@ -199,7 +199,7 @@ where
         let mut string = String::new();
         let len = self.len();
         for (i, x) in self.iter().enumerate() {
-            string.push_str(&format_rule(&format!("{}", x), i, len));
+            string.push_str(&format_rule(&alloc::format!("{}", x), i, len));
         }
         string
     }
@@ -227,7 +227,7 @@ where
     T: core::fmt::Display,
 {
     fn iter_string(self, format_rule: FormatRuleFn) -> String {
-        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let items: Vec<String> = self.map(|x| alloc::format!("{}", x)).collect();
         let len = items.len();
         let mut result = String::new();
         for (i, s) in items.into_iter().enumerate() {
@@ -244,7 +244,7 @@ where
     F: Fn(&str, usize, usize) -> String,
 {
     fn iter_string_fn(self, format_rule: F) -> String {
-        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let items: Vec<String> = self.map(|x| alloc::format!("{}", x)).collect();
         let len = items.len();
         let mut result = String::new();
         for (i, s) in items.into_iter().enumerate() {
@@ -261,7 +261,7 @@ where
     F: FnMut(&str, usize, usize) -> String,
 {
     fn iter_string_fn_mut(self, mut format_rule: F) -> String {
-        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let items: Vec<String> = self.map(|x| alloc::format!("{}", x)).collect();
         let len = items.len();
         let mut result = String::new();
         for (i, s) in items.into_iter().enumerate() {
@@ -293,7 +293,7 @@ where
         let mut result = String::new();
         let len = self.len();
         for (i, x) in self.iter().enumerate() {
-            let s = format!("{}", x);
+            let s = alloc::format!("{}", x);
             result.push_str(&format_rule(&mut initial_state, &s, i, len));
         }
         result
@@ -307,7 +307,7 @@ where
     F: FnMut(&mut S, &str, usize, usize) -> String,
 {
     fn iter_string_with_state(self, mut initial_state: S, mut format_rule: F) -> String {
-        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let items: Vec<String> = self.map(|x| alloc::format!("{}", x)).collect();
         let len = items.len();
         let mut result = String::new();
         for (i, s) in items.into_iter().enumerate() {
@@ -339,7 +339,7 @@ where
         let mut result = String::new();
         let len = self.len();
         for (i, x) in self.iter().enumerate() {
-            let s = format!("{}", x);
+            let s = alloc::format!("{}", x);
             result.push_str(&format_rule(state, &s, i, len));
         }
         result
@@ -353,7 +353,7 @@ where
     F: Fn(&S, &str, usize, usize) -> String,
 {
     fn iter_string_with_state_fn(self, state: &S, format_rule: F) -> String {
-        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let items: Vec<String> = self.map(|x| alloc::format!("{}", x)).collect();
         let len = items.len();
         let mut result = String::new();
         for (i, s) in items.into_iter().enumerate() {
@@ -391,7 +391,7 @@ where
         let mut result = String::new();
         let len = self.len();
         for (i, x) in self.iter().enumerate() {
-            let s = format!("{}", x);
+            let s = alloc::format!("{}", x);
             result.push_str(&format_rule(state, &s, i, len));
         }
         result
@@ -409,7 +409,7 @@ where
         state: &S,
         format_rule: fn(&S, &str, usize, usize) -> String,
     ) -> String {
-        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let items: Vec<String> = self.map(|x| alloc::format!("{}", x)).collect();
         let len = items.len();
         let mut result = String::new();
         for (i, s) in items.into_iter().enumerate() {
@@ -435,7 +435,7 @@ where
         let mut string = String::new();
         let len = self.len();
         for (i, x) in self.iter().enumerate() {
-            string.push_str(&rule.clone().format(&format!("{}", x), i, len));
+            string.push_str(&rule.clone().format(&alloc::format!("{}", x), i, len));
         }
         string
     }
@@ -457,7 +457,7 @@ where
         let mut string = String::new();
         let len = self.len();
         for (i, x) in self.iter().enumerate() {
-            string.push_str(&rule.format(&format!("{}", x), i, len));
+            string.push_str(&rule.format(&alloc::format!("{}", x), i, len));
         }
         string
     }
@@ -477,7 +477,7 @@ where
 {
     #[inline(always)]
     fn iter_string_rule_owned(self, rule: R) -> String {
-        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let items: Vec<String> = self.map(|x| alloc::format!("{}", x)).collect();
         let len = items.len();
         let mut result = String::new();
         for (i, s) in items.into_iter().enumerate() {
@@ -501,7 +501,7 @@ where
 {
     #[inline(always)]
     fn iter_string_mut_rule_owned(self, mut rule: R) -> String {
-        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let items: Vec<String> = self.map(|x| alloc::format!("{}", x)).collect();
         let len = items.len();
         let mut result = String::new();
         for (i, s) in items.into_iter().enumerate() {
@@ -527,7 +527,7 @@ where
         let mut result = String::new();
         let len = self.len();
         for (i, x) in self.iter().enumerate() {
-            let s = format!("{}", x);
+            let s = alloc::format!("{}", x);
             result.push_str(&rule.format(state, &s, i, len));
         }
         result
@@ -548,7 +548,7 @@ where
 {
     #[inline(always)]
     fn iter_string_with_state_rule_owned(self, state: &S, rule: R) -> String {
-        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let items: Vec<String> = self.map(|x| alloc::format!("{}", x)).collect();
         let len = items.len();
         let mut result = String::new();
         for (i, s) in items.into_iter().enumerate() {
@@ -574,7 +574,7 @@ where
         let mut result = String::new();
         let len = self.len();
         for (i, x) in self.iter().enumerate() {
-            let s = format!("{}", x);
+            let s = alloc::format!("{}", x);
             result.push_str(&rule.format(&mut initial_state, &s, i, len));
         }
         result
@@ -595,7 +595,7 @@ where
 {
     #[inline(always)]
     fn iter_string_with_state_mut_rule_owned(self, mut initial_state: S, mut rule: R) -> String {
-        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let items: Vec<String> = self.map(|x| alloc::format!("{}", x)).collect();
         let len = items.len();
         let mut result = String::new();
         for (i, s) in items.into_iter().enumerate() {
@@ -621,7 +621,7 @@ where
         let mut string = String::new();
         let len = self.len();
         for (i, x) in self.iter().enumerate() {
-            string.push_str(&rule.format(&format!("{}", x), i, len));
+            string.push_str(&rule.format(&alloc::format!("{}", x), i, len));
         }
         string
     }
@@ -643,7 +643,7 @@ where
         let mut string = String::new();
         let len = self.len();
         for (i, x) in self.iter().enumerate() {
-            string.push_str(&rule.format(&format!("{}", x), i, len));
+            string.push_str(&rule.format(&alloc::format!("{}", x), i, len));
         }
         string
     }
@@ -663,7 +663,7 @@ where
 {
     #[inline(always)]
     fn iter_string_rule_ref(self, rule: &'a R) -> String {
-        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let items: Vec<String> = self.map(|x| alloc::format!("{}", x)).collect();
         let len = items.len();
         let mut result = String::new();
         for (i, s) in items.into_iter().enumerate() {
@@ -687,7 +687,7 @@ where
 {
     #[inline(always)]
     fn iter_string_mut_rule_ref(self, rule: &mut R) -> String {
-        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let items: Vec<String> = self.map(|x| alloc::format!("{}", x)).collect();
         let len = items.len();
         let mut result = String::new();
         for (i, s) in items.into_iter().enumerate() {
@@ -713,7 +713,7 @@ where
         let mut result = String::new();
         let len = self.len();
         for (i, x) in self.iter().enumerate() {
-            let s = format!("{}", x);
+            let s = alloc::format!("{}", x);
             result.push_str(&rule.format(state, &s, i, len));
         }
         result
@@ -734,7 +734,7 @@ where
 {
     #[inline(always)]
     fn iter_string_with_state_rule_ref(self, state: &S, rule: &R) -> String {
-        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let items: Vec<String> = self.map(|x| alloc::format!("{}", x)).collect();
         let len = items.len();
         let mut result = String::new();
         for (i, s) in items.into_iter().enumerate() {
@@ -760,7 +760,7 @@ where
         let mut result = String::new();
         let len = self.len();
         for (i, x) in self.iter().enumerate() {
-            let s = format!("{}", x);
+            let s = alloc::format!("{}", x);
             result.push_str(&rule.format(&mut initial_state, &s, i, len));
         }
         result
@@ -781,7 +781,7 @@ where
 {
     #[inline(always)]
     fn iter_string_with_state_mut_rule_ref(self, mut initial_state: S, rule: &mut R) -> String {
-        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let items: Vec<String> = self.map(|x| alloc::format!("{}", x)).collect();
         let len = items.len();
         let mut result = String::new();
         for (i, s) in items.into_iter().enumerate() {
@@ -792,7 +792,7 @@ where
 }
 
 // ============================================================================
-// RAYON SYNC
+// RAYON SYNC (ОПТИМИЗИРОВАННЫЙ + ИСПРАВЛЕННЫЙ SYNC)
 // ============================================================================
 
 #[cfg(feature = "rayon")]
@@ -806,13 +806,19 @@ where
     T: core::fmt::Display,
 {
     fn par_iter_string(self, format_rule: FormatRuleFn) -> String {
-        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let items: Vec<String> = self.map(|x| alloc::format!("{}", x)).collect();
         let len = items.len();
-        let mut result = String::new();
-        for (i, s) in items.into_iter().enumerate() {
-            result.push_str(&format_rule(&s, i, len));
-        }
-        result
+        items
+            .into_par_iter()
+            .enumerate()
+            .map(|(i, s)| format_rule(&s, i, len))
+            .reduce(
+                || String::new(),
+                |mut acc, chunk| {
+                    acc.push_str(&chunk);
+                    acc
+                },
+            )
     }
 }
 
@@ -828,16 +834,22 @@ impl<I, T, F> ParIteratorStringFn<F> for I
 where
     I: rayon::iter::ParallelIterator<Item = T>,
     T: core::fmt::Display,
-    F: Fn(&str, usize, usize) -> String,
+    F: Fn(&str, usize, usize) -> String + Sync, // <-- ДОБАВЛЕНО: + Sync
 {
     fn par_iter_string_fn(self, format_rule: F) -> String {
-        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let items: Vec<String> = self.map(|x| alloc::format!("{}", x)).collect();
         let len = items.len();
-        let mut result = String::new();
-        for (i, s) in items.into_iter().enumerate() {
-            result.push_str(&format_rule(&s, i, len));
-        }
-        result
+        items
+            .into_par_iter()
+            .enumerate()
+            .map(|(i, s)| format_rule(&s, i, len))
+            .reduce(
+                || String::new(),
+                |mut acc, chunk| {
+                    acc.push_str(&chunk);
+                    acc
+                },
+            )
     }
 }
 
@@ -856,7 +868,7 @@ where
     F: FnMut(&str, usize, usize) -> String,
 {
     fn par_iter_string_fn_mut(self, mut format_rule: F) -> String {
-        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let items: Vec<String> = self.map(|x| alloc::format!("{}", x)).collect();
         let len = items.len();
         let mut result = String::new();
         for (i, s) in items.into_iter().enumerate() {
@@ -878,13 +890,19 @@ where
 {
     #[inline(always)]
     fn par_iter_string_fn_ptr(self, format_rule: FormatRuleFn) -> String {
-        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let items: Vec<String> = self.map(|x| alloc::format!("{}", x)).collect();
         let len = items.len();
-        let mut result = String::new();
-        for (i, s) in items.into_iter().enumerate() {
-            result.push_str(&format_rule(&s, i, len));
-        }
-        result
+        items
+            .into_par_iter()
+            .enumerate()
+            .map(|(i, s)| format_rule(&s, i, len))
+            .reduce(
+                || String::new(),
+                |mut acc, chunk| {
+                    acc.push_str(&chunk);
+                    acc
+                },
+            )
     }
 }
 
@@ -903,7 +921,7 @@ where
     F: FnMut(&mut S, &str, usize, usize) -> String,
 {
     fn par_iter_string_with_state(self, mut initial_state: S, mut format_rule: F) -> String {
-        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let items: Vec<String> = self.map(|x| alloc::format!("{}", x)).collect();
         let len = items.len();
         let mut result = String::new();
         for (i, s) in items.into_iter().enumerate() {
@@ -925,16 +943,23 @@ impl<I, T, S, F> ParIteratorStringWithStateFn<S, F> for I
 where
     I: rayon::iter::ParallelIterator<Item = T>,
     T: core::fmt::Display,
-    F: Fn(&S, &str, usize, usize) -> String,
+    S: Sync,                                        // <-- ДОБАВЛЕНО
+    F: Fn(&S, &str, usize, usize) -> String + Sync, // <-- ДОБАВЛЕНО: + Sync
 {
     fn par_iter_string_with_state_fn(self, state: &S, format_rule: F) -> String {
-        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let items: Vec<String> = self.map(|x| alloc::format!("{}", x)).collect();
         let len = items.len();
-        let mut result = String::new();
-        for (i, s) in items.into_iter().enumerate() {
-            result.push_str(&format_rule(state, &s, i, len));
-        }
-        result
+        items
+            .into_par_iter()
+            .enumerate()
+            .map(|(i, s)| format_rule(state, &s, i, len))
+            .reduce(
+                || String::new(),
+                |mut acc, chunk| {
+                    acc.push_str(&chunk);
+                    acc
+                },
+            )
     }
 }
 
@@ -951,6 +976,7 @@ impl<I, T, S> ParIteratorStringWithStateFnPtr<S> for I
 where
     I: rayon::iter::ParallelIterator<Item = T>,
     T: core::fmt::Display,
+    S: Sync, // <-- ДОБАВЛЕНО
 {
     #[inline(always)]
     fn par_iter_string_with_state_fn_ptr(
@@ -958,13 +984,19 @@ where
         state: &S,
         format_rule: fn(&S, &str, usize, usize) -> String,
     ) -> String {
-        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let items: Vec<String> = self.map(|x| alloc::format!("{}", x)).collect();
         let len = items.len();
-        let mut result = String::new();
-        for (i, s) in items.into_iter().enumerate() {
-            result.push_str(&format_rule(state, &s, i, len));
-        }
-        result
+        items
+            .into_par_iter()
+            .enumerate()
+            .map(|(i, s)| format_rule(state, &s, i, len))
+            .reduce(
+                || String::new(),
+                |mut acc, chunk| {
+                    acc.push_str(&chunk);
+                    acc
+                },
+            )
     }
 }
 
@@ -980,17 +1012,23 @@ impl<I, T, R> ParIteratorStringRuleOwned<R> for I
 where
     I: rayon::iter::ParallelIterator<Item = T>,
     T: core::fmt::Display,
-    R: FormatRuleNoStateOwned + Clone,
+    R: FormatRuleNoStateOwned + Clone + Sync, // <-- ДОБАВЛЕНО: + Sync
 {
     #[inline(always)]
     fn par_iter_string_rule_owned(self, rule: R) -> String {
-        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let items: Vec<String> = self.map(|x| alloc::format!("{}", x)).collect();
         let len = items.len();
-        let mut result = String::new();
-        for (i, s) in items.into_iter().enumerate() {
-            result.push_str(&rule.clone().format(&s, i, len));
-        }
-        result
+        items
+            .into_par_iter()
+            .enumerate()
+            .map(|(i, s)| rule.clone().format(&s, i, len))
+            .reduce(
+                || String::new(),
+                |mut acc, chunk| {
+                    acc.push_str(&chunk);
+                    acc
+                },
+            )
     }
 }
 
@@ -1010,7 +1048,7 @@ where
 {
     #[inline(always)]
     fn par_iter_string_mut_rule_owned(self, mut rule: R) -> String {
-        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let items: Vec<String> = self.map(|x| alloc::format!("{}", x)).collect();
         let len = items.len();
         let mut result = String::new();
         for (i, s) in items.into_iter().enumerate() {
@@ -1032,17 +1070,24 @@ impl<I, T, S, R> ParIteratorStringWithStateRuleOwned<S, R> for I
 where
     I: rayon::iter::ParallelIterator<Item = T>,
     T: core::fmt::Display,
-    R: FormatRule<S>,
+    S: Sync,                 // <-- ДОБАВЛЕНО
+    R: FormatRule<S> + Sync, // <-- ДОБАВЛЕНО: + Sync
 {
     #[inline(always)]
     fn par_iter_string_with_state_rule_owned(self, state: &S, rule: R) -> String {
-        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let items: Vec<String> = self.map(|x| alloc::format!("{}", x)).collect();
         let len = items.len();
-        let mut result = String::new();
-        for (i, s) in items.into_iter().enumerate() {
-            result.push_str(&rule.format(state, &s, i, len));
-        }
-        result
+        items
+            .into_par_iter()
+            .enumerate()
+            .map(|(i, s)| rule.format(state, &s, i, len))
+            .reduce(
+                || String::new(),
+                |mut acc, chunk| {
+                    acc.push_str(&chunk);
+                    acc
+                },
+            )
     }
 }
 
@@ -1066,7 +1111,7 @@ where
         mut initial_state: S,
         mut rule: R,
     ) -> String {
-        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let items: Vec<String> = self.map(|x| alloc::format!("{}", x)).collect();
         let len = items.len();
         let mut result = String::new();
         for (i, s) in items.into_iter().enumerate() {
@@ -1088,17 +1133,23 @@ impl<'a, I, T, R> ParIteratorStringRuleRef<'a, R> for I
 where
     I: rayon::iter::ParallelIterator<Item = T>,
     T: core::fmt::Display,
-    R: FormatRuleNoState<'a>,
+    R: FormatRuleNoState<'a> + Sync, // <-- ДОБАВЛЕНО: + Sync
 {
     #[inline(always)]
     fn par_iter_string_rule_ref(self, rule: &'a R) -> String {
-        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let items: Vec<String> = self.map(|x| alloc::format!("{}", x)).collect();
         let len = items.len();
-        let mut result = String::new();
-        for (i, s) in items.into_iter().enumerate() {
-            result.push_str(&rule.format(&s, i, len));
-        }
-        result
+        items
+            .into_par_iter()
+            .enumerate()
+            .map(|(i, s)| rule.format(&s, i, len))
+            .reduce(
+                || String::new(),
+                |mut acc, chunk| {
+                    acc.push_str(&chunk);
+                    acc
+                },
+            )
     }
 }
 
@@ -1118,7 +1169,7 @@ where
 {
     #[inline(always)]
     fn par_iter_string_mut_rule_ref(self, rule: &mut R) -> String {
-        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let items: Vec<String> = self.map(|x| alloc::format!("{}", x)).collect();
         let len = items.len();
         let mut result = String::new();
         for (i, s) in items.into_iter().enumerate() {
@@ -1140,17 +1191,24 @@ impl<I, T, S, R> ParIteratorStringWithStateRuleRef<S, R> for I
 where
     I: rayon::iter::ParallelIterator<Item = T>,
     T: core::fmt::Display,
-    R: FormatRule<S>,
+    S: Sync,                 // <-- ДОБАВЛЕНО
+    R: FormatRule<S> + Sync, // <-- ДОБАВЛЕНО: + Sync
 {
     #[inline(always)]
     fn par_iter_string_with_state_rule_ref(self, state: &S, rule: &R) -> String {
-        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let items: Vec<String> = self.map(|x| alloc::format!("{}", x)).collect();
         let len = items.len();
-        let mut result = String::new();
-        for (i, s) in items.into_iter().enumerate() {
-            result.push_str(&rule.format(state, &s, i, len));
-        }
-        result
+        items
+            .into_par_iter()
+            .enumerate()
+            .map(|(i, s)| rule.format(state, &s, i, len))
+            .reduce(
+                || String::new(),
+                |mut acc, chunk| {
+                    acc.push_str(&chunk);
+                    acc
+                },
+            )
     }
 }
 
@@ -1170,7 +1228,7 @@ where
 {
     #[inline(always)]
     fn par_iter_string_with_state_mut_rule_ref(self, mut initial_state: S, rule: &mut R) -> String {
-        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let items: Vec<String> = self.map(|x| alloc::format!("{}", x)).collect();
         let len = items.len();
         let mut result = String::new();
         for (i, s) in items.into_iter().enumerate() {
@@ -1181,7 +1239,7 @@ where
 }
 
 // ============================================================================
-// DYN ASYNC
+// DYN ASYNC (ОПТИМИЗИРОВАННЫЙ)
 // ============================================================================
 
 #[cfg(feature = "dyn_async")]
@@ -1499,13 +1557,14 @@ where
         format_rule: &'a F,
     ) -> Box<dyn core::future::Future<Output = String> + 'a> {
         Box::new(async move {
-            let mut string = String::new();
             let len = self.len();
+            let mut result = String::new();
+            result.reserve(len.saturating_mul(16));
             for (i, x) in self.iter().enumerate() {
-                let s = format!("{}", x);
-                string.push_str(&format_rule(&s, i, len).await);
+                let s = alloc::format!("{}", x);
+                result.push_str(&format_rule(&s, i, len).await);
             }
-            string
+            result
         })
     }
 }
@@ -1532,13 +1591,14 @@ where
         format_rule: &'a F,
     ) -> Box<dyn core::future::Future<Output = String> + 'a + Send> {
         Box::new(async move {
-            let mut string = String::new();
             let len = self.len();
+            let mut result = String::new();
+            result.reserve(len.saturating_mul(16));
             for (i, x) in self.iter().enumerate() {
-                let s = format!("{}", x);
-                string.push_str(&format_rule(&s, i, len).await);
+                let s = alloc::format!("{}", x);
+                result.push_str(&format_rule(&s, i, len).await);
             }
-            string
+            result
         })
     }
 }
@@ -1564,13 +1624,14 @@ where
         format_rule: &'a mut F,
     ) -> Box<dyn core::future::Future<Output = String> + 'a> {
         Box::new(async move {
-            let mut string = String::new();
             let len = self.len();
+            let mut result = String::new();
+            result.reserve(len.saturating_mul(16));
             for (i, x) in self.iter().enumerate() {
-                let s = format!("{}", x);
-                string.push_str(&format_rule(&s, i, len).await);
+                let s = alloc::format!("{}", x);
+                result.push_str(&format_rule(&s, i, len).await);
             }
-            string
+            result
         })
     }
 }
@@ -1597,13 +1658,14 @@ where
         format_rule: &'a mut F,
     ) -> Box<dyn core::future::Future<Output = String> + 'a + Send> {
         Box::new(async move {
-            let mut string = String::new();
             let len = self.len();
+            let mut result = String::new();
+            result.reserve(len.saturating_mul(16));
             for (i, x) in self.iter().enumerate() {
-                let s = format!("{}", x);
-                string.push_str(&format_rule(&s, i, len).await);
+                let s = alloc::format!("{}", x);
+                result.push_str(&format_rule(&s, i, len).await);
             }
-            string
+            result
         })
     }
 }
@@ -1631,10 +1693,11 @@ where
         format_rule: &'a mut F,
     ) -> Box<dyn core::future::Future<Output = String> + 'a> {
         Box::new(async move {
-            let mut result = String::new();
             let len = self.len();
+            let mut result = String::new();
+            result.reserve(len.saturating_mul(16));
             for (i, x) in self.iter().enumerate() {
-                let s = format!("{}", x);
+                let s = alloc::format!("{}", x);
                 result.push_str(&format_rule(&mut initial_state, &s, i, len).await);
             }
             result
@@ -1669,9 +1732,10 @@ where
         Self: 'a,
     {
         Box::new(async move {
-            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let items: Vec<String> = self.map(|x| alloc::format!("{}", x)).collect();
             let len = items.len();
             let mut result = String::new();
+            result.reserve(len.saturating_mul(16));
             for (i, s) in items.into_iter().enumerate() {
                 result.push_str(&format_rule(&s, i, len).await);
             }
@@ -1708,9 +1772,10 @@ where
         Self: 'a,
     {
         Box::new(async move {
-            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let items: Vec<String> = self.map(|x| alloc::format!("{}", x)).collect();
             let len = items.len();
             let mut result = String::new();
+            result.reserve(len.saturating_mul(16));
             for (i, s) in items.into_iter().enumerate() {
                 result.push_str(&format_rule(&s, i, len).await);
             }
@@ -1746,9 +1811,10 @@ where
         Self: 'a,
     {
         Box::new(async move {
-            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let items: Vec<String> = self.map(|x| alloc::format!("{}", x)).collect();
             let len = items.len();
             let mut result = String::new();
+            result.reserve(len.saturating_mul(16));
             for (i, s) in items.into_iter().enumerate() {
                 result.push_str(&format_rule(&s, i, len).await);
             }
@@ -1785,9 +1851,10 @@ where
         Self: 'a,
     {
         Box::new(async move {
-            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let items: Vec<String> = self.map(|x| alloc::format!("{}", x)).collect();
             let len = items.len();
             let mut result = String::new();
+            result.reserve(len.saturating_mul(16));
             for (i, s) in items.into_iter().enumerate() {
                 result.push_str(&format_rule(&s, i, len).await);
             }
@@ -1827,9 +1894,10 @@ where
         S: 'a,
     {
         Box::new(async move {
-            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let items: Vec<String> = self.map(|x| alloc::format!("{}", x)).collect();
             let len = items.len();
             let mut result = String::new();
+            result.reserve(len.saturating_mul(16));
             for (i, s) in items.into_iter().enumerate() {
                 result.push_str(&format_rule(&mut initial_state, &s, i, len).await);
             }
@@ -1839,7 +1907,7 @@ where
 }
 
 // ============================================================================
-// IMPL ASYNC (RPITIT)
+// IMPL ASYNC (RPITIT, ОПТИМИЗИРОВАННЫЙ)
 // ============================================================================
 
 #[cfg(feature = "impl_async")]
@@ -2189,13 +2257,14 @@ where
         F: 'a,
     {
         async move {
-            let mut string = String::new();
             let len = self.len();
+            let mut result = String::new();
+            result.reserve(len.saturating_mul(16));
             for (i, x) in self.iter().enumerate() {
-                let s = format!("{}", x);
-                string.push_str(&format_rule(&s, i, len).await);
+                let s = alloc::format!("{}", x);
+                result.push_str(&format_rule(&s, i, len).await);
             }
-            string
+            result
         }
     }
 }
@@ -2229,13 +2298,14 @@ where
         F: 'a,
     {
         async move {
-            let mut string = String::new();
             let len = self.len();
+            let mut result = String::new();
+            result.reserve(len.saturating_mul(16));
             for (i, x) in self.iter().enumerate() {
-                let s = format!("{}", x);
-                string.push_str(&format_rule(&s, i, len).await);
+                let s = alloc::format!("{}", x);
+                result.push_str(&format_rule(&s, i, len).await);
             }
-            string
+            result
         }
     }
 }
@@ -2268,13 +2338,14 @@ where
         F: 'a,
     {
         async move {
-            let mut string = String::new();
             let len = self.len();
+            let mut result = String::new();
+            result.reserve(len.saturating_mul(16));
             for (i, x) in self.iter().enumerate() {
-                let s = format!("{}", x);
-                string.push_str(&format_rule(&s, i, len).await);
+                let s = alloc::format!("{}", x);
+                result.push_str(&format_rule(&s, i, len).await);
             }
-            string
+            result
         }
     }
 }
@@ -2308,13 +2379,14 @@ where
         F: 'a,
     {
         async move {
-            let mut string = String::new();
             let len = self.len();
+            let mut result = String::new();
+            result.reserve(len.saturating_mul(16));
             for (i, x) in self.iter().enumerate() {
-                let s = format!("{}", x);
-                string.push_str(&format_rule(&s, i, len).await);
+                let s = alloc::format!("{}", x);
+                result.push_str(&format_rule(&s, i, len).await);
             }
-            string
+            result
         }
     }
 }
@@ -2351,10 +2423,11 @@ where
         S: 'a,
     {
         async move {
-            let mut result = String::new();
             let len = self.len();
+            let mut result = String::new();
+            result.reserve(len.saturating_mul(16));
             for (i, x) in self.iter().enumerate() {
-                let s = format!("{}", x);
+                let s = alloc::format!("{}", x);
                 result.push_str(&format_rule(&mut initial_state, &s, i, len).await);
             }
             result
@@ -2391,9 +2464,10 @@ where
         F: 'a,
     {
         async move {
-            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let items: Vec<String> = self.map(|x| alloc::format!("{}", x)).collect();
             let len = items.len();
             let mut result = String::new();
+            result.reserve(len.saturating_mul(16));
             for (i, s) in items.into_iter().enumerate() {
                 result.push_str(&format_rule(&s, i, len).await);
             }
@@ -2432,9 +2506,10 @@ where
         F: 'a,
     {
         async move {
-            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let items: Vec<String> = self.map(|x| alloc::format!("{}", x)).collect();
             let len = items.len();
             let mut result = String::new();
+            result.reserve(len.saturating_mul(16));
             for (i, s) in items.into_iter().enumerate() {
                 result.push_str(&format_rule(&s, i, len).await);
             }
@@ -2472,9 +2547,10 @@ where
         F: 'a,
     {
         async move {
-            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let items: Vec<String> = self.map(|x| alloc::format!("{}", x)).collect();
             let len = items.len();
             let mut result = String::new();
+            result.reserve(len.saturating_mul(16));
             for (i, s) in items.into_iter().enumerate() {
                 result.push_str(&format_rule(&s, i, len).await);
             }
@@ -2513,9 +2589,10 @@ where
         F: 'a,
     {
         async move {
-            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let items: Vec<String> = self.map(|x| alloc::format!("{}", x)).collect();
             let len = items.len();
             let mut result = String::new();
+            result.reserve(len.saturating_mul(16));
             for (i, s) in items.into_iter().enumerate() {
                 result.push_str(&format_rule(&s, i, len).await);
             }
@@ -2557,9 +2634,10 @@ where
         S: 'a,
     {
         async move {
-            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let items: Vec<String> = self.map(|x| alloc::format!("{}", x)).collect();
             let len = items.len();
             let mut result = String::new();
+            result.reserve(len.saturating_mul(16));
             for (i, s) in items.into_iter().enumerate() {
                 result.push_str(&format_rule(&mut initial_state, &s, i, len).await);
             }
@@ -2569,7 +2647,7 @@ where
 }
 
 // ============================================================================
-// RAYON DYN ASYNC
+// RAYON DYN ASYNC (ГИБРИДНЫЙ, ОПТИМИЗИРОВАННЫЙ)
 // ============================================================================
 
 #[cfg(all(feature = "rayon", feature = "dyn_async"))]
@@ -2599,9 +2677,10 @@ where
         Self: 'a,
     {
         Box::new(async move {
-            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let items: Vec<String> = self.map(|x| alloc::format!("{}", x)).collect();
             let len = items.len();
             let mut result = String::new();
+            result.reserve(len.saturating_mul(16));
             for (i, s) in items.into_iter().enumerate() {
                 result.push_str(&format_rule(&s, i, len).await);
             }
@@ -2638,9 +2717,10 @@ where
         Self: 'a,
     {
         Box::new(async move {
-            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let items: Vec<String> = self.map(|x| alloc::format!("{}", x)).collect();
             let len = items.len();
             let mut result = String::new();
+            result.reserve(len.saturating_mul(16));
             for (i, s) in items.into_iter().enumerate() {
                 result.push_str(&format_rule(&s, i, len).await);
             }
@@ -2676,9 +2756,10 @@ where
         Self: 'a,
     {
         Box::new(async move {
-            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let items: Vec<String> = self.map(|x| alloc::format!("{}", x)).collect();
             let len = items.len();
             let mut result = String::new();
+            result.reserve(len.saturating_mul(16));
             for (i, s) in items.into_iter().enumerate() {
                 result.push_str(&format_rule(&s, i, len).await);
             }
@@ -2715,9 +2796,10 @@ where
         Self: 'a,
     {
         Box::new(async move {
-            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let items: Vec<String> = self.map(|x| alloc::format!("{}", x)).collect();
             let len = items.len();
             let mut result = String::new();
+            result.reserve(len.saturating_mul(16));
             for (i, s) in items.into_iter().enumerate() {
                 result.push_str(&format_rule(&s, i, len).await);
             }
@@ -2749,9 +2831,10 @@ where
         Self: 'a,
     {
         Box::new(async move {
-            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let items: Vec<String> = self.map(|x| alloc::format!("{}", x)).collect();
             let len = items.len();
             let mut result = String::new();
+            result.reserve(len.saturating_mul(16));
             for (i, s) in items.into_iter().enumerate() {
                 result.push_str(&format_rule(&s, i, len));
             }
@@ -2761,7 +2844,7 @@ where
 }
 
 // ============================================================================
-// RAYON IMPL ASYNC
+// RAYON IMPL ASYNC (ГИБРИДНЫЙ, ОПТИМИЗИРОВАННЫЙ)
 // ============================================================================
 
 #[cfg(all(feature = "rayon", feature = "impl_async"))]
@@ -2793,9 +2876,10 @@ where
         F: 'a,
     {
         async move {
-            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let items: Vec<String> = self.map(|x| alloc::format!("{}", x)).collect();
             let len = items.len();
             let mut result = String::new();
+            result.reserve(len.saturating_mul(16));
             for (i, s) in items.into_iter().enumerate() {
                 result.push_str(&format_rule(&s, i, len).await);
             }
@@ -2834,9 +2918,10 @@ where
         F: 'a,
     {
         async move {
-            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let items: Vec<String> = self.map(|x| alloc::format!("{}", x)).collect();
             let len = items.len();
             let mut result = String::new();
+            result.reserve(len.saturating_mul(16));
             for (i, s) in items.into_iter().enumerate() {
                 result.push_str(&format_rule(&s, i, len).await);
             }
@@ -2874,9 +2959,10 @@ where
         F: 'a,
     {
         async move {
-            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let items: Vec<String> = self.map(|x| alloc::format!("{}", x)).collect();
             let len = items.len();
             let mut result = String::new();
+            result.reserve(len.saturating_mul(16));
             for (i, s) in items.into_iter().enumerate() {
                 result.push_str(&format_rule(&s, i, len).await);
             }
@@ -2915,9 +3001,10 @@ where
         F: 'a,
     {
         async move {
-            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let items: Vec<String> = self.map(|x| alloc::format!("{}", x)).collect();
             let len = items.len();
             let mut result = String::new();
+            result.reserve(len.saturating_mul(16));
             for (i, s) in items.into_iter().enumerate() {
                 result.push_str(&format_rule(&s, i, len).await);
             }
@@ -2949,9 +3036,10 @@ where
         Self: 'a,
     {
         async move {
-            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let items: Vec<String> = self.map(|x| alloc::format!("{}", x)).collect();
             let len = items.len();
             let mut result = String::new();
+            result.reserve(len.saturating_mul(16));
             for (i, s) in items.into_iter().enumerate() {
                 result.push_str(&format_rule(&s, i, len));
             }
@@ -2971,24 +3059,34 @@ mod tests {
     #[cfg(any(feature = "dyn_async", feature = "impl_async"))]
     use core::future::Future;
 
+    #[cfg(not(feature = "std"))]
+    use core::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
+    #[cfg(feature = "std")]
+    use pollster::*;
+    #[cfg(feature = "std")]
+    use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
+
     #[cfg(any(feature = "dyn_async", feature = "impl_async"))]
-    fn noop_raw_waker() -> core::task::RawWaker {
+    #[cfg(not(feature = "std"))]
+    fn noop_raw_waker() -> RawWaker {
         fn no_op(_: *const ()) {}
-        fn clone(p: *const ()) -> core::task::RawWaker {
-            core::task::RawWaker::new(p, &VTABLE)
+        fn clone(p: *const ()) -> RawWaker {
+            RawWaker::new(p, &VTABLE)
         }
-        static VTABLE: core::task::RawWakerVTable =
-            core::task::RawWakerVTable::new(clone, no_op, no_op, no_op);
-        core::task::RawWaker::new(core::ptr::null(), &VTABLE)
+        static VTABLE: RawWakerVTable = RawWakerVTable::new(clone, no_op, no_op, no_op);
+        RawWaker::new(core::ptr::null(), &VTABLE)
     }
 
     #[cfg(any(feature = "dyn_async", feature = "impl_async"))]
+    #[cfg(not(feature = "std"))]
     fn block_on<F: core::future::Future>(mut fut: F) -> F::Output {
         let mut fut = unsafe { core::pin::Pin::new_unchecked(&mut fut) };
-        let waker = unsafe { core::task::Waker::from_raw(noop_raw_waker()) };
-        let mut cx = core::task::Context::from_waker(&waker);
+
+        let waker = unsafe { Waker::from_raw(noop_raw_waker()) };
+        let mut cx = Context::from_waker(&waker);
+
         loop {
-            if let core::task::Poll::Ready(val) = fut.as_mut().poll(&mut cx) {
+            if let Poll::Ready(val) = fut.as_mut().poll(&mut cx) {
                 return val;
             }
             core::hint::spin_loop();
@@ -2996,17 +3094,35 @@ mod tests {
     }
 
     #[cfg(any(feature = "dyn_async", feature = "impl_async"))]
+    #[cfg(not(feature = "std"))]
     fn block_on_dyn<'a, T>(fut: Box<dyn Future<Output = T> + 'a>) -> T {
         let mut pin_future = Box::into_pin(fut);
         let mut fut = pin_future.as_mut();
-        let waker = unsafe { core::task::Waker::from_raw(noop_raw_waker()) };
-        let mut cx = core::task::Context::from_waker(&waker);
+        let waker = unsafe { Waker::from_raw(noop_raw_waker()) };
+        let mut cx = Context::from_waker(&waker);
+
         loop {
-            if let core::task::Poll::Ready(val) = fut.as_mut().poll(&mut cx) {
+            if let Poll::Ready(val) = fut.as_mut().poll(&mut cx) {
                 return val;
             }
             core::hint::spin_loop();
         }
+    }
+
+    #[cfg(any(feature = "dyn_async", feature = "impl_async"))]
+    #[cfg(feature = "std")]
+    fn block_on<F: core::future::Future>(mut fut: F) -> F::Output {
+        let mut fut = unsafe { core::pin::Pin::new_unchecked(&mut fut) };
+        fut.as_mut().block_on()
+    }
+
+    #[cfg(any(feature = "dyn_async", feature = "impl_async"))]
+    #[cfg(feature = "std")]
+    fn block_on_dyn<'a, T>(fut: Box<dyn Future<Output = T> + 'a>) -> T {
+        let mut pin_future = Box::into_pin(fut);
+        let mut fut = pin_future.as_mut();
+
+        fut.as_mut().block_on()
     }
 
     #[test]

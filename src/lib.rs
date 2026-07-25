@@ -2448,37 +2448,34 @@ where
 // ============================================================================
 // RAYON + DYN ASYNC
 // ============================================================================
+
 #[cfg(all(feature = "rayon", feature = "dyn_async"))]
-pub trait ParIteratorStringFnAsync<
-    F: Fn(&str, usize, usize) -> Fut + Sync,
-    Fut: core::future::Future<Output = String>,
->
+pub trait ParIteratorStringFnAsync<'a, F, Fut>
 {
-    fn par_iter_string_async_fn<'a>(
+    fn par_iter_string_async_fn(
         self,
         f: &'a F,
     ) -> Box<dyn core::future::Future<Output = String> + 'a>
     where
         Self: 'a,
-        Fut: 'a;
+        Fut: core::future::Future<Output = String> + 'a,
+        F: Fn(&str, usize, usize) -> Fut + Sync,
+        ;
 }
 #[cfg(all(feature = "rayon", feature = "dyn_async"))]
-impl<
-        I: rayon::iter::ParallelIterator,
-        T: core::fmt::Display,
-        F: Fn(&str, usize, usize) -> Fut + Sync,
-        Fut: core::future::Future<Output = String>,
-    > ParIteratorStringFnAsync<F, Fut> for I
+impl<'a, I, T, F, Fut> ParIteratorStringFnAsync<'a, F, Fut> for I
 where
     I: rayon::iter::ParallelIterator<Item = T>,
+    T: core::fmt::Display,
 {
-    fn par_iter_string_async_fn<'a>(
+    fn par_iter_string_async_fn(
         self,
         f: &'a F,
     ) -> Box<dyn core::future::Future<Output = String> + 'a>
     where
         Self: 'a,
-        Fut: 'a,
+        Fut: core::future::Future<Output = String> + 'a,
+        F: Fn(&str, usize, usize) -> Fut + Sync,
     {
         Box::new(async move {
             let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
@@ -2884,6 +2881,7 @@ where
 // ============================================================================
 #[cfg(test)]
 mod tests {
+    use core::pin::pin;
     use super::*;
     use alloc::vec;
     #[cfg(any(feature = "dyn_async", feature = "impl_async"))]
@@ -3926,13 +3924,8 @@ mod tests {
                 }
             })
         };
-        assert_eq!(
-            "{10, 20, 30}",
-            block_on_dyn(ParIteratorStringFnAsync::par_iter_string_async_fn(
-                v.into_par_iter(),
-                &fmt
-            ))
-        );
+        let fut = ParIteratorStringFnAsync::par_iter_string_async_fn(v.into_par_iter(), &fmt);
+        assert_eq!("{10, 20, 30}", block_on_dyn(fut));
     }
     #[cfg(all(feature = "rayon", feature = "impl_async"))]
     #[test]

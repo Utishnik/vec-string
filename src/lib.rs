@@ -2450,8 +2450,7 @@ where
 // ============================================================================
 
 #[cfg(all(feature = "rayon", feature = "dyn_async"))]
-pub trait ParIteratorStringFnAsync<'a, F, Fut>
-{
+pub trait ParIteratorStringFnAsync<'a, F, Fut> {
     fn par_iter_string_async_fn(
         self,
         f: &'a F,
@@ -2459,8 +2458,7 @@ pub trait ParIteratorStringFnAsync<'a, F, Fut>
     where
         Self: 'a,
         Fut: core::future::Future<Output = String> + 'a,
-        F: Fn(&str, usize, usize) -> Fut + Sync,
-        ;
+        F: Fn(&str, usize, usize) -> Fut + Sync;
 }
 #[cfg(all(feature = "rayon", feature = "dyn_async"))]
 impl<'a, I, T, F, Fut> ParIteratorStringFnAsync<'a, F, Fut> for I
@@ -2881,7 +2879,6 @@ where
 // ============================================================================
 #[cfg(test)]
 mod tests {
-    use core::pin::pin;
     use super::*;
     use alloc::vec;
     #[cfg(any(feature = "dyn_async", feature = "impl_async"))]
@@ -3738,12 +3735,9 @@ mod tests {
     #[test]
     fn test_vec_string_fn_dyn_async() {
         let v = vec![1, 2, 3];
-        let fmt = |value: &str,
-                   index: usize,
-                   length: usize|
-         -> Box<dyn core::future::Future<Output = String> + '_> {
+        let fmt = |value: &str, index: usize, length: usize| {
             let value = value.to_string();
-            Box::new(async move {
+            async move {
                 if length == 0 {
                     return String::new();
                 }
@@ -3759,7 +3753,7 @@ mod tests {
                 } else {
                     format!(", {}", value)
                 }
-            })
+            }
         };
         assert_eq!(
             "<1, 2, 3>",
@@ -3770,12 +3764,9 @@ mod tests {
     #[test]
     fn test_iterator_string_fn_dyn_async() {
         let v = vec![10, 20, 30];
-        let fmt = |value: &str,
-                   index: usize,
-                   length: usize|
-         -> Box<dyn core::future::Future<Output = String> + '_> {
+        let fmt = |value: &str, index: usize, length: usize| {
             let value = value.to_string();
-            Box::new(async move {
+            async move {
                 if length == 0 {
                     return String::new();
                 }
@@ -3791,7 +3782,7 @@ mod tests {
                 } else {
                     format!(", {}", value)
                 }
-            })
+            }
         };
         assert_eq!(
             "{10, 20, 30}",
@@ -3803,14 +3794,11 @@ mod tests {
     fn test_vec_string_fn_mut_dyn_async() {
         let v = vec!["a", "b", "c"];
         let mut counter = 0usize;
-        let mut fmt = |value: &str,
-                       _index: usize,
-                       _length: usize|
-         -> Box<dyn core::future::Future<Output = String> + '_> {
+        let mut fmt = |value: &str, _index: usize, _length: usize| {
             let value = value.to_string();
             counter += 1;
             let c = counter;
-            Box::new(async move { format!("[{}{}]", value, c) })
+            async move { format!("[{}{}]", value, c) }
         };
         assert_eq!(
             "[a1][b2][c3]",
@@ -3901,12 +3889,9 @@ mod tests {
     fn test_rayon_par_iter_string_fn_dyn_async() {
         use rayon::iter::IntoParallelIterator;
         let v = vec![10, 20, 30];
-        let fmt = |value: &str,
-                   index: usize,
-                   length: usize|
-         -> Box<dyn core::future::Future<Output = String> + '_> {
+        let fmt = |value: &str, index: usize, length: usize| {
             let value = value.to_string();
-            Box::new(async move {
+            async move {
                 if length == 0 {
                     return String::new();
                 }
@@ -3922,7 +3907,7 @@ mod tests {
                 } else {
                     format!(", {}", value)
                 }
-            })
+            }
         };
         let fut = ParIteratorStringFnAsync::par_iter_string_async_fn(v.into_par_iter(), &fmt);
         assert_eq!("{10, 20, 30}", block_on_dyn(fut));

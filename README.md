@@ -1,5 +1,8 @@
 # vec-string
 
+уже не short возможно чуууть чуууть овер инженеринг.
+TODO: может для mut format rule в par iter сделать версию где есть синхронизация
+
 Very short crate to display vectors Vec&lt;T> where T: Display
 Normally you can do `format!("{:?}", vec);` when the elements implement `Debug`.
 This crate is to do the same but for when the elements implement `Display`.

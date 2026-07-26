@@ -3091,7 +3091,10 @@ pub trait IteratorStringFnMutImplAsyncSendExact<
     Fut: core::future::Future<Output = String> + Send,
 >
 {
-    async fn iter_string_async_fn_mut_exact<'a>(self, f: &'a mut F) -> String
+    fn iter_string_async_fn_mut_exact<'a>(
+        self,
+        f: &'a mut F,
+    ) -> impl core::future::Future<Output = String> + 'a + Send
     where
         Self: 'a,
         F: 'a,
@@ -3106,20 +3109,25 @@ impl<
 where
     I::Item: core::fmt::Display + Send,
 {
-    async fn iter_string_async_fn_mut_exact<'a>(self, f: &'a mut F) -> String
+    fn iter_string_async_fn_mut_exact<'a>(
+        self,
+        f: &'a mut F,
+    ) -> impl core::future::Future<Output = String> + 'a + Send
     where
         Self: 'a,
         F: 'a,
         Fut: 'a,
     {
-        let l = self.len();
-        let mut r = String::new();
-        r.reserve(l.saturating_mul(16));
-        for (i, x) in self.enumerate() {
-            let s = format!("{}", x);
-            r.push_str(&f(&s, i, l).await);
+        async move {
+            let l = self.len();
+            let mut r = String::new();
+            r.reserve(l.saturating_mul(16));
+            for (i, x) in self.enumerate() {
+                let s = format!("{}", x);
+                r.push_str(&f(&s, i, l).await);
+            }
+            r
         }
-        r
     }
 }
 #[cfg(feature = "impl_async")]
@@ -3129,7 +3137,11 @@ pub trait IteratorStringWithStateImplAsyncExact<
     Fut: core::future::Future<Output = String>,
 >
 {
-    async fn iter_string_with_state_async_exact<'a>(self, st: S, f: &'a mut F) -> String
+    fn iter_string_with_state_async_exact<'a>(
+        self,
+        st: S,
+        f: &'a mut F,
+    ) -> impl core::future::Future<Output = String> + 'a
     where
         Self: 'a,
         F: 'a,
@@ -3146,21 +3158,27 @@ impl<
 where
     I::Item: core::fmt::Display,
 {
-    async fn iter_string_with_state_async_exact<'a>(self, mut st: S, f: &'a mut F) -> String
+    fn iter_string_with_state_async_exact<'a>(
+        self,
+        mut st: S,
+        f: &'a mut F,
+    ) -> impl core::future::Future<Output = String> + 'a
     where
         Self: 'a,
         F: 'a,
         S: 'a,
         Fut: 'a,
     {
-        let l = self.len();
-        let mut r = String::new();
-        r.reserve(l.saturating_mul(16));
-        for (i, x) in self.enumerate() {
-            let s = format!("{}", x);
-            r.push_str(&f(&mut st, &s, i, l).await);
+        async move {
+            let l = self.len();
+            let mut r = String::new();
+            r.reserve(l.saturating_mul(16));
+            for (i, x) in self.enumerate() {
+                let s = format!("{}", x);
+                r.push_str(&f(&mut st, &s, i, l).await);
+            }
+            r
         }
-        r
     }
 }
 
@@ -3377,7 +3395,10 @@ pub trait ParIteratorStringFnImplAsync<
     Fut: core::future::Future<Output = String>,
 >
 {
-    async fn par_iter_string_async_fn<'a>(self, f: &'a F) -> String
+    fn par_iter_string_async_fn<'a>(
+        self,
+        f: &'a F,
+    ) -> impl core::future::Future<Output = String> + 'a
     where
         Self: 'a,
         F: 'a,
@@ -3393,20 +3414,25 @@ impl<
 where
     I: rayon::iter::ParallelIterator<Item = T>,
 {
-    async fn par_iter_string_async_fn<'a>(self, f: &'a F) -> String
+    fn par_iter_string_async_fn<'a>(
+        self,
+        f: &'a F,
+    ) -> impl core::future::Future<Output = String> + 'a
     where
         Self: 'a,
         F: 'a,
         Fut: 'a,
     {
-        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
-        let l = items.len();
-        let mut r = String::new();
-        r.reserve(l.saturating_mul(16));
-        for (i, s) in items.into_iter().enumerate() {
-            r.push_str(&f(&s, i, l).await);
+        async move {
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let l = items.len();
+            let mut r = String::new();
+            r.reserve(l.saturating_mul(16));
+            for (i, s) in items.into_iter().enumerate() {
+                r.push_str(&f(&s, i, l).await);
+            }
+            r
         }
-        r
     }
 }
 #[cfg(all(feature = "rayon", feature = "impl_async"))]
@@ -3415,7 +3441,10 @@ pub trait ParIteratorStringFnImplAsyncSend<
     Fut: core::future::Future<Output = String> + Send,
 >
 {
-    async fn par_iter_string_async_fn<'a>(self, f: &'a F) -> String
+    fn par_iter_string_async_fn<'a>(
+        self,
+        f: &'a F,
+    ) -> impl core::future::Future<Output = String> + 'a + Send
     where
         Self: 'a,
         F: 'a,
@@ -3431,20 +3460,25 @@ impl<
 where
     I: rayon::iter::ParallelIterator<Item = T>,
 {
-    async fn par_iter_string_async_fn<'a>(self, f: &'a F) -> String
+    fn par_iter_string_async_fn<'a>(
+        self,
+        f: &'a F,
+    ) -> impl core::future::Future<Output = String> + 'a + Send
     where
         Self: 'a,
         F: 'a,
         Fut: 'a,
     {
-        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
-        let l = items.len();
-        let mut r = String::new();
-        r.reserve(l.saturating_mul(16));
-        for (i, s) in items.into_iter().enumerate() {
-            r.push_str(&f(&s, i, l).await);
+        async move {
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let l = items.len();
+            let mut r = String::new();
+            r.reserve(l.saturating_mul(16));
+            for (i, s) in items.into_iter().enumerate() {
+                r.push_str(&f(&s, i, l).await);
+            }
+            r
         }
-        r
     }
 }
 #[cfg(all(feature = "rayon", feature = "impl_async"))]
@@ -3453,7 +3487,10 @@ pub trait ParIteratorStringFnMutImplAsync<
     Fut: core::future::Future<Output = String>,
 >
 {
-    async fn par_iter_string_async_fn_mut<'a>(self, f: &'a mut F) -> String
+    fn par_iter_string_async_fn_mut<'a>(
+        self,
+        f: &'a mut F,
+    ) -> impl core::future::Future<Output = String> + 'a
     where
         Self: 'a,
         F: 'a,
@@ -3469,20 +3506,25 @@ impl<
 where
     I: rayon::iter::ParallelIterator<Item = T>,
 {
-    async fn par_iter_string_async_fn_mut<'a>(self, f: &'a mut F) -> String
+    fn par_iter_string_async_fn_mut<'a>(
+        self,
+        f: &'a mut F,
+    ) -> impl core::future::Future<Output = String> + 'a
     where
         Self: 'a,
         F: 'a,
         Fut: 'a,
     {
-        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
-        let l = items.len();
-        let mut r = String::new();
-        r.reserve(l.saturating_mul(16));
-        for (i, s) in items.into_iter().enumerate() {
-            r.push_str(&f(&s, i, l).await);
+        async move {
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let l = items.len();
+            let mut r = String::new();
+            r.reserve(l.saturating_mul(16));
+            for (i, s) in items.into_iter().enumerate() {
+                r.push_str(&f(&s, i, l).await);
+            }
+            r
         }
-        r
     }
 }
 #[cfg(all(feature = "rayon", feature = "impl_async"))]
@@ -3491,7 +3533,10 @@ pub trait ParIteratorStringFnMutImplAsyncSend<
     Fut: core::future::Future<Output = String> + Send,
 >
 {
-    async fn par_iter_string_async_fn_mut<'a>(self, f: &'a mut F) -> String
+    fn par_iter_string_async_fn_mut<'a>(
+        self,
+        f: &'a mut F,
+    ) -> impl core::future::Future<Output = String> + 'a + Send
     where
         Self: 'a,
         F: 'a,
@@ -3507,25 +3552,33 @@ impl<
 where
     I: rayon::iter::ParallelIterator<Item = T>,
 {
-    async fn par_iter_string_async_fn_mut<'a>(self, f: &'a mut F) -> String
+    fn par_iter_string_async_fn_mut<'a>(
+        self,
+        f: &'a mut F,
+    ) -> impl core::future::Future<Output = String> + 'a + Send
     where
         Self: 'a,
         F: 'a,
         Fut: 'a,
     {
-        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
-        let l = items.len();
-        let mut r = String::new();
-        r.reserve(l.saturating_mul(16));
-        for (i, s) in items.into_iter().enumerate() {
-            r.push_str(&f(&s, i, l).await);
+        async move {
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let l = items.len();
+            let mut r = String::new();
+            r.reserve(l.saturating_mul(16));
+            for (i, s) in items.into_iter().enumerate() {
+                r.push_str(&f(&s, i, l).await);
+            }
+            r
         }
-        r
     }
 }
 #[cfg(all(feature = "rayon", feature = "impl_async"))]
 pub trait ParIteratorStringFnPtrImplAsync {
-    async fn par_iter_string_async_fn_ptr<'a>(self, f: FormatRuleFn) -> String
+    fn par_iter_string_async_fn_ptr<'a>(
+        self,
+        f: FormatRuleFn,
+    ) -> impl core::future::Future<Output = String> + 'a
     where
         Self: 'a;
 }
@@ -3534,18 +3587,23 @@ impl<I: rayon::iter::ParallelIterator, T: core::fmt::Display> ParIteratorStringF
 where
     I: rayon::iter::ParallelIterator<Item = T>,
 {
-    async fn par_iter_string_async_fn_ptr<'a>(self, f: FormatRuleFn) -> String
+    fn par_iter_string_async_fn_ptr<'a>(
+        self,
+        f: FormatRuleFn,
+    ) -> impl core::future::Future<Output = String> + 'a
     where
         Self: 'a,
     {
-        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
-        let l = items.len();
-        let mut r = String::new();
-        r.reserve(l.saturating_mul(16));
-        for (i, s) in items.into_iter().enumerate() {
-            r.push_str(&f(&s, i, l));
+        async move {
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let l = items.len();
+            let mut r = String::new();
+            r.reserve(l.saturating_mul(16));
+            for (i, s) in items.into_iter().enumerate() {
+                r.push_str(&f(&s, i, l));
+            }
+            r
         }
-        r
     }
 }
 
@@ -3914,7 +3972,7 @@ mod tests {
     }
     #[test]
     fn test_iterator_string_rule_owned_exact() {
-        let v = vec![10, 20, 30];
+        let v = [10, 20, 30];
         let fmt = |value: &str, index: usize, length: usize| {
             if length == 0 {
                 return String::new();
@@ -4308,6 +4366,7 @@ mod tests {
     #[test]
     fn test_iterator_string_with_state_async_exact() {
         let v = vec![1, 2, 3];
+        #[allow(unused_mut)]
         let mut state = 10i32;
         let mut fmt = |s: &mut i32, val: &str, idx, len| {
             let val = val.to_string();
@@ -4379,7 +4438,7 @@ mod tests {
     #[cfg(feature = "impl_async")]
     #[test]
     fn test_iterator_string_fn_impl_async_collecting() {
-        let v = vec![10, 20, 30];
+        let v = [10, 20, 30];
         let fmt = |value: &str, index: usize, length: usize| {
             let value = value.to_string();
             async move {
@@ -4411,7 +4470,7 @@ mod tests {
     #[cfg(feature = "impl_async")]
     #[test]
     fn test_iterator_string_fn_impl_async_exact() {
-        let v = vec![10, 20, 30];
+        let v = [10, 20, 30];
         let fmt = |value: &str, index: usize, length: usize| {
             let value = value.to_string();
             async move {
@@ -4444,7 +4503,7 @@ mod tests {
     #[cfg(feature = "impl_async")]
     #[test]
     fn test_iterator_string_fn_mut_impl_async_collecting() {
-        let v = vec!["a", "b", "c"];
+        let v = ["a", "b", "c"];
         let mut counter = 0usize;
         let mut fmt = |value: &str, _index: usize, _length: usize| {
             let value = value.to_string();
@@ -4463,7 +4522,7 @@ mod tests {
     #[cfg(feature = "impl_async")]
     #[test]
     fn test_iterator_string_fn_mut_impl_async_exact() {
-        let v = vec!["a", "b", "c"];
+        let v = ["a", "b", "c"];
         let mut counter = 0usize;
         let mut fmt = |value: &str, _index: usize, _length: usize| {
             let value = value.to_string();
@@ -4486,6 +4545,7 @@ mod tests {
     #[test]
     fn test_iterator_string_with_state_impl_async_exact() {
         let v = vec![1, 2, 3];
+        #[allow(unused_mut)]
         let mut state = String::from("val");
         let mut fmt = |s: &mut String, val: &str, idx, len| {
             s.push_str(val);
@@ -4596,7 +4656,7 @@ mod tests {
                 return String::new();
             }
             if idx == total - 1 {
-                format!("{}", val)
+                val.to_string()
             } else {
                 format!("{}, ", val)
             }
@@ -4606,7 +4666,7 @@ mod tests {
 
     #[test]
     fn test_exact_size_vs_collecting_consistency() {
-        let data = vec![5, 10, 15];
+        let data = [5, 10, 15];
         let fmt = |val: &str, _i, _t| format!("({})", val);
         let col_res = IteratorStringFn::iter_string_fn(data.iter(), fmt);
         let exact_res = IteratorStringFnExact::iter_string_fn_exact(data.iter(), fmt);

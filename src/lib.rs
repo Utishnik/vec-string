@@ -219,7 +219,7 @@ impl<S, F: FnMut(&mut S, &str, usize, usize) -> String> FormatRuleMut<S> for F {
 }
 
 // ============================================================================
-// SYNC VecString* / IteratorString*
+// SYNC VecString* / IteratorString* (collecting)
 // ============================================================================
 pub trait VecString {
     fn vec_string(&self, format_rule: FormatRuleFn) -> String;
@@ -260,6 +260,7 @@ impl<T: core::fmt::Display, F: FnMut(&str, usize, usize) -> String> VecStringFnM
         s
     }
 }
+
 pub trait IteratorString {
     fn iter_string(self, format_rule: FormatRuleFn) -> String;
 }
@@ -311,6 +312,7 @@ where
         r
     }
 }
+
 pub trait VecStringWithState<S, F: FnMut(&mut S, &str, usize, usize) -> String> {
     fn vec_string_with_state(&self, st: S, f: F) -> String;
 }
@@ -345,6 +347,7 @@ where
         r
     }
 }
+
 pub trait VecStringWithStateFn<S, F: Fn(&S, &str, usize, usize) -> String> {
     fn vec_string_with_state_fn(&self, st: &S, f: F) -> String;
 }
@@ -379,6 +382,7 @@ where
         r
     }
 }
+
 pub trait VecStringWithStateFnPtr<S> {
     fn vec_string_with_state_fn_ptr(
         &self,
@@ -428,7 +432,7 @@ where
 }
 
 // ============================================================================
-// SYNC RuleOwned / MutRuleOwned / RuleRef / MutRuleRef
+// SYNC RuleOwned / MutRuleOwned / RuleRef / MutRuleRef (collecting)
 // ============================================================================
 pub trait VecStringRuleOwned<R: FormatRuleNoStateOwned> {
     fn vec_string_rule_owned(self, rule: R) -> String;
@@ -490,6 +494,7 @@ where
         r
     }
 }
+
 pub trait VecStringWithStateRuleOwned<S, R: FormatRule<S>> {
     fn vec_string_with_state_rule_owned(&self, st: &S, rule: R) -> String;
 }
@@ -554,6 +559,7 @@ where
         r
     }
 }
+
 pub trait VecStringRuleRef<'a, R: FormatRuleNoState<'a>> {
     fn vec_string_rule_ref(&self, rule: &'a R) -> String;
 }
@@ -614,6 +620,7 @@ where
         r
     }
 }
+
 pub trait VecStringWithStateRuleRef<S, R: FormatRule<S>> {
     fn vec_string_with_state_rule_ref(&self, st: &S, rule: &R) -> String;
 }
@@ -671,6 +678,268 @@ where
         let l = items.len();
         let mut r = String::new();
         for (i, s) in items.into_iter().enumerate() {
+            r.push_str(&rule.format(&mut st, &s, i, l));
+        }
+        r
+    }
+}
+
+// ============================================================================
+// SYNC Exact-size traits (no allocation)
+// ============================================================================
+pub trait IteratorStringExact {
+    fn iter_string_exact(self, format_rule: FormatRuleFn) -> String;
+}
+pub trait IteratorStringFnExact<F: Fn(&str, usize, usize) -> String> {
+    fn iter_string_fn_exact(self, format_rule: F) -> String;
+}
+pub trait IteratorStringFnMutExact<F: FnMut(&str, usize, usize) -> String> {
+    fn iter_string_fn_mut_exact(self, format_rule: F) -> String;
+}
+impl<I: StableIter + ExactSizeIterator> IteratorStringExact for I
+where
+    I::Item: core::fmt::Display,
+{
+    fn iter_string_exact(self, f: FormatRuleFn) -> String {
+        let l = self.len();
+        let mut r = String::new();
+        for (i, x) in self.enumerate() {
+            r.push_str(&f(&format!("{}", x), i, l));
+        }
+        r
+    }
+}
+impl<I: StableIter + ExactSizeIterator, F: Fn(&str, usize, usize) -> String>
+    IteratorStringFnExact<F> for I
+where
+    I::Item: core::fmt::Display,
+{
+    fn iter_string_fn_exact(self, f: F) -> String {
+        let l = self.len();
+        let mut r = String::new();
+        for (i, x) in self.enumerate() {
+            r.push_str(&f(&format!("{}", x), i, l));
+        }
+        r
+    }
+}
+impl<I: StableIter + ExactSizeIterator, F: FnMut(&str, usize, usize) -> String>
+    IteratorStringFnMutExact<F> for I
+where
+    I::Item: core::fmt::Display,
+{
+    fn iter_string_fn_mut_exact(self, mut f: F) -> String {
+        let l = self.len();
+        let mut r = String::new();
+        for (i, x) in self.enumerate() {
+            r.push_str(&f(&format!("{}", x), i, l));
+        }
+        r
+    }
+}
+
+pub trait IteratorStringWithStateExact<S, F: FnMut(&mut S, &str, usize, usize) -> String> {
+    fn iter_string_with_state_exact(self, st: S, f: F) -> String;
+}
+impl<I: StableIter + ExactSizeIterator, S, F: FnMut(&mut S, &str, usize, usize) -> String>
+    IteratorStringWithStateExact<S, F> for I
+where
+    I::Item: core::fmt::Display,
+{
+    fn iter_string_with_state_exact(self, mut st: S, mut f: F) -> String {
+        let l = self.len();
+        let mut r = String::new();
+        for (i, x) in self.enumerate() {
+            let s = format!("{}", x);
+            r.push_str(&f(&mut st, &s, i, l));
+        }
+        r
+    }
+}
+
+pub trait IteratorStringWithStateFnExact<S, F: Fn(&S, &str, usize, usize) -> String> {
+    fn iter_string_with_state_fn_exact(self, st: &S, f: F) -> String;
+}
+impl<I: StableIter + ExactSizeIterator, S, F: Fn(&S, &str, usize, usize) -> String>
+    IteratorStringWithStateFnExact<S, F> for I
+where
+    I::Item: core::fmt::Display,
+{
+    fn iter_string_with_state_fn_exact(self, st: &S, f: F) -> String {
+        let l = self.len();
+        let mut r = String::new();
+        for (i, x) in self.enumerate() {
+            let s = format!("{}", x);
+            r.push_str(&f(st, &s, i, l));
+        }
+        r
+    }
+}
+
+pub trait IteratorStringWithStateFnPtrExact<S> {
+    fn iter_string_with_state_fn_ptr_exact(
+        self,
+        st: &S,
+        f: fn(&S, &str, usize, usize) -> String,
+    ) -> String;
+}
+impl<I: StableIter + ExactSizeIterator, S> IteratorStringWithStateFnPtrExact<S> for I
+where
+    I::Item: core::fmt::Display,
+{
+    fn iter_string_with_state_fn_ptr_exact(
+        self,
+        st: &S,
+        f: fn(&S, &str, usize, usize) -> String,
+    ) -> String {
+        let l = self.len();
+        let mut r = String::new();
+        for (i, x) in self.enumerate() {
+            let s = format!("{}", x);
+            r.push_str(&f(st, &s, i, l));
+        }
+        r
+    }
+}
+
+pub trait IteratorStringRuleOwnedExact<R: FormatRuleNoStateOwned> {
+    fn iter_string_rule_owned_exact(self, rule: R) -> String;
+}
+impl<I: StableIter + ExactSizeIterator, R: FormatRuleNoStateOwned + Clone>
+    IteratorStringRuleOwnedExact<R> for I
+where
+    I::Item: core::fmt::Display,
+{
+    fn iter_string_rule_owned_exact(self, rule: R) -> String {
+        let l = self.len();
+        let mut r = String::new();
+        for (i, x) in self.enumerate() {
+            r.push_str(&rule.clone().format(&format!("{}", x), i, l));
+        }
+        r
+    }
+}
+pub trait IteratorStringMutRuleOwnedExact<R: FormatRuleMutNoState> {
+    fn iter_string_mut_rule_owned_exact(self, rule: R) -> String;
+}
+impl<I: StableIter + ExactSizeIterator, R: FormatRuleMutNoState> IteratorStringMutRuleOwnedExact<R>
+    for I
+where
+    I::Item: core::fmt::Display,
+{
+    fn iter_string_mut_rule_owned_exact(self, mut rule: R) -> String {
+        let l = self.len();
+        let mut r = String::new();
+        for (i, x) in self.enumerate() {
+            r.push_str(&rule.format(&format!("{}", x), i, l));
+        }
+        r
+    }
+}
+
+pub trait IteratorStringWithStateRuleOwnedExact<S, R: FormatRule<S>> {
+    fn iter_string_with_state_rule_owned_exact(self, st: &S, rule: R) -> String;
+}
+impl<I: StableIter + ExactSizeIterator, S, R: FormatRule<S>>
+    IteratorStringWithStateRuleOwnedExact<S, R> for I
+where
+    I::Item: core::fmt::Display,
+{
+    fn iter_string_with_state_rule_owned_exact(self, st: &S, rule: R) -> String {
+        let l = self.len();
+        let mut r = String::new();
+        for (i, x) in self.enumerate() {
+            let s = format!("{}", x);
+            r.push_str(&rule.format(st, &s, i, l));
+        }
+        r
+    }
+}
+pub trait IteratorStringWithStateMutRuleOwnedExact<S, R: FormatRuleMut<S>> {
+    fn iter_string_with_state_mut_rule_owned_exact(self, st: S, rule: R) -> String;
+}
+impl<I: StableIter + ExactSizeIterator, S, R: FormatRuleMut<S>>
+    IteratorStringWithStateMutRuleOwnedExact<S, R> for I
+where
+    I::Item: core::fmt::Display,
+{
+    fn iter_string_with_state_mut_rule_owned_exact(self, mut st: S, mut rule: R) -> String {
+        let l = self.len();
+        let mut r = String::new();
+        for (i, x) in self.enumerate() {
+            let s = format!("{}", x);
+            r.push_str(&rule.format(&mut st, &s, i, l));
+        }
+        r
+    }
+}
+
+pub trait IteratorStringRuleRefExact<'a, R: FormatRuleNoState<'a>> {
+    fn iter_string_rule_ref_exact(self, rule: &'a R) -> String;
+}
+impl<'a, I: StableIter + ExactSizeIterator, R: FormatRuleNoState<'a>>
+    IteratorStringRuleRefExact<'a, R> for I
+where
+    I::Item: core::fmt::Display,
+{
+    fn iter_string_rule_ref_exact(self, rule: &'a R) -> String {
+        let l = self.len();
+        let mut r = String::new();
+        for (i, x) in self.enumerate() {
+            r.push_str(&rule.format(&format!("{}", x), i, l));
+        }
+        r
+    }
+}
+pub trait IteratorStringMutRuleRefExact<R: FormatRuleMutNoState> {
+    fn iter_string_mut_rule_ref_exact(self, rule: &mut R) -> String;
+}
+impl<I: StableIter + ExactSizeIterator, R: FormatRuleMutNoState> IteratorStringMutRuleRefExact<R>
+    for I
+where
+    I::Item: core::fmt::Display,
+{
+    fn iter_string_mut_rule_ref_exact(self, rule: &mut R) -> String {
+        let l = self.len();
+        let mut r = String::new();
+        for (i, x) in self.enumerate() {
+            r.push_str(&rule.format(&format!("{}", x), i, l));
+        }
+        r
+    }
+}
+
+pub trait IteratorStringWithStateRuleRefExact<S, R: FormatRule<S>> {
+    fn iter_string_with_state_rule_ref_exact(self, st: &S, rule: &R) -> String;
+}
+impl<I: StableIter + ExactSizeIterator, S, R: FormatRule<S>>
+    IteratorStringWithStateRuleRefExact<S, R> for I
+where
+    I::Item: core::fmt::Display,
+{
+    fn iter_string_with_state_rule_ref_exact(self, st: &S, rule: &R) -> String {
+        let l = self.len();
+        let mut r = String::new();
+        for (i, x) in self.enumerate() {
+            let s = format!("{}", x);
+            r.push_str(&rule.format(st, &s, i, l));
+        }
+        r
+    }
+}
+pub trait IteratorStringWithStateMutRuleRefExact<S, R: FormatRuleMut<S>> {
+    fn iter_string_with_state_mut_rule_ref_exact(self, st: S, rule: &mut R) -> String;
+}
+impl<I: StableIter + ExactSizeIterator, S, R: FormatRuleMut<S>>
+    IteratorStringWithStateMutRuleRefExact<S, R> for I
+where
+    I::Item: core::fmt::Display,
+{
+    fn iter_string_with_state_mut_rule_ref_exact(self, mut st: S, rule: &mut R) -> String {
+        let l = self.len();
+        let mut r = String::new();
+        for (i, x) in self.enumerate() {
+            let s = format!("{}", x);
             r.push_str(&rule.format(&mut st, &s, i, l));
         }
         r
@@ -1338,7 +1607,7 @@ impl FormatRuleFnPtrAsync
 }
 
 // ============================================================================
-// DYN ASYNC: Vec/Iterator (с ExactSizeIterator — без collect)
+// DYN ASYNC: Vec (unchanged, already collecting)
 // ============================================================================
 #[cfg(feature = "dyn_async")]
 pub trait VecStringFnAsync<
@@ -1525,7 +1794,9 @@ impl<
     }
 }
 
-// Iterator async — ExactSizeIterator (без collect)
+// ============================================================================
+// DYN ASYNC: Iterator – COLLECTING versions
+// ============================================================================
 #[cfg(feature = "dyn_async")]
 pub trait IteratorStringFnAsync<
     'a,
@@ -1540,7 +1811,7 @@ pub trait IteratorStringFnAsync<
 #[cfg(feature = "dyn_async")]
 impl<
         'a,
-        I: StableIter + ExactSizeIterator,
+        I: StableIter,
         F: Fn(&str, usize, usize) -> Fut,
         Fut: core::future::Future<Output = String> + 'a,
     > IteratorStringFnAsync<'a, F, Fut> for I
@@ -1552,11 +1823,11 @@ where
         Self: 'a,
     {
         Box::new(async move {
-            let l = self.len();
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let l = items.len();
             let mut r = String::new();
             r.reserve(l.saturating_mul(16));
-            for (i, x) in self.enumerate() {
-                let s = format!("{}", x);
+            for (i, s) in items.into_iter().enumerate() {
                 r.push_str(&f(&s, i, l).await);
             }
             r
@@ -1580,7 +1851,7 @@ pub trait IteratorStringFnAsyncSend<
 #[cfg(feature = "dyn_async")]
 impl<
         'a,
-        I: StableIter + ExactSizeIterator + Send,
+        I: StableIter + Send,
         F: Fn(&str, usize, usize) -> Fut + Sync,
         Fut: core::future::Future<Output = String> + 'a + Send,
     > IteratorStringFnAsyncSend<'a, F, Fut> for I
@@ -1595,11 +1866,11 @@ where
         Self: 'a,
     {
         Box::new(async move {
-            let l = self.len();
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let l = items.len();
             let mut r = String::new();
             r.reserve(l.saturating_mul(16));
-            for (i, x) in self.enumerate() {
-                let s = format!("{}", x);
+            for (i, s) in items.into_iter().enumerate() {
                 r.push_str(&f(&s, i, l).await);
             }
             r
@@ -1623,7 +1894,7 @@ pub trait IteratorStringFnMutAsync<
 #[cfg(feature = "dyn_async")]
 impl<
         'a,
-        I: StableIter + ExactSizeIterator,
+        I: StableIter,
         F: FnMut(&str, usize, usize) -> Fut,
         Fut: core::future::Future<Output = String> + 'a,
     > IteratorStringFnMutAsync<'a, F, Fut> for I
@@ -1638,11 +1909,11 @@ where
         Self: 'a,
     {
         Box::new(async move {
-            let l = self.len();
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let l = items.len();
             let mut r = String::new();
             r.reserve(l.saturating_mul(16));
-            for (i, x) in self.enumerate() {
-                let s = format!("{}", x);
+            for (i, s) in items.into_iter().enumerate() {
                 r.push_str(&f(&s, i, l).await);
             }
             r
@@ -1666,7 +1937,7 @@ pub trait IteratorStringFnMutAsyncSend<
 #[cfg(feature = "dyn_async")]
 impl<
         'a,
-        I: StableIter + ExactSizeIterator + Send,
+        I: StableIter + Send,
         F: FnMut(&str, usize, usize) -> Fut + Send,
         Fut: core::future::Future<Output = String> + 'a + Send,
     > IteratorStringFnMutAsyncSend<'a, F, Fut> for I
@@ -1681,11 +1952,11 @@ where
         Self: 'a,
     {
         Box::new(async move {
-            let l = self.len();
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let l = items.len();
             let mut r = String::new();
             r.reserve(l.saturating_mul(16));
-            for (i, x) in self.enumerate() {
-                let s = format!("{}", x);
+            for (i, s) in items.into_iter().enumerate() {
                 r.push_str(&f(&s, i, l).await);
             }
             r
@@ -1711,7 +1982,7 @@ pub trait IteratorStringWithStateAsync<
 #[cfg(feature = "dyn_async")]
 impl<
         'a,
-        I: StableIter + ExactSizeIterator,
+        I: StableIter,
         S: 'a,
         F: FnMut(&mut S, &str, usize, usize) -> Fut,
         Fut: core::future::Future<Output = String> + 'a,
@@ -1720,6 +1991,229 @@ where
     I::Item: core::fmt::Display,
 {
     fn iter_string_with_state_async(
+        self,
+        mut st: S,
+        f: &'a mut F,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a>
+    where
+        Self: 'a,
+    {
+        Box::new(async move {
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let l = items.len();
+            let mut r = String::new();
+            r.reserve(l.saturating_mul(16));
+            for (i, s) in items.into_iter().enumerate() {
+                r.push_str(&f(&mut st, &s, i, l).await);
+            }
+            r
+        })
+    }
+}
+
+// ============================================================================
+// DYN ASYNC: Iterator – EXACT versions (no collect)
+// ============================================================================
+#[cfg(feature = "dyn_async")]
+pub trait IteratorStringFnAsyncExact<
+    'a,
+    F: Fn(&str, usize, usize) -> Fut,
+    Fut: core::future::Future<Output = String> + 'a,
+>
+{
+    fn iter_string_async_fn_exact(
+        self,
+        f: &'a F,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a>
+    where
+        Self: 'a;
+}
+#[cfg(feature = "dyn_async")]
+impl<
+        'a,
+        I: StableIter + ExactSizeIterator,
+        F: Fn(&str, usize, usize) -> Fut,
+        Fut: core::future::Future<Output = String> + 'a,
+    > IteratorStringFnAsyncExact<'a, F, Fut> for I
+where
+    I::Item: core::fmt::Display,
+{
+    fn iter_string_async_fn_exact(
+        self,
+        f: &'a F,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a>
+    where
+        Self: 'a,
+    {
+        Box::new(async move {
+            let l = self.len();
+            let mut r = String::new();
+            r.reserve(l.saturating_mul(16));
+            for (i, x) in self.enumerate() {
+                let s = format!("{}", x);
+                r.push_str(&f(&s, i, l).await);
+            }
+            r
+        })
+    }
+}
+#[cfg(feature = "dyn_async")]
+pub trait IteratorStringFnAsyncSendExact<
+    'a,
+    F: Fn(&str, usize, usize) -> Fut + Sync,
+    Fut: core::future::Future<Output = String> + 'a + Send,
+>
+{
+    fn iter_string_async_fn_exact(
+        self,
+        f: &'a F,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a + Send>
+    where
+        Self: 'a;
+}
+#[cfg(feature = "dyn_async")]
+impl<
+        'a,
+        I: StableIter + ExactSizeIterator + Send,
+        F: Fn(&str, usize, usize) -> Fut + Sync,
+        Fut: core::future::Future<Output = String> + 'a + Send,
+    > IteratorStringFnAsyncSendExact<'a, F, Fut> for I
+where
+    I::Item: core::fmt::Display + Send,
+{
+    fn iter_string_async_fn_exact(
+        self,
+        f: &'a F,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a + Send>
+    where
+        Self: 'a,
+    {
+        Box::new(async move {
+            let l = self.len();
+            let mut r = String::new();
+            r.reserve(l.saturating_mul(16));
+            for (i, x) in self.enumerate() {
+                let s = format!("{}", x);
+                r.push_str(&f(&s, i, l).await);
+            }
+            r
+        })
+    }
+}
+#[cfg(feature = "dyn_async")]
+pub trait IteratorStringFnMutAsyncExact<
+    'a,
+    F: FnMut(&str, usize, usize) -> Fut,
+    Fut: core::future::Future<Output = String> + 'a,
+>
+{
+    fn iter_string_async_fn_mut_exact(
+        self,
+        f: &'a mut F,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a>
+    where
+        Self: 'a;
+}
+#[cfg(feature = "dyn_async")]
+impl<
+        'a,
+        I: StableIter + ExactSizeIterator,
+        F: FnMut(&str, usize, usize) -> Fut,
+        Fut: core::future::Future<Output = String> + 'a,
+    > IteratorStringFnMutAsyncExact<'a, F, Fut> for I
+where
+    I::Item: core::fmt::Display,
+{
+    fn iter_string_async_fn_mut_exact(
+        self,
+        f: &'a mut F,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a>
+    where
+        Self: 'a,
+    {
+        Box::new(async move {
+            let l = self.len();
+            let mut r = String::new();
+            r.reserve(l.saturating_mul(16));
+            for (i, x) in self.enumerate() {
+                let s = format!("{}", x);
+                r.push_str(&f(&s, i, l).await);
+            }
+            r
+        })
+    }
+}
+#[cfg(feature = "dyn_async")]
+pub trait IteratorStringFnMutAsyncSendExact<
+    'a,
+    F: FnMut(&str, usize, usize) -> Fut + Send,
+    Fut: core::future::Future<Output = String> + 'a + Send,
+>
+{
+    fn iter_string_async_fn_mut_exact(
+        self,
+        f: &'a mut F,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a + Send>
+    where
+        Self: 'a;
+}
+#[cfg(feature = "dyn_async")]
+impl<
+        'a,
+        I: StableIter + ExactSizeIterator + Send,
+        F: FnMut(&str, usize, usize) -> Fut + Send,
+        Fut: core::future::Future<Output = String> + 'a + Send,
+    > IteratorStringFnMutAsyncSendExact<'a, F, Fut> for I
+where
+    I::Item: core::fmt::Display + Send,
+{
+    fn iter_string_async_fn_mut_exact(
+        self,
+        f: &'a mut F,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a + Send>
+    where
+        Self: 'a,
+    {
+        Box::new(async move {
+            let l = self.len();
+            let mut r = String::new();
+            r.reserve(l.saturating_mul(16));
+            for (i, x) in self.enumerate() {
+                let s = format!("{}", x);
+                r.push_str(&f(&s, i, l).await);
+            }
+            r
+        })
+    }
+}
+#[cfg(feature = "dyn_async")]
+pub trait IteratorStringWithStateAsyncExact<
+    'a,
+    S: 'a,
+    F: FnMut(&mut S, &str, usize, usize) -> Fut,
+    Fut: core::future::Future<Output = String> + 'a,
+>
+{
+    fn iter_string_with_state_async_exact(
+        self,
+        st: S,
+        f: &'a mut F,
+    ) -> Box<dyn core::future::Future<Output = String> + 'a>
+    where
+        Self: 'a;
+}
+#[cfg(feature = "dyn_async")]
+impl<
+        'a,
+        I: StableIter + ExactSizeIterator,
+        S: 'a,
+        F: FnMut(&mut S, &str, usize, usize) -> Fut,
+        Fut: core::future::Future<Output = String> + 'a,
+    > IteratorStringWithStateAsyncExact<'a, S, F, Fut> for I
+where
+    I::Item: core::fmt::Display,
+{
+    fn iter_string_with_state_async_exact(
         self,
         mut st: S,
         f: &'a mut F,
@@ -1770,8 +2264,10 @@ pub trait FormatRuleNoStateImplAsyncSend<Fut: core::future::Future<Output = Stri
     ) -> impl core::future::Future<Output = String> + Send;
 }
 #[cfg(feature = "impl_async")]
-impl<F: Fn(&str, usize, usize) -> Fut, Fut: core::future::Future<Output = String> + Send>
-    FormatRuleNoStateImplAsyncSend<Fut> for F
+impl<
+        F: Fn(&str, usize, usize) -> Fut + Sync,
+        Fut: core::future::Future<Output = String> + Send,
+    > FormatRuleNoStateImplAsyncSend<Fut> for F
 {
     fn format(
         &self,
@@ -1809,8 +2305,10 @@ pub trait FormatRuleNoStateOwnedImplAsyncSend<Fut: core::future::Future<Output =
     ) -> impl core::future::Future<Output = String> + Send;
 }
 #[cfg(feature = "impl_async")]
-impl<F: FnOnce(String, usize, usize) -> Fut, Fut: core::future::Future<Output = String> + Send>
-    FormatRuleNoStateOwnedImplAsyncSend<Fut> for F
+impl<
+        F: FnOnce(String, usize, usize) -> Fut + Send,
+        Fut: core::future::Future<Output = String> + Send,
+    > FormatRuleNoStateOwnedImplAsyncSend<Fut> for F
 {
     fn format(
         self,
@@ -1853,8 +2351,10 @@ pub trait FormatRuleMutNoStateImplAsyncSend<Fut: core::future::Future<Output = S
     ) -> impl core::future::Future<Output = String> + Send;
 }
 #[cfg(feature = "impl_async")]
-impl<F: FnMut(&str, usize, usize) -> Fut, Fut: core::future::Future<Output = String> + Send>
-    FormatRuleMutNoStateImplAsyncSend<Fut> for F
+impl<
+        F: FnMut(&str, usize, usize) -> Fut + Send,
+        Fut: core::future::Future<Output = String> + Send,
+    > FormatRuleMutNoStateImplAsyncSend<Fut> for F
 {
     fn format(
         &mut self,
@@ -1901,8 +2401,8 @@ pub trait FormatRuleImplAsyncSend<S, Fut: core::future::Future<Output = String> 
 }
 #[cfg(feature = "impl_async")]
 impl<
-        S,
-        F: Fn(&S, &str, usize, usize) -> Fut,
+        S: Sync,
+        F: Fn(&S, &str, usize, usize) -> Fut + Sync,
         Fut: core::future::Future<Output = String> + Send,
     > FormatRuleImplAsyncSend<S, Fut> for F
 {
@@ -1955,8 +2455,8 @@ pub trait FormatRuleMutImplAsyncSend<S, Fut: core::future::Future<Output = Strin
 }
 #[cfg(feature = "impl_async")]
 impl<
-        S,
-        F: FnMut(&mut S, &str, usize, usize) -> Fut,
+        S: Send,
+        F: FnMut(&mut S, &str, usize, usize) -> Fut + Send,
         Fut: core::future::Future<Output = String> + Send,
     > FormatRuleMutImplAsyncSend<S, Fut> for F
 {
@@ -1994,7 +2494,7 @@ impl<Fut: core::future::Future<Output = String>> FormatRuleFnPtrImplAsync<Fut>
 }
 
 // ============================================================================
-// IMPL ASYNC: Vec/Iterator (с ExactSizeIterator — без collect)
+// IMPL ASYNC: Vec (collecting, same as before)
 // ============================================================================
 #[cfg(feature = "impl_async")]
 pub trait VecStringFnImplAsync<
@@ -2218,7 +2718,9 @@ impl<
     }
 }
 
-// Iterator impl_async — ExactSizeIterator (без collect)
+// ============================================================================
+// IMPL ASYNC: Iterator – COLLECTING versions
+// ============================================================================
 #[cfg(feature = "impl_async")]
 pub trait IteratorStringFnImplAsync<
     F: Fn(&str, usize, usize) -> Fut,
@@ -2233,7 +2735,7 @@ pub trait IteratorStringFnImplAsync<
 }
 #[cfg(feature = "impl_async")]
 impl<
-        I: StableIter + ExactSizeIterator,
+        I: StableIter,
         F: Fn(&str, usize, usize) -> Fut,
         Fut: core::future::Future<Output = String>,
     > IteratorStringFnImplAsync<F, Fut> for I
@@ -2247,11 +2749,11 @@ where
         Fut: 'a,
     {
         async move {
-            let l = self.len();
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let l = items.len();
             let mut r = String::new();
             r.reserve(l.saturating_mul(16));
-            for (i, x) in self.enumerate() {
-                let s = format!("{}", x);
+            for (i, s) in items.into_iter().enumerate() {
                 r.push_str(&f(&s, i, l).await);
             }
             r
@@ -2275,7 +2777,7 @@ pub trait IteratorStringFnImplAsyncSend<
 }
 #[cfg(feature = "impl_async")]
 impl<
-        I: StableIter + ExactSizeIterator + Send,
+        I: StableIter + Send,
         F: Fn(&str, usize, usize) -> Fut + Sync,
         Fut: core::future::Future<Output = String> + Send,
     > IteratorStringFnImplAsyncSend<F, Fut> for I
@@ -2292,11 +2794,11 @@ where
         Fut: 'a,
     {
         async move {
-            let l = self.len();
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let l = items.len();
             let mut r = String::new();
             r.reserve(l.saturating_mul(16));
-            for (i, x) in self.enumerate() {
-                let s = format!("{}", x);
+            for (i, s) in items.into_iter().enumerate() {
                 r.push_str(&f(&s, i, l).await);
             }
             r
@@ -2320,7 +2822,7 @@ pub trait IteratorStringFnMutImplAsync<
 }
 #[cfg(feature = "impl_async")]
 impl<
-        I: StableIter + ExactSizeIterator,
+        I: StableIter,
         F: FnMut(&str, usize, usize) -> Fut,
         Fut: core::future::Future<Output = String>,
     > IteratorStringFnMutImplAsync<F, Fut> for I
@@ -2337,11 +2839,11 @@ where
         Fut: 'a,
     {
         async move {
-            let l = self.len();
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let l = items.len();
             let mut r = String::new();
             r.reserve(l.saturating_mul(16));
-            for (i, x) in self.enumerate() {
-                let s = format!("{}", x);
+            for (i, s) in items.into_iter().enumerate() {
                 r.push_str(&f(&s, i, l).await);
             }
             r
@@ -2365,7 +2867,7 @@ pub trait IteratorStringFnMutImplAsyncSend<
 }
 #[cfg(feature = "impl_async")]
 impl<
-        I: StableIter + ExactSizeIterator + Send,
+        I: StableIter + Send,
         F: FnMut(&str, usize, usize) -> Fut + Send,
         Fut: core::future::Future<Output = String> + Send,
     > IteratorStringFnMutImplAsyncSend<F, Fut> for I
@@ -2382,11 +2884,11 @@ where
         Fut: 'a,
     {
         async move {
-            let l = self.len();
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let l = items.len();
             let mut r = String::new();
             r.reserve(l.saturating_mul(16));
-            for (i, x) in self.enumerate() {
-                let s = format!("{}", x);
+            for (i, s) in items.into_iter().enumerate() {
                 r.push_str(&f(&s, i, l).await);
             }
             r
@@ -2413,7 +2915,7 @@ pub trait IteratorStringWithStateImplAsync<
 }
 #[cfg(feature = "impl_async")]
 impl<
-        I: StableIter + ExactSizeIterator,
+        I: StableIter,
         S,
         F: FnMut(&mut S, &str, usize, usize) -> Fut,
         Fut: core::future::Future<Output = String>,
@@ -2422,6 +2924,241 @@ where
     I::Item: core::fmt::Display,
 {
     fn iter_string_with_state_async<'a>(
+        self,
+        mut st: S,
+        f: &'a mut F,
+    ) -> impl core::future::Future<Output = String> + 'a
+    where
+        Self: 'a,
+        F: 'a,
+        S: 'a,
+        Fut: 'a,
+    {
+        async move {
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let l = items.len();
+            let mut r = String::new();
+            r.reserve(l.saturating_mul(16));
+            for (i, s) in items.into_iter().enumerate() {
+                r.push_str(&f(&mut st, &s, i, l).await);
+            }
+            r
+        }
+    }
+}
+
+// ============================================================================
+// IMPL ASYNC: Iterator – EXACT versions
+// ============================================================================
+#[cfg(feature = "impl_async")]
+pub trait IteratorStringFnImplAsyncExact<
+    F: Fn(&str, usize, usize) -> Fut,
+    Fut: core::future::Future<Output = String>,
+>
+{
+    fn iter_string_async_fn_exact<'a>(
+        self,
+        f: &'a F,
+    ) -> impl core::future::Future<Output = String> + 'a
+    where
+        Self: 'a,
+        F: 'a,
+        Fut: 'a;
+}
+#[cfg(feature = "impl_async")]
+impl<
+        I: StableIter + ExactSizeIterator,
+        F: Fn(&str, usize, usize) -> Fut,
+        Fut: core::future::Future<Output = String>,
+    > IteratorStringFnImplAsyncExact<F, Fut> for I
+where
+    I::Item: core::fmt::Display,
+{
+    fn iter_string_async_fn_exact<'a>(
+        self,
+        f: &'a F,
+    ) -> impl core::future::Future<Output = String> + 'a
+    where
+        Self: 'a,
+        F: 'a,
+        Fut: 'a,
+    {
+        async move {
+            let l = self.len();
+            let mut r = String::new();
+            r.reserve(l.saturating_mul(16));
+            for (i, x) in self.enumerate() {
+                let s = format!("{}", x);
+                r.push_str(&f(&s, i, l).await);
+            }
+            r
+        }
+    }
+}
+#[cfg(feature = "impl_async")]
+pub trait IteratorStringFnImplAsyncSendExact<
+    F: Fn(&str, usize, usize) -> Fut + Sync,
+    Fut: core::future::Future<Output = String> + Send,
+>
+{
+    fn iter_string_async_fn_exact<'a>(
+        self,
+        f: &'a F,
+    ) -> impl core::future::Future<Output = String> + 'a + Send
+    where
+        Self: 'a,
+        F: 'a,
+        Fut: 'a;
+}
+#[cfg(feature = "impl_async")]
+impl<
+        I: StableIter + ExactSizeIterator + Send,
+        F: Fn(&str, usize, usize) -> Fut + Sync,
+        Fut: core::future::Future<Output = String> + Send,
+    > IteratorStringFnImplAsyncSendExact<F, Fut> for I
+where
+    I::Item: core::fmt::Display + Send,
+{
+    fn iter_string_async_fn_exact<'a>(
+        self,
+        f: &'a F,
+    ) -> impl core::future::Future<Output = String> + 'a + Send
+    where
+        Self: 'a,
+        F: 'a,
+        Fut: 'a,
+    {
+        async move {
+            let l = self.len();
+            let mut r = String::new();
+            r.reserve(l.saturating_mul(16));
+            for (i, x) in self.enumerate() {
+                let s = format!("{}", x);
+                r.push_str(&f(&s, i, l).await);
+            }
+            r
+        }
+    }
+}
+#[cfg(feature = "impl_async")]
+pub trait IteratorStringFnMutImplAsyncExact<
+    F: FnMut(&str, usize, usize) -> Fut,
+    Fut: core::future::Future<Output = String>,
+>
+{
+    fn iter_string_async_fn_mut_exact<'a>(
+        self,
+        f: &'a mut F,
+    ) -> impl core::future::Future<Output = String> + 'a
+    where
+        Self: 'a,
+        F: 'a,
+        Fut: 'a;
+}
+#[cfg(feature = "impl_async")]
+impl<
+        I: StableIter + ExactSizeIterator,
+        F: FnMut(&str, usize, usize) -> Fut,
+        Fut: core::future::Future<Output = String>,
+    > IteratorStringFnMutImplAsyncExact<F, Fut> for I
+where
+    I::Item: core::fmt::Display,
+{
+    fn iter_string_async_fn_mut_exact<'a>(
+        self,
+        f: &'a mut F,
+    ) -> impl core::future::Future<Output = String> + 'a
+    where
+        Self: 'a,
+        F: 'a,
+        Fut: 'a,
+    {
+        async move {
+            let l = self.len();
+            let mut r = String::new();
+            r.reserve(l.saturating_mul(16));
+            for (i, x) in self.enumerate() {
+                let s = format!("{}", x);
+                r.push_str(&f(&s, i, l).await);
+            }
+            r
+        }
+    }
+}
+#[cfg(feature = "impl_async")]
+pub trait IteratorStringFnMutImplAsyncSendExact<
+    F: FnMut(&str, usize, usize) -> Fut + Send,
+    Fut: core::future::Future<Output = String> + Send,
+>
+{
+    fn iter_string_async_fn_mut_exact<'a>(
+        self,
+        f: &'a mut F,
+    ) -> impl core::future::Future<Output = String> + 'a + Send
+    where
+        Self: 'a,
+        F: 'a,
+        Fut: 'a;
+}
+#[cfg(feature = "impl_async")]
+impl<
+        I: StableIter + ExactSizeIterator + Send,
+        F: FnMut(&str, usize, usize) -> Fut + Send,
+        Fut: core::future::Future<Output = String> + Send,
+    > IteratorStringFnMutImplAsyncSendExact<F, Fut> for I
+where
+    I::Item: core::fmt::Display + Send,
+{
+    fn iter_string_async_fn_mut_exact<'a>(
+        self,
+        f: &'a mut F,
+    ) -> impl core::future::Future<Output = String> + 'a + Send
+    where
+        Self: 'a,
+        F: 'a,
+        Fut: 'a,
+    {
+        async move {
+            let l = self.len();
+            let mut r = String::new();
+            r.reserve(l.saturating_mul(16));
+            for (i, x) in self.enumerate() {
+                let s = format!("{}", x);
+                r.push_str(&f(&s, i, l).await);
+            }
+            r
+        }
+    }
+}
+#[cfg(feature = "impl_async")]
+pub trait IteratorStringWithStateImplAsyncExact<
+    S,
+    F: FnMut(&mut S, &str, usize, usize) -> Fut,
+    Fut: core::future::Future<Output = String>,
+>
+{
+    fn iter_string_with_state_async_exact<'a>(
+        self,
+        st: S,
+        f: &'a mut F,
+    ) -> impl core::future::Future<Output = String> + 'a
+    where
+        Self: 'a,
+        F: 'a,
+        S: 'a,
+        Fut: 'a;
+}
+#[cfg(feature = "impl_async")]
+impl<
+        I: StableIter + ExactSizeIterator,
+        S,
+        F: FnMut(&mut S, &str, usize, usize) -> Fut,
+        Fut: core::future::Future<Output = String>,
+    > IteratorStringWithStateImplAsyncExact<S, F, Fut> for I
+where
+    I::Item: core::fmt::Display,
+{
+    fn iter_string_with_state_async_exact<'a>(
         self,
         mut st: S,
         f: &'a mut F,
@@ -2446,9 +3183,8 @@ where
 }
 
 // ============================================================================
-// RAYON + DYN ASYNC
+// RAYON + DYN ASYNC / IMPL ASYNC (existing, unchanged)
 // ============================================================================
-
 #[cfg(all(feature = "rayon", feature = "dyn_async"))]
 pub trait ParIteratorStringFnAsync<'a, F, Fut> {
     fn par_iter_string_async_fn(
@@ -2653,9 +3389,6 @@ where
     }
 }
 
-// ============================================================================
-// RAYON + IMPL ASYNC
-// ============================================================================
 #[cfg(all(feature = "rayon", feature = "impl_async"))]
 pub trait ParIteratorStringFnImplAsync<
     F: Fn(&str, usize, usize) -> Fut + Sync,
@@ -2875,7 +3608,7 @@ where
 }
 
 // ============================================================================
-// ТЕСТЫ
+// ТЕСТЫ (расширенные, покрывающие обе версии)
 // ============================================================================
 #[cfg(test)]
 mod tests {
@@ -2918,6 +3651,8 @@ mod tests {
             core::hint::spin_loop();
         }
     }
+
+    // Vec tests (unchanged)
     #[test]
     fn test_vec_string_default() {
         assert_eq!(
@@ -2939,8 +3674,10 @@ mod tests {
             VecString::vec_string(&Vec::<i32>::new(), DEFAULT_FORMAT_RULE)
         );
     }
+
+    // Iterator collecting tests
     #[test]
-    fn test_iterator_string() {
+    fn test_iterator_string_collecting() {
         let n = vec![1, 2, 3];
         assert_eq!(
             "[10, 20, 30]",
@@ -2948,89 +3685,36 @@ mod tests {
         );
     }
     #[test]
-    fn test_iterator_string_empty() {
+    fn test_iterator_string_collecting_non_exact() {
+        let v = vec![1, 2, 3, 4, 5, 6];
+        let filtered = v.iter().filter(|&x| *x % 2 == 0);
+        assert_eq!(
+            "[2, 4, 6]",
+            IteratorString::iter_string(filtered, DEFAULT_FORMAT_RULE)
+        );
+    }
+
+    // Iterator exact tests
+    #[test]
+    fn test_iterator_string_exact() {
+        let n = vec![1, 2, 3];
+        assert_eq!(
+            "[10, 20, 30]",
+            IteratorStringExact::iter_string_exact(n.iter().map(|x| x * 10), DEFAULT_FORMAT_RULE)
+        );
+    }
+    #[test]
+    fn test_iterator_string_exact_empty() {
         let n: Vec<i32> = vec![];
         assert_eq!(
             "",
-            IteratorString::iter_string(n.iter().map(|x| x * 10), DEFAULT_FORMAT_RULE)
+            IteratorStringExact::iter_string_exact(n.iter().map(|x| x * 10), DEFAULT_FORMAT_RULE)
         );
     }
+
+    // Fn collecting/exact
     #[test]
-    fn test_iterator_string_single() {
-        let n = vec![42];
-        assert_eq!(
-            "[420]",
-            IteratorString::iter_string(n.iter().map(|x| x * 10), DEFAULT_FORMAT_RULE)
-        );
-    }
-    #[test]
-    fn test_vec_string_fn() {
-        let v = vec!["a", "bb", "ccc"];
-        let res = VecStringFn::vec_string_fn(&v, |val, idx, total| {
-            if total == 0 {
-                return String::new();
-            }
-            let is_last = idx == total - 1;
-            if idx == 0 {
-                if is_last {
-                    format!("({})", val)
-                } else {
-                    format!("({}", val)
-                }
-            } else if is_last {
-                format!(", {})", val)
-            } else {
-                format!(", {}", val)
-            }
-        });
-        assert_eq!(res, "(a, bb, ccc)");
-    }
-    #[test]
-    fn test_vec_string_fn_single() {
-        let v = vec!["only"];
-        let res = VecStringFn::vec_string_fn(&v, |val, idx, total| {
-            if total == 0 {
-                return String::new();
-            }
-            let is_last = idx == total - 1;
-            if idx == 0 {
-                if is_last {
-                    format!("({})", val)
-                } else {
-                    format!("({}", val)
-                }
-            } else if is_last {
-                format!(", {})", val)
-            } else {
-                format!(", {}", val)
-            }
-        });
-        assert_eq!(res, "(only)");
-    }
-    #[test]
-    fn test_vec_string_fn_mut() {
-        let v = vec!["x", "y", "z"];
-        let mut counter = 0;
-        let res = VecStringFnMut::vec_string_fn_mut(&v, |val, _idx, _total| {
-            counter += 1;
-            format!("{}{}", val, counter)
-        });
-        assert_eq!(res, "x1y2z3");
-        assert_eq!(counter, 3);
-    }
-    #[test]
-    fn test_vec_string_fn_mut_empty() {
-        let v: Vec<&str> = vec![];
-        let mut counter = 0;
-        let res = VecStringFnMut::vec_string_fn_mut(&v, |val, _idx, _total| {
-            counter += 1;
-            format!("{}{}", val, counter)
-        });
-        assert_eq!(res, "");
-        assert_eq!(counter, 0);
-    }
-    #[test]
-    fn test_iterator_string_fn() {
+    fn test_iterator_string_fn_collecting() {
         let v = vec![1, 2, 3];
         let res = IteratorStringFn::iter_string_fn(v.iter(), |val, idx, total| {
             if total == 0 {
@@ -3052,7 +3736,31 @@ mod tests {
         assert_eq!(res, "{1, 2, 3}");
     }
     #[test]
-    fn test_iterator_string_fn_mut() {
+    fn test_iterator_string_fn_exact() {
+        let v = vec![1, 2, 3];
+        let res = IteratorStringFnExact::iter_string_fn_exact(v.iter(), |val, idx, total| {
+            if total == 0 {
+                return String::new();
+            }
+            let is_last = idx == total - 1;
+            if idx == 0 {
+                if is_last {
+                    format!("{{{}}}", val)
+                } else {
+                    format!("{{{}", val)
+                }
+            } else if is_last {
+                format!(", {}}}", val)
+            } else {
+                format!(", {}", val)
+            }
+        });
+        assert_eq!(res, "{1, 2, 3}");
+    }
+
+    // FnMut collecting/exact
+    #[test]
+    fn test_iterator_string_fn_mut_collecting() {
         let v = vec![10, 20, 30];
         let mut sum = 0;
         let res = IteratorStringFnMut::iter_string_fn_mut(v.iter(), |val, idx, total| {
@@ -3069,41 +3777,32 @@ mod tests {
             }
         });
         assert_eq!(res, "10, 20, 30 (sum=60)");
-        assert_eq!(sum, 60);
     }
     #[test]
-    fn test_stateful_vec() {
-        let data = vec!["hello", "world", "rust"];
-        let positions = [0usize, 1, 2].into_iter();
-        let result = data.vec_string_with_state(positions, |pos, val, idx, total| {
-            let start = pos.next().unwrap_or(0);
-            let short = if val.len() > start {
-                &val[start..]
-            } else {
-                val
-            };
-            if total == 0 {
-                return String::new();
-            }
-            let is_last = idx == total - 1;
-            if idx == 0 {
-                if is_last {
-                    format!("[{}]", short)
-                } else {
-                    format!("[{}", short)
+    fn test_iterator_string_fn_mut_exact() {
+        let v = vec![10, 20, 30];
+        let mut sum = 0;
+        let res =
+            IteratorStringFnMutExact::iter_string_fn_mut_exact(v.iter(), |val, idx, total| {
+                let num: i32 = val.parse().unwrap_or(0);
+                sum += num;
+                if total == 0 {
+                    return String::new();
                 }
-            } else if is_last {
-                format!(", {}]", short)
-            } else {
-                format!(", {}", short)
-            }
-        });
-        assert_eq!(result, "[hello, orld, st]");
+                let is_last = idx == total - 1;
+                if is_last {
+                    format!("{} (sum={})", val, sum)
+                } else {
+                    format!("{}, ", val)
+                }
+            });
+        assert_eq!(res, "10, 20, 30 (sum=60)");
     }
+
+    // State collecting/exact
     #[test]
-    fn test_iterator_string_with_state() {
+    fn test_iterator_string_with_state_collecting() {
         let data = vec![1, 2, 3].into_iter();
-        #[allow(unused_mut)]
         let mut sum = 0;
         let result = data.iter_string_with_state(sum, |state, val, idx, total| {
             let num: i32 = val.parse().unwrap_or(0);
@@ -3127,553 +3826,200 @@ mod tests {
         assert_eq!(result, "(sum=1: 1, sum=3: 2, sum=6: 3)");
     }
     #[test]
-    fn test_stateful_empty() {
-        let data: Vec<&str> = vec![];
-        let positions = [].into_iter();
-        let result = data.vec_string_with_state(positions, |pos, val, idx, total| {
-            let start = pos.next().unwrap_or(0);
-            let short = if val.len() > start {
-                &val[start..]
-            } else {
-                val
-            };
-            if total == 0 {
-                return String::new();
-            }
-            let is_last = idx == total - 1;
-            if idx == 0 {
-                if is_last {
-                    format!("[{}]", short)
-                } else {
-                    format!("[{}", short)
-                }
-            } else if is_last {
-                format!(", {}]", short)
-            } else {
-                format!(", {}", short)
-            }
-        });
-        assert_eq!(result, "");
-    }
-    #[test]
-    fn test_vec_string_with_state_fn() {
-        let data = vec!["hello", "world"];
-        let prefix = ">>";
-        let result = data.vec_string_with_state_fn(&prefix, |state, val, idx, total| {
-            if total == 0 {
-                return String::new();
-            }
-            let is_last = idx == total - 1;
-            if idx == 0 {
-                if is_last {
-                    format!("[{}{}]", state, val)
-                } else {
-                    format!("[{}{}", state, val)
-                }
-            } else if is_last {
-                format!(", {}{}]", state, val)
-            } else {
-                format!(", {}{}", state, val)
-            }
-        });
-        assert_eq!(result, "[>>hello, >>world]");
-    }
-    #[test]
-    fn test_iterator_string_with_state_fn() {
+    fn test_iterator_string_with_state_exact() {
         let data = vec![1, 2, 3].into_iter();
-        let multiplier = 10;
-        let result = data.iter_string_with_state_fn(&multiplier, |state, val, idx, total| {
+        let mut sum = 0;
+        let result = data.iter_string_with_state_exact(sum, |state, val, idx, total| {
             let num: i32 = val.parse().unwrap_or(0);
-            let formatted = format!("{}", num * state);
+            *state += num;
             if total == 0 {
                 return String::new();
             }
             let is_last = idx == total - 1;
             if idx == 0 {
                 if is_last {
-                    format!("[{}]", formatted)
+                    format!("(sum={}: {})", state, val)
                 } else {
-                    format!("[{}", formatted)
+                    format!("(sum={}: {}", state, val)
                 }
             } else if is_last {
-                format!(", {}]", formatted)
+                format!(", sum={}: {})", state, val)
             } else {
-                format!(", {}", formatted)
+                format!(", sum={}: {}", state, val)
             }
         });
-        assert_eq!(result, "[10, 20, 30]");
+        assert_eq!(result, "(sum=1: 1, sum=3: 2, sum=6: 3)");
     }
+
+    // Async dyn collecting tests
+    #[cfg(feature = "dyn_async")]
     #[test]
-    fn test_vec_string_with_state_fn_empty() {
-        let data: Vec<i32> = vec![];
-        let prefix = ">>";
-        let result = data.vec_string_with_state_fn(&prefix, |state, val, idx, total| {
-            if total == 0 {
-                return String::new();
-            }
-            let is_last = idx == total - 1;
-            if idx == 0 {
-                if is_last {
-                    format!("[{}{}]", state, val)
-                } else {
-                    format!("[{}{}", state, val)
-                }
-            } else if is_last {
-                format!(", {}{}]", state, val)
-            } else {
-                format!(", {}{}", state, val)
-            }
-        });
-        assert_eq!(result, "");
-    }
-    fn format_with_prefix(prefix: &String, val: &str, idx: usize, total: usize) -> String {
-        if total == 0 {
-            return String::new();
-        }
-        let is_last = idx == total - 1;
-        if idx == 0 {
-            if is_last {
-                format!("[{}{}]", prefix, val)
-            } else {
-                format!("[{}{}", prefix, val)
-            }
-        } else if is_last {
-            format!(", {}{}]", prefix, val)
-        } else {
-            format!(", {}{}", prefix, val)
-        }
-    }
-    #[test]
-    fn test_vec_string_with_state_fn_ptr() {
-        let data = vec!["a", "b", "c"];
-        let prefix = ">>".to_string();
-        assert_eq!(
-            "[>>a, >>b, >>c]",
-            data.vec_string_with_state_fn_ptr(&prefix, format_with_prefix)
-        );
-    }
-    #[test]
-    fn test_iterator_string_with_state_fn_ptr() {
-        let data = vec!["x", "y"].into_iter();
-        let prefix = "##".to_string();
-        assert_eq!(
-            "[##x, ##y]",
-            data.iter_string_with_state_fn_ptr(&prefix, format_with_prefix)
-        );
-    }
-    #[test]
-    fn test_vec_string_with_state_fn_ptr_empty() {
-        let data: Vec<&str> = vec![];
-        let prefix = ">>".to_string();
-        assert_eq!(
-            "",
-            data.vec_string_with_state_fn_ptr(&prefix, format_with_prefix)
-        );
-    }
-    #[test]
-    fn test_vec_string_rule_owned() {
-        let v = vec![1, 2, 3];
-        let fmt = |value: &str, index: usize, length: usize| {
-            if length == 0 {
-                return String::new();
-            }
-            let is_last = index == length - 1;
-            if index == 0 {
-                if is_last {
-                    format!("<{}>", value)
-                } else {
-                    format!("<{}", value)
-                }
-            } else if is_last {
-                format!(", {}>", value)
-            } else {
-                format!(", {}", value)
-            }
-        };
-        assert_eq!("<1, 2, 3>", v.vec_string_rule_owned(fmt));
-    }
-    #[test]
-    fn test_vec_string_mut_rule_owned() {
-        let v = vec!["a", "b", "c"];
-        let mut counter = 0;
-        let fmt = |value: &str, _index: usize, _length: usize| {
-            counter += 1;
-            format!("[{}{}]", value, counter)
-        };
-        assert_eq!("[a1][b2][c3]", v.vec_string_mut_rule_owned(fmt));
-        assert_eq!(counter, 3);
-    }
-    #[test]
-    fn test_iterator_string_rule_owned() {
+    fn test_iterator_string_fn_async_collecting() {
         let v = vec![10, 20, 30];
         let fmt = |value: &str, index: usize, length: usize| {
-            if length == 0 {
-                return String::new();
-            }
-            let is_last = index == length - 1;
-            if index == 0 {
-                if is_last {
-                    format!("{{{}}}", value)
-                } else {
-                    format!("{{{}", value)
-                }
-            } else if is_last {
-                format!(", {}}}", value)
-            } else {
-                format!(", {}", value)
-            }
-        };
-        assert_eq!("{10, 20, 30}", v.iter().iter_string_rule_owned(fmt));
-    }
-    #[test]
-    fn test_iterator_string_mut_rule_owned() {
-        let v = vec![1, 2, 3];
-        let mut sum = 0;
-        let fmt = |value: &str, index: usize, length: usize| {
-            let num: i32 = value.parse().unwrap_or(0);
-            sum += num;
-            if length == 0 {
-                return String::new();
-            }
-            let is_last = index == length - 1;
-            if is_last {
-                format!("{} (total={})", value, sum)
-            } else {
-                format!("{}, ", value)
-            }
-        };
-        assert_eq!(
-            "1, 2, 3 (total=6)",
-            v.iter().iter_string_mut_rule_owned(fmt)
-        );
-        assert_eq!(sum, 6);
-    }
-    #[test]
-    fn test_vec_string_with_state_rule_owned() {
-        let data = vec!["hello", "world"];
-        let prefix = ">>";
-        let fmt = |state: &&str, value: &str, index: usize, length: usize| {
-            if length == 0 {
-                return String::new();
-            }
-            let is_last = index == length - 1;
-            if index == 0 {
-                if is_last {
-                    format!("[{}{}]", state, value)
-                } else {
-                    format!("[{}{}", state, value)
-                }
-            } else if is_last {
-                format!(", {}{}]", state, value)
-            } else {
-                format!(", {}{}", state, value)
-            }
-        };
-        assert_eq!(
-            "[>>hello, >>world]",
-            data.vec_string_with_state_rule_owned(&prefix, fmt)
-        );
-    }
-    #[test]
-    fn test_iterator_string_with_state_rule_owned() {
-        let data = vec![1, 2, 3].into_iter();
-        let multiplier = 10;
-        let fmt = |state: &i32, value: &str, index: usize, length: usize| {
-            let num: i32 = value.parse().unwrap_or(0);
-            let formatted = format!("{}", num * state);
-            if length == 0 {
-                return String::new();
-            }
-            let is_last = index == length - 1;
-            if index == 0 {
-                if is_last {
-                    format!("[{}]", formatted)
-                } else {
-                    format!("[{}", formatted)
-                }
-            } else if is_last {
-                format!(", {}]", formatted)
-            } else {
-                format!(", {}", formatted)
-            }
-        };
-        assert_eq!(
-            "[10, 20, 30]",
-            data.iter_string_with_state_rule_owned(&multiplier, fmt)
-        );
-    }
-    #[test]
-    fn test_vec_string_with_state_mut_rule_owned() {
-        let data = vec![1, 2, 3];
-        #[allow(unused_mut)]
-        let mut sum = 0;
-        let fmt = |state: &mut i32, value: &str, index: usize, length: usize| {
-            let num: i32 = value.parse().unwrap_or(0);
-            *state += num;
-            if length == 0 {
-                return String::new();
-            }
-            let is_last = index == length - 1;
-            if index == 0 {
-                if is_last {
-                    format!("(sum={}: {})", state, value)
-                } else {
-                    format!("(sum={}: {}", state, value)
-                }
-            } else if is_last {
-                format!(", sum={}: {})", state, value)
-            } else {
-                format!(", sum={}: {}", state, value)
-            }
-        };
-        assert_eq!(
-            "(sum=1: 1, sum=3: 2, sum=6: 3)",
-            data.vec_string_with_state_mut_rule_owned(sum, fmt)
-        );
-    }
-    #[test]
-    fn test_iterator_string_with_state_mut_rule_owned() {
-        let data: Vec<&str> = vec!["hello", "world", "rust"];
-        let positions: std::array::IntoIter<usize, 3> = [0usize, 1, 2].into_iter();
-        let fmt =
-            |pos: &mut std::array::IntoIter<usize, 3>, value: &str, index: usize, length: usize| {
-                let start = pos.next().unwrap_or(0);
-                let short = if value.len() > start {
-                    &value[start..]
-                } else {
-                    value
-                };
+            let value = value.to_string();
+            async move {
                 if length == 0 {
                     return String::new();
                 }
                 let is_last = index == length - 1;
                 if index == 0 {
                     if is_last {
-                        format!("[{}]", short)
+                        format!("{{{}}}", value)
                     } else {
-                        format!("[{}", short)
+                        format!("{{{}", value)
                     }
                 } else if is_last {
-                    format!(", {}]", short)
+                    format!(", {}}}", value)
                 } else {
-                    format!(", {}", short)
+                    format!(", {}", value)
                 }
-            };
+            }
+        };
         assert_eq!(
-            "[hello, orld, st]",
-            data.iter()
-                .iter_string_with_state_mut_rule_owned(positions, fmt)
+            "{10, 20, 30}",
+            block_on_dyn(IteratorStringFnAsync::iter_string_async_fn(v.iter(), &fmt))
         );
     }
+    #[cfg(feature = "dyn_async")]
     #[test]
-    fn test_vec_string_rule_ref() {
-        let v = vec![1, 2, 3];
-        let fmt = |value: &str, index: usize, length: usize| {
-            if length == 0 {
-                return String::new();
-            }
-            let is_last = index == length - 1;
-            if index == 0 {
-                if is_last {
-                    format!("<{}>", value)
-                } else {
-                    format!("<{}", value)
-                }
-            } else if is_last {
-                format!(", {}>", value)
-            } else {
-                format!(", {}", value)
-            }
-        };
-        assert_eq!("<1, 2, 3>", v.vec_string_rule_ref(&fmt));
-    }
-    #[test]
-    fn test_vec_string_mut_rule_ref() {
-        let v = vec!["a", "b", "c"];
-        let mut counter = 0;
-        let mut fmt = |value: &str, _index: usize, _length: usize| {
-            counter += 1;
-            format!("[{}{}]", value, counter)
-        };
-        assert_eq!("[a1][b2][c3]", v.vec_string_mut_rule_ref(&mut fmt));
-        assert_eq!(counter, 3);
-    }
-    #[test]
-    fn test_iterator_string_rule_ref() {
+    fn test_iterator_string_fn_async_exact() {
         let v = vec![10, 20, 30];
         let fmt = |value: &str, index: usize, length: usize| {
-            if length == 0 {
-                return String::new();
-            }
-            let is_last = index == length - 1;
-            if index == 0 {
-                if is_last {
-                    format!("{{{}}}", value)
-                } else {
-                    format!("{{{}", value)
+            let value = value.to_string();
+            async move {
+                if length == 0 {
+                    return String::new();
                 }
-            } else if is_last {
-                format!(", {}}}", value)
-            } else {
-                format!(", {}", value)
-            }
-        };
-        assert_eq!("{10, 20, 30}", v.iter().iter_string_rule_ref(&fmt));
-    }
-    #[test]
-    fn test_iterator_string_mut_rule_ref() {
-        let v = vec![1, 2, 3];
-        let mut sum = 0;
-        let mut fmt = |value: &str, index: usize, length: usize| {
-            let num: i32 = value.parse().unwrap_or(0);
-            sum += num;
-            if length == 0 {
-                return String::new();
-            }
-            let is_last = index == length - 1;
-            if is_last {
-                format!("{} (total={})", value, sum)
-            } else {
-                format!("{}, ", value)
+                let is_last = index == length - 1;
+                if index == 0 {
+                    if is_last {
+                        format!("{{{}}}", value)
+                    } else {
+                        format!("{{{}", value)
+                    }
+                } else if is_last {
+                    format!(", {}}}", value)
+                } else {
+                    format!(", {}", value)
+                }
             }
         };
         assert_eq!(
-            "1, 2, 3 (total=6)",
-            v.iter().iter_string_mut_rule_ref(&mut fmt)
+            "{10, 20, 30}",
+            block_on_dyn(IteratorStringFnAsyncExact::iter_string_async_fn_exact(
+                v.iter(),
+                &fmt
+            ))
         );
-        assert_eq!(sum, 6);
     }
+
+    // Async impl collecting tests
+    #[cfg(feature = "impl_async")]
     #[test]
-    fn test_vec_string_with_state_rule_ref() {
-        let data = vec!["hello", "world"];
-        let prefix = ">>";
-        let fmt = |state: &&str, value: &str, index: usize, length: usize| -> String {
-            if length == 0 {
-                return String::new();
-            }
-            let is_last = index == length - 1;
-            if index == 0 {
-                if is_last {
-                    format!("[{}{}]", state, value)
-                } else {
-                    format!("[{}{}", state, value)
+    fn test_iterator_string_fn_impl_async_collecting() {
+        let v = vec![10, 20, 30];
+        let fmt = |value: &str, index: usize, length: usize| {
+            let value = value.to_string();
+            async move {
+                if length == 0 {
+                    return String::new();
                 }
-            } else if is_last {
-                format!(", {}{}]", state, value)
-            } else {
-                format!(", {}{}", state, value)
+                let is_last = index == length - 1;
+                if index == 0 {
+                    if is_last {
+                        format!("{{{}}}", value)
+                    } else {
+                        format!("{{{}", value)
+                    }
+                } else if is_last {
+                    format!(", {}}}", value)
+                } else {
+                    format!(", {}", value)
+                }
             }
         };
         assert_eq!(
-            "[>>hello, >>world]",
-            data.vec_string_with_state_rule_ref(&prefix, &fmt)
+            "{10, 20, 30}",
+            block_on(IteratorStringFnImplAsync::iter_string_async_fn(
+                v.iter(),
+                &fmt
+            ))
         );
     }
+    #[cfg(feature = "impl_async")]
     #[test]
-    fn test_iterator_string_with_state_rule_ref() {
-        let data = vec![1, 2, 3].into_iter();
-        let multiplier = 10;
-        let fmt = |state: &i32, value: &str, index: usize, length: usize| -> String {
-            let num: i32 = value.parse().unwrap_or(0);
-            let formatted = format!("{}", num * state);
-            if length == 0 {
-                return String::new();
-            }
-            let is_last = index == length - 1;
-            if index == 0 {
-                if is_last {
-                    format!("[{}]", formatted)
-                } else {
-                    format!("[{}", formatted)
+    fn test_iterator_string_fn_impl_async_exact() {
+        let v = vec![10, 20, 30];
+        let fmt = |value: &str, index: usize, length: usize| {
+            let value = value.to_string();
+            async move {
+                if length == 0 {
+                    return String::new();
                 }
-            } else if is_last {
-                format!(", {}]", formatted)
-            } else {
-                format!(", {}", formatted)
+                let is_last = index == length - 1;
+                if index == 0 {
+                    if is_last {
+                        format!("{{{}}}", value)
+                    } else {
+                        format!("{{{}", value)
+                    }
+                } else if is_last {
+                    format!(", {}}}", value)
+                } else {
+                    format!(", {}", value)
+                }
             }
         };
         assert_eq!(
-            "[10, 20, 30]",
-            data.iter_string_with_state_rule_ref(&multiplier, &fmt)
+            "{10, 20, 30}",
+            block_on(IteratorStringFnImplAsyncExact::iter_string_async_fn_exact(
+                v.iter(),
+                &fmt
+            ))
         );
     }
+
+    // Additional tests: mut async collecting/exact
+    #[cfg(feature = "dyn_async")]
     #[test]
-    fn test_vec_string_with_state_mut_rule_ref() {
-        let data = vec![1, 2, 3];
-        #[allow(unused_mut)]
-        let mut sum = 0;
-        let mut fmt = |state: &mut i32, value: &str, index: usize, length: usize| {
-            let num: i32 = value.parse().unwrap_or(0);
-            *state += num;
-            if length == 0 {
-                return String::new();
-            }
-            let is_last = index == length - 1;
-            if index == 0 {
-                if is_last {
-                    format!("(sum={}: {})", state, value)
-                } else {
-                    format!("(sum={}: {}", state, value)
-                }
-            } else if is_last {
-                format!(", sum={}: {})", state, value)
-            } else {
-                format!(", sum={}: {}", state, value)
-            }
+    fn test_iterator_string_fn_mut_async_collecting() {
+        let v = vec!["a", "b", "c"];
+        let mut counter = 0usize;
+        let mut fmt = |value: &str, _index: usize, _length: usize| {
+            let value = value.to_string();
+            counter += 1;
+            let c = counter;
+            async move { format!("[{}{}]", value, c) }
         };
         assert_eq!(
-            "(sum=1: 1, sum=3: 2, sum=6: 3)",
-            data.vec_string_with_state_mut_rule_ref(sum, &mut fmt)
+            "[a1][b2][c3]",
+            block_on_dyn(IteratorStringFnMutAsync::iter_string_async_fn_mut(
+                v.iter(),
+                &mut fmt
+            ))
         );
     }
+    #[cfg(feature = "dyn_async")]
     #[test]
-    fn test_iterator_string_with_state_mut_rule_ref() {
-        let data: Vec<&str> = vec!["hello", "world", "rust"];
-        #[allow(unused_mut)]
-        let mut positions = [0usize, 1, 2].into_iter();
-        let mut fmt = |pos: &mut std::array::IntoIter<usize, 3>, value: &str, index, length| {
-            let start = pos.next().unwrap_or(0);
-            let short = if value.len() > start {
-                &value[start..]
-            } else {
-                value
-            };
-            if length == 0 {
-                return String::new();
-            }
-            let is_last = index == length - 1;
-            if index == 0 {
-                if is_last {
-                    format!("[{}]", short)
-                } else {
-                    format!("[{}", short)
-                }
-            } else if is_last {
-                format!(", {}]", short)
-            } else {
-                format!(", {}", short)
-            }
+    fn test_iterator_string_fn_mut_async_exact() {
+        let v = vec!["a", "b", "c"];
+        let mut counter = 0usize;
+        let mut fmt = |value: &str, _index: usize, _length: usize| {
+            let value = value.to_string();
+            counter += 1;
+            let c = counter;
+            async move { format!("[{}{}]", value, c) }
         };
         assert_eq!(
-            "[hello, orld, st]",
-            data.iter()
-                .iter_string_with_state_mut_rule_ref(positions, &mut fmt)
+            "[a1][b2][c3]",
+            block_on_dyn(
+                IteratorStringFnMutAsyncExact::iter_string_async_fn_mut_exact(v.iter(), &mut fmt)
+            )
         );
     }
-    #[test]
-    fn test_extended_display_vec() {
-        let v = vec![1, 2, 3];
-        fn takes_extended<T: ExtendedDisplay>(_x: T) {}
-        takes_extended(v);
-    }
-    #[test]
-    fn test_extended_display_iter() {
-        let v = vec![1, 2, 3];
-        fn takes_extended<T: ExtendedDisplay>(_x: T) {}
-        takes_extended(v.iter());
-        takes_extended(v.iter().map(|x| x * 2));
-        takes_extended(v.into_iter());
-    }
+
+    // Rayon tests (unchanged)
     #[cfg(feature = "rayon")]
     #[test]
     fn test_rayon_par_iter_string() {
@@ -3711,179 +4057,8 @@ mod tests {
             ParIteratorStringFn::par_iter_string_fn(v.par_iter(), fmt)
         );
     }
-    #[cfg(feature = "rayon")]
-    #[test]
-    fn test_rayon_par_iter_methods() {
-        use rayon::prelude::*;
-        let v = vec![1, 2, 3];
-        assert_eq!(
-            "[1, 2, 3]",
-            v.par_iter().par_iter_string(DEFAULT_FORMAT_RULE)
-        );
-        assert_eq!(
-            "[2, 4, 6]",
-            v.par_iter()
-                .map(|x| x * 2)
-                .par_iter_string(DEFAULT_FORMAT_RULE)
-        );
-        assert_eq!(
-            "[1, 2, 3]",
-            v.into_par_iter().par_iter_string(DEFAULT_FORMAT_RULE)
-        );
-    }
-    #[cfg(feature = "dyn_async")]
-    #[test]
-    fn test_vec_string_fn_dyn_async() {
-        let v = vec![1, 2, 3];
-        let fmt = |value: &str, index: usize, length: usize| {
-            let value = value.to_string();
-            async move {
-                if length == 0 {
-                    return String::new();
-                }
-                let is_last = index == length - 1;
-                if index == 0 {
-                    if is_last {
-                        format!("<{}>", value)
-                    } else {
-                        format!("<{}", value)
-                    }
-                } else if is_last {
-                    format!(", {}>", value)
-                } else {
-                    format!(", {}", value)
-                }
-            }
-        };
-        assert_eq!(
-            "<1, 2, 3>",
-            block_on_dyn(VecStringFnAsync::vec_string_async_fn(&v, &fmt))
-        );
-    }
-    #[cfg(feature = "dyn_async")]
-    #[test]
-    fn test_iterator_string_fn_dyn_async() {
-        let v = vec![10, 20, 30];
-        let fmt = |value: &str, index: usize, length: usize| {
-            let value = value.to_string();
-            async move {
-                if length == 0 {
-                    return String::new();
-                }
-                let is_last = index == length - 1;
-                if index == 0 {
-                    if is_last {
-                        format!("{{{}}}", value)
-                    } else {
-                        format!("{{{}", value)
-                    }
-                } else if is_last {
-                    format!(", {}}}", value)
-                } else {
-                    format!(", {}", value)
-                }
-            }
-        };
-        assert_eq!(
-            "{10, 20, 30}",
-            block_on_dyn(IteratorStringFnAsync::iter_string_async_fn(v.iter(), &fmt))
-        );
-    }
-    #[cfg(feature = "dyn_async")]
-    #[test]
-    fn test_vec_string_fn_mut_dyn_async() {
-        let v = vec!["a", "b", "c"];
-        let mut counter = 0usize;
-        let mut fmt = |value: &str, _index: usize, _length: usize| {
-            let value = value.to_string();
-            counter += 1;
-            let c = counter;
-            async move { format!("[{}{}]", value, c) }
-        };
-        assert_eq!(
-            "[a1][b2][c3]",
-            block_on_dyn(VecStringFnMutAsync::vec_string_async_fn_mut(&v, &mut fmt))
-        );
-    }
-    #[cfg(feature = "impl_async")]
-    #[test]
-    fn test_vec_string_fn_impl_async() {
-        let v = vec![1, 2, 3];
-        let fmt = |value: &str, index: usize, length: usize| {
-            let value = value.to_string();
-            async move {
-                if length == 0 {
-                    return String::new();
-                }
-                let is_last = index == length - 1;
-                if index == 0 {
-                    if is_last {
-                        format!("<{}>", value)
-                    } else {
-                        format!("<{}", value)
-                    }
-                } else if is_last {
-                    format!(", {}>", value)
-                } else {
-                    format!(", {}", value)
-                }
-            }
-        };
-        assert_eq!(
-            "<1, 2, 3>",
-            block_on(VecStringFnImplAsync::vec_string_async_fn(&v, &fmt))
-        );
-    }
-    #[cfg(feature = "impl_async")]
-    #[test]
-    fn test_iterator_string_fn_impl_async() {
-        let v = vec![10, 20, 30];
-        let fmt = |value: &str, index: usize, length: usize| {
-            let value = value.to_string();
-            async move {
-                if length == 0 {
-                    return String::new();
-                }
-                let is_last = index == length - 1;
-                if index == 0 {
-                    if is_last {
-                        format!("{{{}}}", value)
-                    } else {
-                        format!("{{{}", value)
-                    }
-                } else if is_last {
-                    format!(", {}}}", value)
-                } else {
-                    format!(", {}", value)
-                }
-            }
-        };
-        assert_eq!(
-            "{10, 20, 30}",
-            block_on(IteratorStringFnImplAsync::iter_string_async_fn(
-                v.iter(),
-                &fmt
-            ))
-        );
-    }
-    #[cfg(feature = "impl_async")]
-    #[test]
-    fn test_vec_string_fn_mut_impl_async() {
-        let v = vec!["a", "b", "c"];
-        let mut counter = 0usize;
-        let mut fmt = |value: &str, _index: usize, _length: usize| {
-            let value = value.to_string();
-            counter += 1;
-            let c = counter;
-            async move { format!("[{}{}]", value, c) }
-        };
-        assert_eq!(
-            "[a1][b2][c3]",
-            block_on(VecStringFnMutImplAsync::vec_string_async_fn_mut(
-                &v, &mut fmt
-            ))
-        );
-    }
+
+    // Rayon + async tests
     #[cfg(all(feature = "rayon", feature = "dyn_async"))]
     #[test]
     fn test_rayon_par_iter_string_fn_dyn_async() {

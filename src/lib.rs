@@ -1,7 +1,5 @@
 #![cfg_attr(not(feature = "std"), no_std)]
-
 extern crate alloc;
-
 #[cfg(any(feature = "dyn_async", feature = "impl_async"))]
 use alloc::boxed::Box;
 use alloc::format;
@@ -13,6 +11,7 @@ use rayon::prelude::*;
 // ============================================================================
 // StableIter
 // ============================================================================
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait StableIter: Iterator {}
 impl<'a, T> StableIter for core::slice::Iter<'a, T> {}
 impl<'a, T> StableIter for core::slice::IterMut<'a, T> {}
@@ -113,6 +112,7 @@ where
 // ============================================================================
 // ExtendedDisplay
 // ============================================================================
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait ExtendedDisplay {}
 impl<T> ExtendedDisplay for Vec<T>
 where
@@ -177,6 +177,7 @@ pub const DEFAULT_FORMAT_RULE: FormatRuleFn = default_format_rule;
 // ============================================================================
 // SYNC ТРЕЙТЫ ПРАВИЛ
 // ============================================================================
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait FormatRuleNoState<'a> {
     fn format(&'a self, value: &str, index: usize, length: usize) -> String;
 }
@@ -185,6 +186,8 @@ impl<'a, F: Fn(&str, usize, usize) -> String> FormatRuleNoState<'a> for F {
         (self)(v, i, l)
     }
 }
+
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait FormatRuleNoStateOwned {
     fn format(self, value: &str, index: usize, length: usize) -> String;
 }
@@ -193,6 +196,8 @@ impl<F: Fn(&str, usize, usize) -> String> FormatRuleNoStateOwned for F {
         (self)(v, i, l)
     }
 }
+
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait FormatRuleMutNoState {
     fn format(&mut self, value: &str, index: usize, length: usize) -> String;
 }
@@ -201,6 +206,8 @@ impl<F: FnMut(&str, usize, usize) -> String> FormatRuleMutNoState for F {
         (self)(v, i, l)
     }
 }
+
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait FormatRule<S> {
     fn format(&self, state: &S, value: &str, index: usize, length: usize) -> String;
 }
@@ -209,6 +216,8 @@ impl<S, F: Fn(&S, &str, usize, usize) -> String> FormatRule<S> for F {
         (self)(s, v, i, l)
     }
 }
+
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait FormatRuleMut<S> {
     fn format(&mut self, state: &mut S, value: &str, index: usize, length: usize) -> String;
 }
@@ -221,15 +230,21 @@ impl<S, F: FnMut(&mut S, &str, usize, usize) -> String> FormatRuleMut<S> for F {
 // ============================================================================
 // SYNC VecString* / IteratorString* (collecting)
 // ============================================================================
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait VecString {
     fn vec_string(&self, format_rule: FormatRuleFn) -> String;
 }
+
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait VecStringFn<F: Fn(&str, usize, usize) -> String> {
     fn vec_string_fn(&self, format_rule: F) -> String;
 }
+
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait VecStringFnMut<F: FnMut(&str, usize, usize) -> String> {
     fn vec_string_fn_mut(&self, format_rule: F) -> String;
 }
+
 impl<T: core::fmt::Display> VecString for Vec<T> {
     fn vec_string(&self, f: FormatRuleFn) -> String {
         let mut s = String::new();
@@ -240,6 +255,7 @@ impl<T: core::fmt::Display> VecString for Vec<T> {
         s
     }
 }
+
 impl<T: core::fmt::Display, F: Fn(&str, usize, usize) -> String> VecStringFn<F> for Vec<T> {
     fn vec_string_fn(&self, f: F) -> String {
         let mut s = String::new();
@@ -250,6 +266,7 @@ impl<T: core::fmt::Display, F: Fn(&str, usize, usize) -> String> VecStringFn<F> 
         s
     }
 }
+
 impl<T: core::fmt::Display, F: FnMut(&str, usize, usize) -> String> VecStringFnMut<F> for Vec<T> {
     fn vec_string_fn_mut(&self, mut f: F) -> String {
         let mut s = String::new();
@@ -261,15 +278,21 @@ impl<T: core::fmt::Display, F: FnMut(&str, usize, usize) -> String> VecStringFnM
     }
 }
 
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait IteratorString {
     fn iter_string(self, format_rule: FormatRuleFn) -> String;
 }
+
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait IteratorStringFn<F: Fn(&str, usize, usize) -> String> {
     fn iter_string_fn(self, format_rule: F) -> String;
 }
+
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait IteratorStringFnMut<F: FnMut(&str, usize, usize) -> String> {
     fn iter_string_fn_mut(self, format_rule: F) -> String;
 }
+
 impl<I: StableIter> IteratorString for I
 where
     I::Item: core::fmt::Display,
@@ -284,6 +307,7 @@ where
         r
     }
 }
+
 impl<I: StableIter, F: Fn(&str, usize, usize) -> String> IteratorStringFn<F> for I
 where
     I::Item: core::fmt::Display,
@@ -298,6 +322,7 @@ where
         r
     }
 }
+
 impl<I: StableIter, F: FnMut(&str, usize, usize) -> String> IteratorStringFnMut<F> for I
 where
     I::Item: core::fmt::Display,
@@ -313,12 +338,16 @@ where
     }
 }
 
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait VecStringWithState<S, F: FnMut(&mut S, &str, usize, usize) -> String> {
     fn vec_string_with_state(&self, st: S, f: F) -> String;
 }
+
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait IteratorStringWithState<S, F: FnMut(&mut S, &str, usize, usize) -> String> {
     fn iter_string_with_state(self, st: S, f: F) -> String;
 }
+
 impl<T: core::fmt::Display, S, F: FnMut(&mut S, &str, usize, usize) -> String>
     VecStringWithState<S, F> for Vec<T>
 {
@@ -332,6 +361,7 @@ impl<T: core::fmt::Display, S, F: FnMut(&mut S, &str, usize, usize) -> String>
         r
     }
 }
+
 impl<I: StableIter, S, F: FnMut(&mut S, &str, usize, usize) -> String> IteratorStringWithState<S, F>
     for I
 where
@@ -348,12 +378,16 @@ where
     }
 }
 
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait VecStringWithStateFn<S, F: Fn(&S, &str, usize, usize) -> String> {
     fn vec_string_with_state_fn(&self, st: &S, f: F) -> String;
 }
+
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait IteratorStringWithStateFn<S, F: Fn(&S, &str, usize, usize) -> String> {
     fn iter_string_with_state_fn(self, st: &S, f: F) -> String;
 }
+
 impl<T: core::fmt::Display, S, F: Fn(&S, &str, usize, usize) -> String> VecStringWithStateFn<S, F>
     for Vec<T>
 {
@@ -367,6 +401,7 @@ impl<T: core::fmt::Display, S, F: Fn(&S, &str, usize, usize) -> String> VecStrin
         r
     }
 }
+
 impl<I: StableIter, S, F: Fn(&S, &str, usize, usize) -> String> IteratorStringWithStateFn<S, F>
     for I
 where
@@ -383,6 +418,7 @@ where
     }
 }
 
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait VecStringWithStateFnPtr<S> {
     fn vec_string_with_state_fn_ptr(
         &self,
@@ -390,6 +426,8 @@ pub trait VecStringWithStateFnPtr<S> {
         f: fn(&S, &str, usize, usize) -> String,
     ) -> String;
 }
+
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait IteratorStringWithStateFnPtr<S> {
     fn iter_string_with_state_fn_ptr(
         self,
@@ -397,6 +435,7 @@ pub trait IteratorStringWithStateFnPtr<S> {
         f: fn(&S, &str, usize, usize) -> String,
     ) -> String;
 }
+
 impl<T: core::fmt::Display, S> VecStringWithStateFnPtr<S> for Vec<T> {
     fn vec_string_with_state_fn_ptr(
         &self,
@@ -412,6 +451,7 @@ impl<T: core::fmt::Display, S> VecStringWithStateFnPtr<S> for Vec<T> {
         r
     }
 }
+
 impl<I: StableIter, S> IteratorStringWithStateFnPtr<S> for I
 where
     I::Item: core::fmt::Display,
@@ -434,9 +474,11 @@ where
 // ============================================================================
 // SYNC RuleOwned / MutRuleOwned / RuleRef / MutRuleRef (collecting)
 // ============================================================================
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait VecStringRuleOwned<R: FormatRuleNoStateOwned> {
     fn vec_string_rule_owned(self, rule: R) -> String;
 }
+
 impl<T: core::fmt::Display, R: FormatRuleNoStateOwned + Clone> VecStringRuleOwned<R> for Vec<T> {
     fn vec_string_rule_owned(self, rule: R) -> String {
         let mut s = String::new();
@@ -447,9 +489,12 @@ impl<T: core::fmt::Display, R: FormatRuleNoStateOwned + Clone> VecStringRuleOwne
         s
     }
 }
+
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait VecStringMutRuleOwned<R: FormatRuleMutNoState> {
     fn vec_string_mut_rule_owned(&self, rule: R) -> String;
 }
+
 impl<T: core::fmt::Display, R: FormatRuleMutNoState> VecStringMutRuleOwned<R> for Vec<T> {
     fn vec_string_mut_rule_owned(&self, mut rule: R) -> String {
         let mut s = String::new();
@@ -460,9 +505,12 @@ impl<T: core::fmt::Display, R: FormatRuleMutNoState> VecStringMutRuleOwned<R> fo
         s
     }
 }
+
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait IteratorStringRuleOwned<R: FormatRuleNoStateOwned> {
     fn iter_string_rule_owned(self, rule: R) -> String;
 }
+
 impl<I: StableIter, R: FormatRuleNoStateOwned + Clone> IteratorStringRuleOwned<R> for I
 where
     I::Item: core::fmt::Display,
@@ -477,9 +525,12 @@ where
         r
     }
 }
+
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait IteratorStringMutRuleOwned<R: FormatRuleMutNoState> {
     fn iter_string_mut_rule_owned(self, rule: R) -> String;
 }
+
 impl<I: StableIter, R: FormatRuleMutNoState> IteratorStringMutRuleOwned<R> for I
 where
     I::Item: core::fmt::Display,
@@ -495,9 +546,11 @@ where
     }
 }
 
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait VecStringWithStateRuleOwned<S, R: FormatRule<S>> {
     fn vec_string_with_state_rule_owned(&self, st: &S, rule: R) -> String;
 }
+
 impl<T: core::fmt::Display, S, R: FormatRule<S>> VecStringWithStateRuleOwned<S, R> for Vec<T> {
     fn vec_string_with_state_rule_owned(&self, st: &S, rule: R) -> String {
         let mut r = String::new();
@@ -509,9 +562,12 @@ impl<T: core::fmt::Display, S, R: FormatRule<S>> VecStringWithStateRuleOwned<S, 
         r
     }
 }
+
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait IteratorStringWithStateRuleOwned<S, R: FormatRule<S>> {
     fn iter_string_with_state_rule_owned(self, st: &S, rule: R) -> String;
 }
+
 impl<I: StableIter, S, R: FormatRule<S>> IteratorStringWithStateRuleOwned<S, R> for I
 where
     I::Item: core::fmt::Display,
@@ -526,9 +582,12 @@ where
         r
     }
 }
+
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait VecStringWithStateMutRuleOwned<S, R: FormatRuleMut<S>> {
     fn vec_string_with_state_mut_rule_owned(&self, st: S, rule: R) -> String;
 }
+
 impl<T: core::fmt::Display, S, R: FormatRuleMut<S>> VecStringWithStateMutRuleOwned<S, R>
     for Vec<T>
 {
@@ -542,9 +601,12 @@ impl<T: core::fmt::Display, S, R: FormatRuleMut<S>> VecStringWithStateMutRuleOwn
         r
     }
 }
+
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait IteratorStringWithStateMutRuleOwned<S, R: FormatRuleMut<S>> {
     fn iter_string_with_state_mut_rule_owned(self, st: S, rule: R) -> String;
 }
+
 impl<I: StableIter, S, R: FormatRuleMut<S>> IteratorStringWithStateMutRuleOwned<S, R> for I
 where
     I::Item: core::fmt::Display,
@@ -560,9 +622,11 @@ where
     }
 }
 
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait VecStringRuleRef<'a, R: FormatRuleNoState<'a>> {
     fn vec_string_rule_ref(&self, rule: &'a R) -> String;
 }
+
 impl<'a, T: core::fmt::Display, R: FormatRuleNoState<'a>> VecStringRuleRef<'a, R> for Vec<T> {
     fn vec_string_rule_ref(&self, rule: &'a R) -> String {
         let mut s = String::new();
@@ -573,9 +637,12 @@ impl<'a, T: core::fmt::Display, R: FormatRuleNoState<'a>> VecStringRuleRef<'a, R
         s
     }
 }
+
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait VecStringMutRuleRef<R: FormatRuleMutNoState> {
     fn vec_string_mut_rule_ref(&self, rule: &mut R) -> String;
 }
+
 impl<T: core::fmt::Display, R: FormatRuleMutNoState> VecStringMutRuleRef<R> for Vec<T> {
     fn vec_string_mut_rule_ref(&self, rule: &mut R) -> String {
         let mut s = String::new();
@@ -586,9 +653,12 @@ impl<T: core::fmt::Display, R: FormatRuleMutNoState> VecStringMutRuleRef<R> for 
         s
     }
 }
+
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait IteratorStringRuleRef<'a, R: FormatRuleNoState<'a>> {
     fn iter_string_rule_ref(self, rule: &'a R) -> String;
 }
+
 impl<'a, I: StableIter, R: FormatRuleNoState<'a>> IteratorStringRuleRef<'a, R> for I
 where
     I::Item: core::fmt::Display,
@@ -603,9 +673,12 @@ where
         r
     }
 }
+
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait IteratorStringMutRuleRef<R: FormatRuleMutNoState> {
     fn iter_string_mut_rule_ref(self, rule: &mut R) -> String;
 }
+
 impl<I: StableIter, R: FormatRuleMutNoState> IteratorStringMutRuleRef<R> for I
 where
     I::Item: core::fmt::Display,
@@ -621,9 +694,11 @@ where
     }
 }
 
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait VecStringWithStateRuleRef<S, R: FormatRule<S>> {
     fn vec_string_with_state_rule_ref(&self, st: &S, rule: &R) -> String;
 }
+
 impl<T: core::fmt::Display, S, R: FormatRule<S>> VecStringWithStateRuleRef<S, R> for Vec<T> {
     fn vec_string_with_state_rule_ref(&self, st: &S, rule: &R) -> String {
         let mut r = String::new();
@@ -635,9 +710,12 @@ impl<T: core::fmt::Display, S, R: FormatRule<S>> VecStringWithStateRuleRef<S, R>
         r
     }
 }
+
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait IteratorStringWithStateRuleRef<S, R: FormatRule<S>> {
     fn iter_string_with_state_rule_ref(self, st: &S, rule: &R) -> String;
 }
+
 impl<I: StableIter, S, R: FormatRule<S>> IteratorStringWithStateRuleRef<S, R> for I
 where
     I::Item: core::fmt::Display,
@@ -652,9 +730,12 @@ where
         r
     }
 }
+
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait VecStringWithStateMutRuleRef<S, R: FormatRuleMut<S>> {
     fn vec_string_with_state_mut_rule_ref(&self, st: S, rule: &mut R) -> String;
 }
+
 impl<T: core::fmt::Display, S, R: FormatRuleMut<S>> VecStringWithStateMutRuleRef<S, R> for Vec<T> {
     fn vec_string_with_state_mut_rule_ref(&self, mut st: S, rule: &mut R) -> String {
         let mut r = String::new();
@@ -666,9 +747,12 @@ impl<T: core::fmt::Display, S, R: FormatRuleMut<S>> VecStringWithStateMutRuleRef
         r
     }
 }
+
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait IteratorStringWithStateMutRuleRef<S, R: FormatRuleMut<S>> {
     fn iter_string_with_state_mut_rule_ref(self, st: S, rule: &mut R) -> String;
 }
+
 impl<I: StableIter, S, R: FormatRuleMut<S>> IteratorStringWithStateMutRuleRef<S, R> for I
 where
     I::Item: core::fmt::Display,
@@ -687,15 +771,21 @@ where
 // ============================================================================
 // SYNC Exact-size traits (no allocation)
 // ============================================================================
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait IteratorStringExact {
     fn iter_string_exact(self, format_rule: FormatRuleFn) -> String;
 }
+
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait IteratorStringFnExact<F: Fn(&str, usize, usize) -> String> {
     fn iter_string_fn_exact(self, format_rule: F) -> String;
 }
+
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait IteratorStringFnMutExact<F: FnMut(&str, usize, usize) -> String> {
     fn iter_string_fn_mut_exact(self, format_rule: F) -> String;
 }
+
 impl<I: StableIter + ExactSizeIterator> IteratorStringExact for I
 where
     I::Item: core::fmt::Display,
@@ -709,6 +799,7 @@ where
         r
     }
 }
+
 impl<I: StableIter + ExactSizeIterator, F: Fn(&str, usize, usize) -> String>
     IteratorStringFnExact<F> for I
 where
@@ -723,6 +814,7 @@ where
         r
     }
 }
+
 impl<I: StableIter + ExactSizeIterator, F: FnMut(&str, usize, usize) -> String>
     IteratorStringFnMutExact<F> for I
 where
@@ -738,9 +830,11 @@ where
     }
 }
 
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait IteratorStringWithStateExact<S, F: FnMut(&mut S, &str, usize, usize) -> String> {
     fn iter_string_with_state_exact(self, st: S, f: F) -> String;
 }
+
 impl<I: StableIter + ExactSizeIterator, S, F: FnMut(&mut S, &str, usize, usize) -> String>
     IteratorStringWithStateExact<S, F> for I
 where
@@ -757,9 +851,11 @@ where
     }
 }
 
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait IteratorStringWithStateFnExact<S, F: Fn(&S, &str, usize, usize) -> String> {
     fn iter_string_with_state_fn_exact(self, st: &S, f: F) -> String;
 }
+
 impl<I: StableIter + ExactSizeIterator, S, F: Fn(&S, &str, usize, usize) -> String>
     IteratorStringWithStateFnExact<S, F> for I
 where
@@ -776,6 +872,7 @@ where
     }
 }
 
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait IteratorStringWithStateFnPtrExact<S> {
     fn iter_string_with_state_fn_ptr_exact(
         self,
@@ -783,6 +880,7 @@ pub trait IteratorStringWithStateFnPtrExact<S> {
         f: fn(&S, &str, usize, usize) -> String,
     ) -> String;
 }
+
 impl<I: StableIter + ExactSizeIterator, S> IteratorStringWithStateFnPtrExact<S> for I
 where
     I::Item: core::fmt::Display,
@@ -802,9 +900,11 @@ where
     }
 }
 
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait IteratorStringRuleOwnedExact<R: FormatRuleNoStateOwned> {
     fn iter_string_rule_owned_exact(self, rule: R) -> String;
 }
+
 impl<I: StableIter + ExactSizeIterator, R: FormatRuleNoStateOwned + Clone>
     IteratorStringRuleOwnedExact<R> for I
 where
@@ -819,9 +919,12 @@ where
         r
     }
 }
+
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait IteratorStringMutRuleOwnedExact<R: FormatRuleMutNoState> {
     fn iter_string_mut_rule_owned_exact(self, rule: R) -> String;
 }
+
 impl<I: StableIter + ExactSizeIterator, R: FormatRuleMutNoState> IteratorStringMutRuleOwnedExact<R>
     for I
 where
@@ -837,9 +940,11 @@ where
     }
 }
 
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait IteratorStringWithStateRuleOwnedExact<S, R: FormatRule<S>> {
     fn iter_string_with_state_rule_owned_exact(self, st: &S, rule: R) -> String;
 }
+
 impl<I: StableIter + ExactSizeIterator, S, R: FormatRule<S>>
     IteratorStringWithStateRuleOwnedExact<S, R> for I
 where
@@ -855,9 +960,12 @@ where
         r
     }
 }
+
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait IteratorStringWithStateMutRuleOwnedExact<S, R: FormatRuleMut<S>> {
     fn iter_string_with_state_mut_rule_owned_exact(self, st: S, rule: R) -> String;
 }
+
 impl<I: StableIter + ExactSizeIterator, S, R: FormatRuleMut<S>>
     IteratorStringWithStateMutRuleOwnedExact<S, R> for I
 where
@@ -874,9 +982,11 @@ where
     }
 }
 
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait IteratorStringRuleRefExact<'a, R: FormatRuleNoState<'a>> {
     fn iter_string_rule_ref_exact(self, rule: &'a R) -> String;
 }
+
 impl<'a, I: StableIter + ExactSizeIterator, R: FormatRuleNoState<'a>>
     IteratorStringRuleRefExact<'a, R> for I
 where
@@ -891,9 +1001,12 @@ where
         r
     }
 }
+
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait IteratorStringMutRuleRefExact<R: FormatRuleMutNoState> {
     fn iter_string_mut_rule_ref_exact(self, rule: &mut R) -> String;
 }
+
 impl<I: StableIter + ExactSizeIterator, R: FormatRuleMutNoState> IteratorStringMutRuleRefExact<R>
     for I
 where
@@ -909,9 +1022,11 @@ where
     }
 }
 
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait IteratorStringWithStateRuleRefExact<S, R: FormatRule<S>> {
     fn iter_string_with_state_rule_ref_exact(self, st: &S, rule: &R) -> String;
 }
+
 impl<I: StableIter + ExactSizeIterator, S, R: FormatRule<S>>
     IteratorStringWithStateRuleRefExact<S, R> for I
 where
@@ -927,9 +1042,12 @@ where
         r
     }
 }
+
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait IteratorStringWithStateMutRuleRefExact<S, R: FormatRuleMut<S>> {
     fn iter_string_with_state_mut_rule_ref_exact(self, st: S, rule: &mut R) -> String;
 }
+
 impl<I: StableIter + ExactSizeIterator, S, R: FormatRuleMut<S>>
     IteratorStringWithStateMutRuleRefExact<S, R> for I
 where
@@ -950,9 +1068,11 @@ where
 // RAYON SYNC
 // ============================================================================
 #[cfg(feature = "rayon")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait ParIteratorString {
     fn par_iter_string(self, f: FormatRuleFn) -> String;
 }
+
 #[cfg(feature = "rayon")]
 impl<I: rayon::iter::ParallelIterator, T: core::fmt::Display> ParIteratorString for I
 where
@@ -974,10 +1094,13 @@ where
             )
     }
 }
+
 #[cfg(feature = "rayon")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait ParIteratorStringFn<F: Fn(&str, usize, usize) -> String> {
     fn par_iter_string_fn(self, f: F) -> String;
 }
+
 #[cfg(feature = "rayon")]
 impl<
         I: rayon::iter::ParallelIterator,
@@ -1003,10 +1126,13 @@ where
             )
     }
 }
+
 #[cfg(feature = "rayon")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait ParIteratorStringFnMut<F: FnMut(&str, usize, usize) -> String> {
     fn par_iter_string_fn_mut(self, f: F) -> String;
 }
+
 #[cfg(feature = "rayon")]
 impl<
         I: rayon::iter::ParallelIterator,
@@ -1026,10 +1152,13 @@ where
         r
     }
 }
+
 #[cfg(feature = "rayon")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait ParIteratorStringFnPtr {
     fn par_iter_string_fn_ptr(self, f: FormatRuleFn) -> String;
 }
+
 #[cfg(feature = "rayon")]
 impl<I: rayon::iter::ParallelIterator, T: core::fmt::Display> ParIteratorStringFnPtr for I
 where
@@ -1051,10 +1180,13 @@ where
             )
     }
 }
+
 #[cfg(feature = "rayon")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait ParIteratorStringWithState<S, F: FnMut(&mut S, &str, usize, usize) -> String> {
     fn par_iter_string_with_state(self, st: S, f: F) -> String;
 }
+
 #[cfg(feature = "rayon")]
 impl<
         I: rayon::iter::ParallelIterator,
@@ -1075,10 +1207,13 @@ where
         r
     }
 }
+
 #[cfg(feature = "rayon")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait ParIteratorStringWithStateFn<S, F: Fn(&S, &str, usize, usize) -> String> {
     fn par_iter_string_with_state_fn(self, st: &S, f: F) -> String;
 }
+
 #[cfg(feature = "rayon")]
 impl<
         I: rayon::iter::ParallelIterator,
@@ -1105,7 +1240,9 @@ where
             )
     }
 }
+
 #[cfg(feature = "rayon")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait ParIteratorStringWithStateFnPtr<S> {
     fn par_iter_string_with_state_fn_ptr(
         self,
@@ -1113,6 +1250,7 @@ pub trait ParIteratorStringWithStateFnPtr<S> {
         f: fn(&S, &str, usize, usize) -> String,
     ) -> String;
 }
+
 #[cfg(feature = "rayon")]
 impl<I: rayon::iter::ParallelIterator, T: core::fmt::Display, S: Sync>
     ParIteratorStringWithStateFnPtr<S> for I
@@ -1139,10 +1277,13 @@ where
             )
     }
 }
+
 #[cfg(feature = "rayon")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait ParIteratorStringRuleOwned<R: FormatRuleNoStateOwned> {
     fn par_iter_string_rule_owned(self, rule: R) -> String;
 }
+
 #[cfg(feature = "rayon")]
 impl<
         I: rayon::iter::ParallelIterator,
@@ -1168,10 +1309,13 @@ where
             )
     }
 }
+
 #[cfg(feature = "rayon")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait ParIteratorStringMutRuleOwned<R: FormatRuleMutNoState> {
     fn par_iter_string_mut_rule_owned(self, rule: R) -> String;
 }
+
 #[cfg(feature = "rayon")]
 impl<I: rayon::iter::ParallelIterator, T: core::fmt::Display, R: FormatRuleMutNoState>
     ParIteratorStringMutRuleOwned<R> for I
@@ -1188,10 +1332,13 @@ where
         r
     }
 }
+
 #[cfg(feature = "rayon")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait ParIteratorStringWithStateRuleOwned<S, R: FormatRule<S>> {
     fn par_iter_string_with_state_rule_owned(self, st: &S, rule: R) -> String;
 }
+
 #[cfg(feature = "rayon")]
 impl<I: rayon::iter::ParallelIterator, T: core::fmt::Display, S: Sync, R: FormatRule<S> + Sync>
     ParIteratorStringWithStateRuleOwned<S, R> for I
@@ -1214,10 +1361,13 @@ where
             )
     }
 }
+
 #[cfg(feature = "rayon")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait ParIteratorStringWithStateMutRuleOwned<S, R: FormatRuleMut<S>> {
     fn par_iter_string_with_state_mut_rule_owned(self, st: S, rule: R) -> String;
 }
+
 #[cfg(feature = "rayon")]
 impl<I: rayon::iter::ParallelIterator, T: core::fmt::Display, S, R: FormatRuleMut<S>>
     ParIteratorStringWithStateMutRuleOwned<S, R> for I
@@ -1234,10 +1384,13 @@ where
         r
     }
 }
+
 #[cfg(feature = "rayon")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait ParIteratorStringRuleRef<'a, R: FormatRuleNoState<'a>> {
     fn par_iter_string_rule_ref(self, rule: &'a R) -> String;
 }
+
 #[cfg(feature = "rayon")]
 impl<
         'a,
@@ -1264,10 +1417,13 @@ where
             )
     }
 }
+
 #[cfg(feature = "rayon")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait ParIteratorStringMutRuleRef<R: FormatRuleMutNoState> {
     fn par_iter_string_mut_rule_ref(self, rule: &mut R) -> String;
 }
+
 #[cfg(feature = "rayon")]
 impl<I: rayon::iter::ParallelIterator, T: core::fmt::Display, R: FormatRuleMutNoState>
     ParIteratorStringMutRuleRef<R> for I
@@ -1284,10 +1440,13 @@ where
         r
     }
 }
+
 #[cfg(feature = "rayon")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait ParIteratorStringWithStateRuleRef<S, R: FormatRule<S>> {
     fn par_iter_string_with_state_rule_ref(self, st: &S, rule: &R) -> String;
 }
+
 #[cfg(feature = "rayon")]
 impl<I: rayon::iter::ParallelIterator, T: core::fmt::Display, S: Sync, R: FormatRule<S> + Sync>
     ParIteratorStringWithStateRuleRef<S, R> for I
@@ -1310,10 +1469,13 @@ where
             )
     }
 }
+
 #[cfg(feature = "rayon")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait ParIteratorStringWithStateMutRuleRef<S, R: FormatRuleMut<S>> {
     fn par_iter_string_with_state_mut_rule_ref(self, st: S, rule: &mut R) -> String;
 }
+
 #[cfg(feature = "rayon")]
 impl<I: rayon::iter::ParallelIterator, T: core::fmt::Display, S, R: FormatRuleMut<S>>
     ParIteratorStringWithStateMutRuleRef<S, R> for I
@@ -1335,6 +1497,7 @@ where
 // DYN ASYNC: Format Rule traits
 // ============================================================================
 #[cfg(feature = "dyn_async")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait FormatRuleNoStateAsync<'a> {
     fn format(
         &'a self,
@@ -1343,6 +1506,7 @@ pub trait FormatRuleNoStateAsync<'a> {
         length: usize,
     ) -> Box<dyn core::future::Future<Output = String> + 'a>;
 }
+
 #[cfg(feature = "dyn_async")]
 impl<'a, F: Fn(&str, usize, usize) -> Box<dyn core::future::Future<Output = String> + 'a>>
     FormatRuleNoStateAsync<'a> for F
@@ -1356,7 +1520,9 @@ impl<'a, F: Fn(&str, usize, usize) -> Box<dyn core::future::Future<Output = Stri
         (self)(v, i, l)
     }
 }
+
 #[cfg(feature = "dyn_async")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait FormatRuleNoStateAsyncSend<'a> {
     fn format(
         &'a self,
@@ -1365,6 +1531,7 @@ pub trait FormatRuleNoStateAsyncSend<'a> {
         length: usize,
     ) -> Box<dyn core::future::Future<Output = String> + 'a + Send>;
 }
+
 #[cfg(feature = "dyn_async")]
 impl<
         'a,
@@ -1380,7 +1547,9 @@ impl<
         (self)(v, i, l)
     }
 }
+
 #[cfg(feature = "dyn_async")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait FormatRuleNoStateOwnedAsync {
     fn format(
         self,
@@ -1389,6 +1558,7 @@ pub trait FormatRuleNoStateOwnedAsync {
         length: usize,
     ) -> Box<dyn core::future::Future<Output = String>>;
 }
+
 #[cfg(feature = "dyn_async")]
 impl<F: FnOnce(String, usize, usize) -> Box<dyn core::future::Future<Output = String>>>
     FormatRuleNoStateOwnedAsync for F
@@ -1402,7 +1572,9 @@ impl<F: FnOnce(String, usize, usize) -> Box<dyn core::future::Future<Output = St
         (self)(v, i, l)
     }
 }
+
 #[cfg(feature = "dyn_async")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait FormatRuleNoStateOwnedAsyncSend {
     fn format(
         self,
@@ -1411,6 +1583,7 @@ pub trait FormatRuleNoStateOwnedAsyncSend {
         length: usize,
     ) -> Box<dyn core::future::Future<Output = String> + Send>;
 }
+
 #[cfg(feature = "dyn_async")]
 impl<F: FnOnce(String, usize, usize) -> Box<dyn core::future::Future<Output = String> + Send>>
     FormatRuleNoStateOwnedAsyncSend for F
@@ -1424,7 +1597,9 @@ impl<F: FnOnce(String, usize, usize) -> Box<dyn core::future::Future<Output = St
         (self)(v, i, l)
     }
 }
+
 #[cfg(feature = "dyn_async")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait FormatRuleMutNoStateAsync<'a> {
     fn format(
         &'a mut self,
@@ -1433,6 +1608,7 @@ pub trait FormatRuleMutNoStateAsync<'a> {
         length: usize,
     ) -> Box<dyn core::future::Future<Output = String> + 'a>;
 }
+
 #[cfg(feature = "dyn_async")]
 impl<'a, F: FnMut(&str, usize, usize) -> Box<dyn core::future::Future<Output = String> + 'a>>
     FormatRuleMutNoStateAsync<'a> for F
@@ -1446,7 +1622,9 @@ impl<'a, F: FnMut(&str, usize, usize) -> Box<dyn core::future::Future<Output = S
         (self)(v, i, l)
     }
 }
+
 #[cfg(feature = "dyn_async")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait FormatRuleMutNoStateAsyncSend<'a> {
     fn format(
         &'a mut self,
@@ -1455,6 +1633,7 @@ pub trait FormatRuleMutNoStateAsyncSend<'a> {
         length: usize,
     ) -> Box<dyn core::future::Future<Output = String> + 'a + Send>;
 }
+
 #[cfg(feature = "dyn_async")]
 impl<
         'a,
@@ -1470,7 +1649,9 @@ impl<
         (self)(v, i, l)
     }
 }
+
 #[cfg(feature = "dyn_async")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait FormatRuleAsync<'a, S> {
     fn format(
         &'a self,
@@ -1480,6 +1661,7 @@ pub trait FormatRuleAsync<'a, S> {
         length: usize,
     ) -> Box<dyn core::future::Future<Output = String> + 'a>;
 }
+
 #[cfg(feature = "dyn_async")]
 impl<
         'a,
@@ -1497,7 +1679,9 @@ impl<
         (self)(s, v, i, l)
     }
 }
+
 #[cfg(feature = "dyn_async")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait FormatRuleAsyncSend<'a, S> {
     fn format(
         &'a self,
@@ -1507,6 +1691,7 @@ pub trait FormatRuleAsyncSend<'a, S> {
         length: usize,
     ) -> Box<dyn core::future::Future<Output = String> + 'a + Send>;
 }
+
 #[cfg(feature = "dyn_async")]
 impl<
         'a,
@@ -1524,7 +1709,9 @@ impl<
         (self)(s, v, i, l)
     }
 }
+
 #[cfg(feature = "dyn_async")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait FormatRuleMutAsync<'a, S> {
     fn format(
         &'a mut self,
@@ -1534,6 +1721,7 @@ pub trait FormatRuleMutAsync<'a, S> {
         length: usize,
     ) -> Box<dyn core::future::Future<Output = String> + 'a>;
 }
+
 #[cfg(feature = "dyn_async")]
 impl<
         'a,
@@ -1551,7 +1739,9 @@ impl<
         (self)(s, v, i, l)
     }
 }
+
 #[cfg(feature = "dyn_async")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait FormatRuleMutAsyncSend<'a, S> {
     fn format(
         &'a mut self,
@@ -1561,6 +1751,7 @@ pub trait FormatRuleMutAsyncSend<'a, S> {
         length: usize,
     ) -> Box<dyn core::future::Future<Output = String> + 'a + Send>;
 }
+
 #[cfg(feature = "dyn_async")]
 impl<
         'a,
@@ -1583,7 +1774,9 @@ impl<
         (self)(s, v, i, l)
     }
 }
+
 #[cfg(feature = "dyn_async")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait FormatRuleFnPtrAsync {
     fn format<'a>(
         &'a self,
@@ -1592,6 +1785,7 @@ pub trait FormatRuleFnPtrAsync {
         length: usize,
     ) -> Box<dyn core::future::Future<Output = String> + 'a>;
 }
+
 #[cfg(feature = "dyn_async")]
 impl FormatRuleFnPtrAsync
     for fn(&str, usize, usize) -> Box<dyn core::future::Future<Output = String> + '_>
@@ -1610,6 +1804,7 @@ impl FormatRuleFnPtrAsync
 // DYN ASYNC: Vec (unchanged, already collecting)
 // ============================================================================
 #[cfg(feature = "dyn_async")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait VecStringFnAsync<
     'a,
     F: Fn(&str, usize, usize) -> Fut,
@@ -1621,6 +1816,7 @@ pub trait VecStringFnAsync<
         f: &'a F,
     ) -> Box<dyn core::future::Future<Output = String> + 'a>;
 }
+
 #[cfg(feature = "dyn_async")]
 impl<
         'a,
@@ -1645,7 +1841,9 @@ impl<
         })
     }
 }
+
 #[cfg(feature = "dyn_async")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait VecStringFnAsyncSend<
     'a,
     F: Fn(&str, usize, usize) -> Fut + Sync,
@@ -1657,6 +1855,7 @@ pub trait VecStringFnAsyncSend<
         f: &'a F,
     ) -> Box<dyn core::future::Future<Output = String> + 'a + Send>;
 }
+
 #[cfg(feature = "dyn_async")]
 impl<
         'a,
@@ -1681,7 +1880,9 @@ impl<
         })
     }
 }
+
 #[cfg(feature = "dyn_async")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait VecStringFnMutAsync<
     'a,
     F: FnMut(&str, usize, usize) -> Fut,
@@ -1693,6 +1894,7 @@ pub trait VecStringFnMutAsync<
         f: &'a mut F,
     ) -> Box<dyn core::future::Future<Output = String> + 'a>;
 }
+
 #[cfg(feature = "dyn_async")]
 impl<
         'a,
@@ -1717,7 +1919,9 @@ impl<
         })
     }
 }
+
 #[cfg(feature = "dyn_async")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait VecStringFnMutAsyncSend<
     'a,
     F: FnMut(&str, usize, usize) -> Fut + Send,
@@ -1729,6 +1933,7 @@ pub trait VecStringFnMutAsyncSend<
         f: &'a mut F,
     ) -> Box<dyn core::future::Future<Output = String> + 'a + Send>;
 }
+
 #[cfg(feature = "dyn_async")]
 impl<
         'a,
@@ -1753,7 +1958,9 @@ impl<
         })
     }
 }
+
 #[cfg(feature = "dyn_async")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait VecStringWithStateAsync<
     'a,
     S: 'a,
@@ -1767,6 +1974,7 @@ pub trait VecStringWithStateAsync<
         f: &'a mut F,
     ) -> Box<dyn core::future::Future<Output = String> + 'a>;
 }
+
 #[cfg(feature = "dyn_async")]
 impl<
         'a,
@@ -1798,6 +2006,7 @@ impl<
 // DYN ASYNC: Iterator – COLLECTING versions
 // ============================================================================
 #[cfg(feature = "dyn_async")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait IteratorStringFnAsync<
     'a,
     F: Fn(&str, usize, usize) -> Fut,
@@ -1808,6 +2017,7 @@ pub trait IteratorStringFnAsync<
     where
         Self: 'a;
 }
+
 #[cfg(feature = "dyn_async")]
 impl<
         'a,
@@ -1834,7 +2044,9 @@ where
         })
     }
 }
+
 #[cfg(feature = "dyn_async")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait IteratorStringFnAsyncSend<
     'a,
     F: Fn(&str, usize, usize) -> Fut + Sync,
@@ -1848,6 +2060,7 @@ pub trait IteratorStringFnAsyncSend<
     where
         Self: 'a;
 }
+
 #[cfg(feature = "dyn_async")]
 impl<
         'a,
@@ -1877,7 +2090,9 @@ where
         })
     }
 }
+
 #[cfg(feature = "dyn_async")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait IteratorStringFnMutAsync<
     'a,
     F: FnMut(&str, usize, usize) -> Fut,
@@ -1891,6 +2106,7 @@ pub trait IteratorStringFnMutAsync<
     where
         Self: 'a;
 }
+
 #[cfg(feature = "dyn_async")]
 impl<
         'a,
@@ -1920,7 +2136,9 @@ where
         })
     }
 }
+
 #[cfg(feature = "dyn_async")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait IteratorStringFnMutAsyncSend<
     'a,
     F: FnMut(&str, usize, usize) -> Fut + Send,
@@ -1934,6 +2152,7 @@ pub trait IteratorStringFnMutAsyncSend<
     where
         Self: 'a;
 }
+
 #[cfg(feature = "dyn_async")]
 impl<
         'a,
@@ -1963,7 +2182,9 @@ where
         })
     }
 }
+
 #[cfg(feature = "dyn_async")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait IteratorStringWithStateAsync<
     'a,
     S: 'a,
@@ -1979,6 +2200,7 @@ pub trait IteratorStringWithStateAsync<
     where
         Self: 'a;
 }
+
 #[cfg(feature = "dyn_async")]
 impl<
         'a,
@@ -2015,6 +2237,7 @@ where
 // DYN ASYNC: Iterator – EXACT versions (no collect)
 // ============================================================================
 #[cfg(feature = "dyn_async")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait IteratorStringFnAsyncExact<
     'a,
     F: Fn(&str, usize, usize) -> Fut,
@@ -2028,6 +2251,7 @@ pub trait IteratorStringFnAsyncExact<
     where
         Self: 'a;
 }
+
 #[cfg(feature = "dyn_async")]
 impl<
         'a,
@@ -2057,7 +2281,9 @@ where
         })
     }
 }
+
 #[cfg(feature = "dyn_async")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait IteratorStringFnAsyncSendExact<
     'a,
     F: Fn(&str, usize, usize) -> Fut + Sync,
@@ -2071,6 +2297,7 @@ pub trait IteratorStringFnAsyncSendExact<
     where
         Self: 'a;
 }
+
 #[cfg(feature = "dyn_async")]
 impl<
         'a,
@@ -2100,7 +2327,9 @@ where
         })
     }
 }
+
 #[cfg(feature = "dyn_async")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait IteratorStringFnMutAsyncExact<
     'a,
     F: FnMut(&str, usize, usize) -> Fut,
@@ -2114,6 +2343,7 @@ pub trait IteratorStringFnMutAsyncExact<
     where
         Self: 'a;
 }
+
 #[cfg(feature = "dyn_async")]
 impl<
         'a,
@@ -2143,7 +2373,9 @@ where
         })
     }
 }
+
 #[cfg(feature = "dyn_async")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait IteratorStringFnMutAsyncSendExact<
     'a,
     F: FnMut(&str, usize, usize) -> Fut + Send,
@@ -2157,6 +2389,7 @@ pub trait IteratorStringFnMutAsyncSendExact<
     where
         Self: 'a;
 }
+
 #[cfg(feature = "dyn_async")]
 impl<
         'a,
@@ -2186,7 +2419,9 @@ where
         })
     }
 }
+
 #[cfg(feature = "dyn_async")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait IteratorStringWithStateAsyncExact<
     'a,
     S: 'a,
@@ -2202,6 +2437,7 @@ pub trait IteratorStringWithStateAsyncExact<
     where
         Self: 'a;
 }
+
 #[cfg(feature = "dyn_async")]
 impl<
         'a,
@@ -2238,6 +2474,7 @@ where
 // IMPL ASYNC: Format Rule traits
 // ============================================================================
 #[cfg(feature = "impl_async")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait FormatRuleNoStateImplAsync<Fut: core::future::Future<Output = String>> {
     fn format(
         &self,
@@ -2246,6 +2483,7 @@ pub trait FormatRuleNoStateImplAsync<Fut: core::future::Future<Output = String>>
         length: usize,
     ) -> impl core::future::Future<Output = String>;
 }
+
 #[cfg(feature = "impl_async")]
 impl<F: Fn(&str, usize, usize) -> Fut, Fut: core::future::Future<Output = String>>
     FormatRuleNoStateImplAsync<Fut> for F
@@ -2254,7 +2492,9 @@ impl<F: Fn(&str, usize, usize) -> Fut, Fut: core::future::Future<Output = String
         (self)(v, i, l)
     }
 }
+
 #[cfg(feature = "impl_async")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait FormatRuleNoStateImplAsyncSend<Fut: core::future::Future<Output = String> + Send> {
     fn format(
         &self,
@@ -2263,6 +2503,7 @@ pub trait FormatRuleNoStateImplAsyncSend<Fut: core::future::Future<Output = Stri
         length: usize,
     ) -> impl core::future::Future<Output = String> + Send;
 }
+
 #[cfg(feature = "impl_async")]
 impl<
         F: Fn(&str, usize, usize) -> Fut + Sync,
@@ -2278,7 +2519,9 @@ impl<
         (self)(v, i, l)
     }
 }
+
 #[cfg(feature = "impl_async")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait FormatRuleNoStateOwnedImplAsync<Fut: core::future::Future<Output = String>> {
     fn format(
         self,
@@ -2287,6 +2530,7 @@ pub trait FormatRuleNoStateOwnedImplAsync<Fut: core::future::Future<Output = Str
         length: usize,
     ) -> impl core::future::Future<Output = String>;
 }
+
 #[cfg(feature = "impl_async")]
 impl<F: FnOnce(String, usize, usize) -> Fut, Fut: core::future::Future<Output = String>>
     FormatRuleNoStateOwnedImplAsync<Fut> for F
@@ -2295,7 +2539,9 @@ impl<F: FnOnce(String, usize, usize) -> Fut, Fut: core::future::Future<Output = 
         (self)(v, i, l)
     }
 }
+
 #[cfg(feature = "impl_async")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait FormatRuleNoStateOwnedImplAsyncSend<Fut: core::future::Future<Output = String> + Send> {
     fn format(
         self,
@@ -2304,6 +2550,7 @@ pub trait FormatRuleNoStateOwnedImplAsyncSend<Fut: core::future::Future<Output =
         length: usize,
     ) -> impl core::future::Future<Output = String> + Send;
 }
+
 #[cfg(feature = "impl_async")]
 impl<
         F: FnOnce(String, usize, usize) -> Fut + Send,
@@ -2319,7 +2566,9 @@ impl<
         (self)(v, i, l)
     }
 }
+
 #[cfg(feature = "impl_async")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait FormatRuleMutNoStateImplAsync<Fut: core::future::Future<Output = String>> {
     fn format(
         &mut self,
@@ -2328,6 +2577,7 @@ pub trait FormatRuleMutNoStateImplAsync<Fut: core::future::Future<Output = Strin
         length: usize,
     ) -> impl core::future::Future<Output = String>;
 }
+
 #[cfg(feature = "impl_async")]
 impl<F: FnMut(&str, usize, usize) -> Fut, Fut: core::future::Future<Output = String>>
     FormatRuleMutNoStateImplAsync<Fut> for F
@@ -2341,7 +2591,9 @@ impl<F: FnMut(&str, usize, usize) -> Fut, Fut: core::future::Future<Output = Str
         (self)(v, i, l)
     }
 }
+
 #[cfg(feature = "impl_async")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait FormatRuleMutNoStateImplAsyncSend<Fut: core::future::Future<Output = String> + Send> {
     fn format(
         &mut self,
@@ -2350,6 +2602,7 @@ pub trait FormatRuleMutNoStateImplAsyncSend<Fut: core::future::Future<Output = S
         length: usize,
     ) -> impl core::future::Future<Output = String> + Send;
 }
+
 #[cfg(feature = "impl_async")]
 impl<
         F: FnMut(&str, usize, usize) -> Fut + Send,
@@ -2365,7 +2618,9 @@ impl<
         (self)(v, i, l)
     }
 }
+
 #[cfg(feature = "impl_async")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait FormatRuleImplAsync<S, Fut: core::future::Future<Output = String>> {
     fn format(
         &self,
@@ -2375,6 +2630,7 @@ pub trait FormatRuleImplAsync<S, Fut: core::future::Future<Output = String>> {
         length: usize,
     ) -> impl core::future::Future<Output = String>;
 }
+
 #[cfg(feature = "impl_async")]
 impl<S, F: Fn(&S, &str, usize, usize) -> Fut, Fut: core::future::Future<Output = String>>
     FormatRuleImplAsync<S, Fut> for F
@@ -2389,7 +2645,9 @@ impl<S, F: Fn(&S, &str, usize, usize) -> Fut, Fut: core::future::Future<Output =
         (self)(s, v, i, l)
     }
 }
+
 #[cfg(feature = "impl_async")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait FormatRuleImplAsyncSend<S, Fut: core::future::Future<Output = String> + Send> {
     fn format(
         &self,
@@ -2399,6 +2657,7 @@ pub trait FormatRuleImplAsyncSend<S, Fut: core::future::Future<Output = String> 
         length: usize,
     ) -> impl core::future::Future<Output = String> + Send;
 }
+
 #[cfg(feature = "impl_async")]
 impl<
         S: Sync,
@@ -2416,7 +2675,9 @@ impl<
         (self)(s, v, i, l)
     }
 }
+
 #[cfg(feature = "impl_async")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait FormatRuleMutImplAsync<S, Fut: core::future::Future<Output = String>> {
     fn format(
         &mut self,
@@ -2426,6 +2687,7 @@ pub trait FormatRuleMutImplAsync<S, Fut: core::future::Future<Output = String>> 
         length: usize,
     ) -> impl core::future::Future<Output = String>;
 }
+
 #[cfg(feature = "impl_async")]
 impl<
         S,
@@ -2443,7 +2705,9 @@ impl<
         (self)(s, v, i, l)
     }
 }
+
 #[cfg(feature = "impl_async")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait FormatRuleMutImplAsyncSend<S, Fut: core::future::Future<Output = String> + Send> {
     fn format(
         &mut self,
@@ -2453,6 +2717,7 @@ pub trait FormatRuleMutImplAsyncSend<S, Fut: core::future::Future<Output = Strin
         length: usize,
     ) -> impl core::future::Future<Output = String> + Send;
 }
+
 #[cfg(feature = "impl_async")]
 impl<
         S: Send,
@@ -2470,7 +2735,9 @@ impl<
         (self)(s, v, i, l)
     }
 }
+
 #[cfg(feature = "impl_async")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait FormatRuleFnPtrImplAsync<Fut: core::future::Future<Output = String>> {
     fn format<'a>(
         &'a self,
@@ -2479,6 +2746,7 @@ pub trait FormatRuleFnPtrImplAsync<Fut: core::future::Future<Output = String>> {
         length: usize,
     ) -> impl core::future::Future<Output = String> + 'a;
 }
+
 #[cfg(feature = "impl_async")]
 impl<Fut: core::future::Future<Output = String>> FormatRuleFnPtrImplAsync<Fut>
     for fn(&str, usize, usize) -> Fut
@@ -2497,6 +2765,7 @@ impl<Fut: core::future::Future<Output = String>> FormatRuleFnPtrImplAsync<Fut>
 // IMPL ASYNC: Vec (collecting, same as before)
 // ============================================================================
 #[cfg(feature = "impl_async")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait VecStringFnImplAsync<
     F: Fn(&str, usize, usize) -> Fut,
     Fut: core::future::Future<Output = String>,
@@ -2511,6 +2780,7 @@ pub trait VecStringFnImplAsync<
         F: 'a,
         Fut: 'a;
 }
+
 #[cfg(feature = "impl_async")]
 impl<
         T: core::fmt::Display,
@@ -2539,7 +2809,9 @@ impl<
         }
     }
 }
+
 #[cfg(feature = "impl_async")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait VecStringFnImplAsyncSend<
     F: Fn(&str, usize, usize) -> Fut + Sync,
     Fut: core::future::Future<Output = String> + Send,
@@ -2554,6 +2826,7 @@ pub trait VecStringFnImplAsyncSend<
         F: 'a,
         Fut: 'a;
 }
+
 #[cfg(feature = "impl_async")]
 impl<
         T: core::fmt::Display + Sync,
@@ -2582,7 +2855,9 @@ impl<
         }
     }
 }
+
 #[cfg(feature = "impl_async")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait VecStringFnMutImplAsync<
     F: FnMut(&str, usize, usize) -> Fut,
     Fut: core::future::Future<Output = String>,
@@ -2597,6 +2872,7 @@ pub trait VecStringFnMutImplAsync<
         F: 'a,
         Fut: 'a;
 }
+
 #[cfg(feature = "impl_async")]
 impl<
         T: core::fmt::Display,
@@ -2625,7 +2901,9 @@ impl<
         }
     }
 }
+
 #[cfg(feature = "impl_async")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait VecStringFnMutImplAsyncSend<
     F: FnMut(&str, usize, usize) -> Fut + Send,
     Fut: core::future::Future<Output = String> + Send,
@@ -2640,6 +2918,7 @@ pub trait VecStringFnMutImplAsyncSend<
         F: 'a,
         Fut: 'a;
 }
+
 #[cfg(feature = "impl_async")]
 impl<
         T: core::fmt::Display + Sync,
@@ -2668,7 +2947,9 @@ impl<
         }
     }
 }
+
 #[cfg(feature = "impl_async")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait VecStringWithStateImplAsync<
     S,
     F: FnMut(&mut S, &str, usize, usize) -> Fut,
@@ -2686,6 +2967,7 @@ pub trait VecStringWithStateImplAsync<
         S: 'a,
         Fut: 'a;
 }
+
 #[cfg(feature = "impl_async")]
 impl<
         T: core::fmt::Display,
@@ -2722,6 +3004,7 @@ impl<
 // IMPL ASYNC: Iterator – COLLECTING versions
 // ============================================================================
 #[cfg(feature = "impl_async")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait IteratorStringFnImplAsync<
     F: Fn(&str, usize, usize) -> Fut,
     Fut: core::future::Future<Output = String>,
@@ -2733,6 +3016,7 @@ pub trait IteratorStringFnImplAsync<
         F: 'a,
         Fut: 'a;
 }
+
 #[cfg(feature = "impl_async")]
 impl<
         I: StableIter,
@@ -2760,7 +3044,9 @@ where
         }
     }
 }
+
 #[cfg(feature = "impl_async")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait IteratorStringFnImplAsyncSend<
     F: Fn(&str, usize, usize) -> Fut + Sync,
     Fut: core::future::Future<Output = String> + Send,
@@ -2775,6 +3061,7 @@ pub trait IteratorStringFnImplAsyncSend<
         F: 'a,
         Fut: 'a;
 }
+
 #[cfg(feature = "impl_async")]
 impl<
         I: StableIter + Send,
@@ -2805,7 +3092,9 @@ where
         }
     }
 }
+
 #[cfg(feature = "impl_async")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait IteratorStringFnMutImplAsync<
     F: FnMut(&str, usize, usize) -> Fut,
     Fut: core::future::Future<Output = String>,
@@ -2820,6 +3109,7 @@ pub trait IteratorStringFnMutImplAsync<
         F: 'a,
         Fut: 'a;
 }
+
 #[cfg(feature = "impl_async")]
 impl<
         I: StableIter,
@@ -2850,7 +3140,9 @@ where
         }
     }
 }
+
 #[cfg(feature = "impl_async")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait IteratorStringFnMutImplAsyncSend<
     F: FnMut(&str, usize, usize) -> Fut + Send,
     Fut: core::future::Future<Output = String> + Send,
@@ -2865,6 +3157,7 @@ pub trait IteratorStringFnMutImplAsyncSend<
         F: 'a,
         Fut: 'a;
 }
+
 #[cfg(feature = "impl_async")]
 impl<
         I: StableIter + Send,
@@ -2895,7 +3188,9 @@ where
         }
     }
 }
+
 #[cfg(feature = "impl_async")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait IteratorStringWithStateImplAsync<
     S,
     F: FnMut(&mut S, &str, usize, usize) -> Fut,
@@ -2913,6 +3208,7 @@ pub trait IteratorStringWithStateImplAsync<
         S: 'a,
         Fut: 'a;
 }
+
 #[cfg(feature = "impl_async")]
 impl<
         I: StableIter,
@@ -2951,6 +3247,7 @@ where
 // IMPL ASYNC: Iterator – EXACT versions
 // ============================================================================
 #[cfg(feature = "impl_async")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait IteratorStringFnImplAsyncExact<
     F: Fn(&str, usize, usize) -> Fut,
     Fut: core::future::Future<Output = String>,
@@ -2965,6 +3262,7 @@ pub trait IteratorStringFnImplAsyncExact<
         F: 'a,
         Fut: 'a;
 }
+
 #[cfg(feature = "impl_async")]
 impl<
         I: StableIter + ExactSizeIterator,
@@ -2995,7 +3293,9 @@ where
         }
     }
 }
+
 #[cfg(feature = "impl_async")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait IteratorStringFnImplAsyncSendExact<
     F: Fn(&str, usize, usize) -> Fut + Sync,
     Fut: core::future::Future<Output = String> + Send,
@@ -3010,6 +3310,7 @@ pub trait IteratorStringFnImplAsyncSendExact<
         F: 'a,
         Fut: 'a;
 }
+
 #[cfg(feature = "impl_async")]
 impl<
         I: StableIter + ExactSizeIterator + Send,
@@ -3040,7 +3341,9 @@ where
         }
     }
 }
+
 #[cfg(feature = "impl_async")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait IteratorStringFnMutImplAsyncExact<
     F: FnMut(&str, usize, usize) -> Fut,
     Fut: core::future::Future<Output = String>,
@@ -3055,6 +3358,7 @@ pub trait IteratorStringFnMutImplAsyncExact<
         F: 'a,
         Fut: 'a;
 }
+
 #[cfg(feature = "impl_async")]
 impl<
         I: StableIter + ExactSizeIterator,
@@ -3085,7 +3389,9 @@ where
         }
     }
 }
+
 #[cfg(feature = "impl_async")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait IteratorStringFnMutImplAsyncSendExact<
     F: FnMut(&str, usize, usize) -> Fut + Send,
     Fut: core::future::Future<Output = String> + Send,
@@ -3100,6 +3406,7 @@ pub trait IteratorStringFnMutImplAsyncSendExact<
         F: 'a,
         Fut: 'a;
 }
+
 #[cfg(feature = "impl_async")]
 impl<
         I: StableIter + ExactSizeIterator + Send,
@@ -3130,7 +3437,9 @@ where
         }
     }
 }
+
 #[cfg(feature = "impl_async")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait IteratorStringWithStateImplAsyncExact<
     S,
     F: FnMut(&mut S, &str, usize, usize) -> Fut,
@@ -3148,6 +3457,7 @@ pub trait IteratorStringWithStateImplAsyncExact<
         S: 'a,
         Fut: 'a;
 }
+
 #[cfg(feature = "impl_async")]
 impl<
         I: StableIter + ExactSizeIterator,
@@ -3186,6 +3496,7 @@ where
 // RAYON + DYN ASYNC / IMPL ASYNC (existing, unchanged)
 // ============================================================================
 #[cfg(all(feature = "rayon", feature = "dyn_async"))]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait ParIteratorStringFnAsync<'a, F, Fut> {
     fn par_iter_string_async_fn(
         self,
@@ -3196,6 +3507,7 @@ pub trait ParIteratorStringFnAsync<'a, F, Fut> {
         Fut: core::future::Future<Output = String> + 'a,
         F: Fn(&str, usize, usize) -> Fut + Sync;
 }
+
 #[cfg(all(feature = "rayon", feature = "dyn_async"))]
 impl<'a, I, T, F, Fut> ParIteratorStringFnAsync<'a, F, Fut> for I
 where
@@ -3223,7 +3535,9 @@ where
         })
     }
 }
+
 #[cfg(all(feature = "rayon", feature = "dyn_async"))]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait ParIteratorStringFnAsyncSend<
     F: Fn(&str, usize, usize) -> Fut + Sync,
     Fut: core::future::Future<Output = String> + Send,
@@ -3237,6 +3551,7 @@ pub trait ParIteratorStringFnAsyncSend<
         Self: 'a,
         Fut: 'a;
 }
+
 #[cfg(all(feature = "rayon", feature = "dyn_async"))]
 impl<
         I: rayon::iter::ParallelIterator + Send,
@@ -3267,7 +3582,9 @@ where
         })
     }
 }
+
 #[cfg(all(feature = "rayon", feature = "dyn_async"))]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait ParIteratorStringFnMutAsync<
     F: FnMut(&str, usize, usize) -> Fut,
     Fut: core::future::Future<Output = String>,
@@ -3281,6 +3598,7 @@ pub trait ParIteratorStringFnMutAsync<
         Self: 'a,
         Fut: 'a;
 }
+
 #[cfg(all(feature = "rayon", feature = "dyn_async"))]
 impl<
         I: rayon::iter::ParallelIterator,
@@ -3311,7 +3629,9 @@ where
         })
     }
 }
+
 #[cfg(all(feature = "rayon", feature = "dyn_async"))]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait ParIteratorStringFnMutAsyncSend<
     F: FnMut(&str, usize, usize) -> Fut + Send,
     Fut: core::future::Future<Output = String> + Send,
@@ -3325,6 +3645,7 @@ pub trait ParIteratorStringFnMutAsyncSend<
         Self: 'a,
         Fut: 'a;
 }
+
 #[cfg(all(feature = "rayon", feature = "dyn_async"))]
 impl<
         I: rayon::iter::ParallelIterator + Send,
@@ -3355,7 +3676,9 @@ where
         })
     }
 }
+
 #[cfg(all(feature = "rayon", feature = "dyn_async"))]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait ParIteratorStringFnPtrAsync {
     fn par_iter_string_async_fn_ptr<'a>(
         self,
@@ -3364,6 +3687,7 @@ pub trait ParIteratorStringFnPtrAsync {
     where
         Self: 'a;
 }
+
 #[cfg(all(feature = "rayon", feature = "dyn_async"))]
 impl<I: rayon::iter::ParallelIterator, T: core::fmt::Display> ParIteratorStringFnPtrAsync for I
 where
@@ -3390,6 +3714,7 @@ where
 }
 
 #[cfg(all(feature = "rayon", feature = "impl_async"))]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait ParIteratorStringFnImplAsync<
     F: Fn(&str, usize, usize) -> Fut + Sync,
     Fut: core::future::Future<Output = String>,
@@ -3404,6 +3729,7 @@ pub trait ParIteratorStringFnImplAsync<
         F: 'a,
         Fut: 'a;
 }
+
 #[cfg(all(feature = "rayon", feature = "impl_async"))]
 impl<
         I: rayon::iter::ParallelIterator,
@@ -3435,7 +3761,9 @@ where
         }
     }
 }
+
 #[cfg(all(feature = "rayon", feature = "impl_async"))]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait ParIteratorStringFnImplAsyncSend<
     F: Fn(&str, usize, usize) -> Fut + Sync,
     Fut: core::future::Future<Output = String> + Send,
@@ -3450,6 +3778,7 @@ pub trait ParIteratorStringFnImplAsyncSend<
         F: 'a,
         Fut: 'a;
 }
+
 #[cfg(all(feature = "rayon", feature = "impl_async"))]
 impl<
         I: rayon::iter::ParallelIterator + Send,
@@ -3481,7 +3810,9 @@ where
         }
     }
 }
+
 #[cfg(all(feature = "rayon", feature = "impl_async"))]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait ParIteratorStringFnMutImplAsync<
     F: FnMut(&str, usize, usize) -> Fut,
     Fut: core::future::Future<Output = String>,
@@ -3496,6 +3827,7 @@ pub trait ParIteratorStringFnMutImplAsync<
         F: 'a,
         Fut: 'a;
 }
+
 #[cfg(all(feature = "rayon", feature = "impl_async"))]
 impl<
         I: rayon::iter::ParallelIterator,
@@ -3527,7 +3859,9 @@ where
         }
     }
 }
+
 #[cfg(all(feature = "rayon", feature = "impl_async"))]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait ParIteratorStringFnMutImplAsyncSend<
     F: FnMut(&str, usize, usize) -> Fut + Send,
     Fut: core::future::Future<Output = String> + Send,
@@ -3542,6 +3876,7 @@ pub trait ParIteratorStringFnMutImplAsyncSend<
         F: 'a,
         Fut: 'a;
 }
+
 #[cfg(all(feature = "rayon", feature = "impl_async"))]
 impl<
         I: rayon::iter::ParallelIterator + Send,
@@ -3573,7 +3908,9 @@ where
         }
     }
 }
+
 #[cfg(all(feature = "rayon", feature = "impl_async"))]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait ParIteratorStringFnPtrImplAsync {
     fn par_iter_string_async_fn_ptr<'a>(
         self,
@@ -3582,6 +3919,7 @@ pub trait ParIteratorStringFnPtrImplAsync {
     where
         Self: 'a;
 }
+
 #[cfg(all(feature = "rayon", feature = "impl_async"))]
 impl<I: rayon::iter::ParallelIterator, T: core::fmt::Display> ParIteratorStringFnPtrImplAsync for I
 where
@@ -3626,6 +3964,7 @@ mod tests {
             core::task::RawWakerVTable::new(clone, no_op, no_op, no_op);
         core::task::RawWaker::new(core::ptr::null(), &VTABLE)
     }
+
     #[cfg(any(feature = "dyn_async", feature = "impl_async"))]
     fn block_on<F: core::future::Future>(mut fut: F) -> F::Output {
         let mut fut = unsafe { core::pin::Pin::new_unchecked(&mut fut) };
@@ -3638,6 +3977,7 @@ mod tests {
             core::hint::spin_loop();
         }
     }
+
     #[cfg(feature = "dyn_async")]
     fn block_on_dyn<'a, T>(fut: Box<dyn Future<Output = T> + 'a>) -> T {
         let mut pin_future = Box::into_pin(fut);
@@ -3662,6 +4002,7 @@ mod tests {
             VecString::vec_string(&vec![1, 2, 3], DEFAULT_FORMAT_RULE)
         );
     }
+
     #[test]
     fn test_vec_string_single_element() {
         assert_eq!(
@@ -3669,6 +4010,7 @@ mod tests {
             VecString::vec_string(&vec![42], DEFAULT_FORMAT_RULE)
         );
     }
+
     #[test]
     fn test_vec_string_empty() {
         assert_eq!(
@@ -3688,6 +4030,7 @@ mod tests {
             IteratorString::iter_string(n.iter().map(|x| x * 10), DEFAULT_FORMAT_RULE)
         );
     }
+
     #[test]
     fn test_iterator_string_collecting_non_exact() {
         let v = [1, 2, 3, 4, 5, 6];
@@ -3698,6 +4041,7 @@ mod tests {
             IteratorString::iter_string(filtered, DEFAULT_FORMAT_RULE)
         );
     }
+
     #[test]
     fn test_iterator_string_collecting_empty() {
         let n: Vec<i32> = vec![];
@@ -3706,6 +4050,7 @@ mod tests {
             IteratorString::iter_string(n.iter().map(|x| x * 10), DEFAULT_FORMAT_RULE)
         );
     }
+
     #[test]
     fn test_iterator_string_collecting_single() {
         let n = [42];
@@ -3726,6 +4071,7 @@ mod tests {
             IteratorStringExact::iter_string_exact(n.iter().map(|x| x * 10), DEFAULT_FORMAT_RULE)
         );
     }
+
     #[test]
     fn test_iterator_string_exact_empty() {
         let n: Vec<i32> = vec![];
@@ -3734,6 +4080,7 @@ mod tests {
             IteratorStringExact::iter_string_exact(n.iter().map(|x| x * 10), DEFAULT_FORMAT_RULE)
         );
     }
+
     #[test]
     fn test_iterator_string_exact_single() {
         let n = [42];
@@ -3768,6 +4115,7 @@ mod tests {
         });
         assert_eq!(res, "{1, 2, 3}");
     }
+
     #[test]
     fn test_iterator_string_fn_exact() {
         let v = [1, 2, 3];
@@ -3814,6 +4162,7 @@ mod tests {
         assert_eq!(res, "10, 20, 30 (sum=60)");
         assert_eq!(sum, 60);
     }
+
     #[test]
     fn test_iterator_string_fn_mut_exact() {
         let v = [10, 20, 30];
@@ -3865,6 +4214,7 @@ mod tests {
         });
         assert_eq!(result, "(sum=1: 1, sum=3: 2, sum=6: 3)");
     }
+
     #[test]
     fn test_iterator_string_with_state_exact() {
         let data = vec![1, 2, 3].into_iter();
@@ -3970,6 +4320,7 @@ mod tests {
         };
         assert_eq!("{10, 20, 30}", v.iter().iter_string_rule_owned(fmt));
     }
+
     #[test]
     fn test_iterator_string_rule_owned_exact() {
         let v = [10, 20, 30];
@@ -4016,6 +4367,7 @@ mod tests {
         );
         assert_eq!(sum, 6);
     }
+
     #[test]
     fn test_iterator_string_mut_rule_owned_exact() {
         let v = [1, 2, 3];
@@ -4159,6 +4511,7 @@ mod tests {
         fn takes_extended<T: ExtendedDisplay>(_x: T) {}
         takes_extended(v);
     }
+
     #[test]
     fn test_extended_display_iter() {
         let v = vec![1, 2, 3];
@@ -4181,6 +4534,7 @@ mod tests {
             ParIteratorString::par_iter_string(numbers.into_par_iter(), DEFAULT_FORMAT_RULE)
         );
     }
+
     #[cfg(feature = "rayon")]
     #[test]
     fn test_rayon_par_iter_string_fn() {
@@ -4208,6 +4562,7 @@ mod tests {
             ParIteratorStringFn::par_iter_string_fn(v.par_iter(), fmt)
         );
     }
+
     #[cfg(feature = "rayon")]
     #[test]
     fn test_rayon_par_iter_methods() {
@@ -4291,6 +4646,7 @@ mod tests {
             block_on_dyn(IteratorStringFnAsync::iter_string_async_fn(v.iter(), &fmt))
         );
     }
+
     #[cfg(feature = "dyn_async")]
     #[test]
     fn test_iterator_string_fn_async_exact() {
@@ -4343,6 +4699,7 @@ mod tests {
             ))
         );
     }
+
     #[cfg(feature = "dyn_async")]
     #[test]
     fn test_iterator_string_fn_mut_async_exact() {
@@ -4467,6 +4824,7 @@ mod tests {
             ))
         );
     }
+
     #[cfg(feature = "impl_async")]
     #[test]
     fn test_iterator_string_fn_impl_async_exact() {
@@ -4519,6 +4877,7 @@ mod tests {
             ))
         );
     }
+
     #[cfg(feature = "impl_async")]
     #[test]
     fn test_iterator_string_fn_mut_impl_async_exact() {
@@ -4611,6 +4970,7 @@ mod tests {
         let fut = ParIteratorStringFnAsync::par_iter_string_async_fn(v.into_par_iter(), &fmt);
         assert_eq!("{10, 20, 30}", block_on_dyn(fut));
     }
+
     #[cfg(all(feature = "rayon", feature = "impl_async"))]
     #[test]
     fn test_rayon_par_iter_string_fn_impl_async() {

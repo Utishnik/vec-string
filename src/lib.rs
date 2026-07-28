@@ -175,7 +175,7 @@ fn default_format_rule(val: &str, index: usize, len: usize) -> String {
 pub const DEFAULT_FORMAT_RULE: FormatRuleFn = default_format_rule;
 
 // ============================================================================
-// SYNC ТРЕЙТЫ ПРАВИЛ
+// SYNC TRAITS FOR RULES
 // ============================================================================
 #[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait FormatRuleNoState<'a> {
@@ -253,6 +253,23 @@ impl<T: core::fmt::Display> VecString for Vec<T> {
             s.push_str(&f(&format!("{}", x), i, l));
         }
         s
+    }
+}
+
+pub trait DisplayInternalFormatRuleFn {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>, fr: FormatRuleFn) -> core::fmt::Result;
+}
+
+impl<T: core::fmt::Display> DisplayInternalFormatRuleFn for Vec<T> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>, fr: FormatRuleFn) -> core::fmt::Result {
+        write!(f, "{}", self.vec_string(fr))
+    }
+}
+
+// We also implement it for slices so that `[T]` can be formatted this way.
+impl<T: core::fmt::Display> DisplayInternalFormatRuleFn for [T] {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>, fr: FormatRuleFn) -> core::fmt::Result {
+        write!(f, "{}", self.iter().iter_string(fr))
     }
 }
 

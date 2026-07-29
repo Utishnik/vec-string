@@ -6821,3 +6821,443 @@ mod additional_tests {
         assert_eq!(6, sum);
     }
 }
+
+// ========================================================================
+// Coverage Boosting Tests (Добавить в конец файла)
+// ========================================================================
+#[cfg(test)]
+mod coverage_tests {
+    use super::*;
+    use alloc::vec;
+
+    // --- Тесты для непокрытых адаптеров StableIter ---
+    #[test]
+    fn test_stable_iter_iter_mut() {
+        let mut v = [1, 2, 3];
+        fn assert_stable<I: StableIter>(_: &I) {}
+        assert_stable(&v.iter_mut());
+        let res = v.iter_mut().iter_string(DEFAULT_FORMAT_RULE);
+        assert_eq!("[1, 2, 3]", res);
+    }
+
+    #[test]
+    fn test_stable_iter_take_while() {
+        let v = [1, 2, 3, 4, 5];
+        let res = v
+            .iter()
+            .take_while(|&&x| x < 4)
+            .iter_string(DEFAULT_FORMAT_RULE);
+        assert_eq!("[1, 2, 3]", res);
+    }
+
+    #[test]
+    fn test_stable_iter_skip_while() {
+        let v = [1, 2, 3, 4, 5];
+        let res = v
+            .iter()
+            .skip_while(|&&x| x < 3)
+            .iter_string(DEFAULT_FORMAT_RULE);
+        assert_eq!("[3, 4, 5]", res);
+    }
+
+    #[test]
+    fn test_stable_iter_cloned() {
+        let v = [1, 2, 3];
+        let res = v.iter().cloned().iter_string(DEFAULT_FORMAT_RULE);
+        assert_eq!("[1, 2, 3]", res);
+    }
+
+    #[test]
+    fn test_stable_iter_copied() {
+        let v = [1, 2, 3];
+        let res = v.iter().copied().iter_string(DEFAULT_FORMAT_RULE);
+        assert_eq!("[1, 2, 3]", res);
+    }
+
+    #[test]
+    fn test_stable_iter_flat_map() {
+        let v = [1, 2];
+        let res = v
+            .iter()
+            .flat_map(|&x| [x, x * 10].into_iter())
+            .iter_string(DEFAULT_FORMAT_RULE);
+        assert_eq!("[1, 10, 2, 20]", res);
+    }
+
+    #[test]
+    fn test_stable_iter_flatten() {
+        let v = [[1, 2], [3, 4]];
+        let res = v.iter().flatten().iter_string(DEFAULT_FORMAT_RULE);
+        assert_eq!("[1, 2, 3, 4]", res);
+    }
+
+    #[test]
+    fn test_stable_iter_fuse() {
+        let v = [1, 2, 3];
+        let res = v.iter().fuse().iter_string(DEFAULT_FORMAT_RULE);
+        assert_eq!("[1, 2, 3]", res);
+    }
+
+    #[test]
+    fn test_stable_iter_peekable() {
+        let v = [1, 2, 3];
+        let res = v.iter().peekable().iter_string(DEFAULT_FORMAT_RULE);
+        assert_eq!("[1, 2, 3]", res);
+    }
+
+    #[test]
+    fn test_stable_iter_step_by() {
+        let v = [1, 2, 3, 4, 5];
+        let res = v.iter().step_by(2).iter_string(DEFAULT_FORMAT_RULE);
+        assert_eq!("[1, 3, 5]", res);
+    }
+
+    #[test]
+    fn test_stable_iter_cycle() {
+        let v = [1, 2];
+        let res = v.iter().cycle().take(5).iter_string(DEFAULT_FORMAT_RULE);
+        assert_eq!("[1, 2, 1, 2, 1]", res);
+    }
+
+    #[test]
+    fn test_stable_iter_rev() {
+        let v = [1, 2, 3];
+        let res = v.iter().rev().iter_string(DEFAULT_FORMAT_RULE);
+        assert_eq!("[3, 2, 1]", res);
+    }
+
+    #[test]
+    fn test_stable_iter_once() {
+        let res = core::iter::once(42).iter_string(DEFAULT_FORMAT_RULE);
+        assert_eq!("[42]", res);
+    }
+
+    #[test]
+    fn test_stable_iter_empty() {
+        let res = core::iter::empty::<i32>().iter_string(DEFAULT_FORMAT_RULE);
+        assert_eq!("", res);
+    }
+
+    #[test]
+    fn test_stable_iter_repeat() {
+        let res = core::iter::repeat(7)
+            .take(3)
+            .iter_string(DEFAULT_FORMAT_RULE);
+        assert_eq!("[7, 7, 7]", res);
+    }
+
+    #[test]
+    fn test_stable_iter_repeat_with() {
+        let mut count = 0;
+        let res = core::iter::repeat_with(|| {
+            count += 1;
+            count
+        })
+        .take(3)
+        .iter_string(DEFAULT_FORMAT_RULE);
+        assert_eq!("[1, 2, 3]", res);
+    }
+
+    #[test]
+    fn test_stable_iter_inspect() {
+        let v = [1, 2, 3];
+        let mut sum = 0;
+        let res = v
+            .iter()
+            .inspect(|&&x| sum += x)
+            .iter_string(DEFAULT_FORMAT_RULE);
+        assert_eq!("[1, 2, 3]", res);
+        assert_eq!(6, sum);
+    }
+
+    #[test]
+    fn test_stable_iter_scan() {
+        let v = [1, 2, 3];
+        let res = v
+            .iter()
+            .scan(0, |state, &x| {
+                *state += x;
+                Some(*state)
+            })
+            .iter_string(DEFAULT_FORMAT_RULE);
+        assert_eq!("[1, 3, 6]", res);
+    }
+
+    // --- Покрытие для dyn_async итераторов ---
+    #[cfg(feature = "dyn_async")]
+    mod dyn_async_coverage {
+        use super::*;
+        use alloc::boxed::Box;
+        use core::future::Future;
+
+        fn block_on_dyn<'a, T>(fut: Box<dyn Future<Output = T> + 'a>) -> T {
+            let mut pin_future = Box::into_pin(fut);
+            let mut fut = pin_future.as_mut();
+            let waker = unsafe { core::task::Waker::from_raw(noop_raw_waker()) };
+            let mut cx = core::task::Context::from_waker(&waker);
+            loop {
+                if let core::task::Poll::Ready(val) = fut.as_mut().poll(&mut cx) {
+                    return val;
+                }
+                core::hint::spin_loop();
+            }
+        }
+
+        fn noop_raw_waker() -> core::task::RawWaker {
+            fn no_op(_: *const ()) {}
+            fn clone(p: *const ()) -> core::task::RawWaker {
+                core::task::RawWaker::new(p, &VTABLE)
+            }
+            static VTABLE: core::task::RawWakerVTable =
+                core::task::RawWakerVTable::new(clone, no_op, no_op, no_op);
+            core::task::RawWaker::new(core::ptr::null(), &VTABLE)
+        }
+
+        #[test]
+        fn test_dyn_async_iter_fn_send() {
+            let v = vec![1, 2, 3];
+            let rule = |val: &str, idx: usize, len: usize| {
+                let val = val.to_string();
+                async move { format!("[{}]", val) }
+            };
+            let fut = IteratorStringFnAsyncSend::iter_string_async_fn(v.iter(), &rule);
+            let result = block_on_dyn(fut);
+            assert_eq!("[1][2][3]", result);
+        }
+
+        #[test]
+        fn test_dyn_async_iter_fn_mut() {
+            let v = vec![1, 2, 3];
+            let mut counter = 0;
+            let mut rule = |val: &str, idx: usize, len: usize| {
+                counter += 1;
+                let c = counter;
+                let val = val.to_string();
+                async move { format!("{}#{}", val, c) }
+            };
+            let fut = IteratorStringFnMutAsync::iter_string_async_fn_mut(v.iter(), &mut rule);
+            let result = block_on_dyn(fut);
+            assert_eq!("1#12#23#3", result);
+        }
+
+        #[test]
+        fn test_dyn_async_iter_with_state() {
+            let v = vec![1, 2, 3];
+            let mut state = 0;
+            let mut rule = |s: &mut &mut i32, val: &str, idx: usize, len: usize| {
+                **s += 1;
+                let val = val.to_string();
+                let current = **s;
+                async move { format!("{}({})", val, current) }
+            };
+            let fut = IteratorStringWithStateAsync::iter_string_with_state_async(
+                v.iter(),
+                &mut state,
+                &mut rule,
+            );
+            let result = block_on_dyn(fut);
+            assert_eq!("1(1)2(2)3(3)", result);
+        }
+    }
+
+    // --- Покрытие для impl_async итераторов ---
+    #[cfg(feature = "impl_async")]
+    mod impl_async_coverage {
+        use super::*;
+        use core::future::Future;
+
+        fn block_on_impl<F: Future>(mut fut: F) -> F::Output {
+            let mut fut = unsafe { core::pin::Pin::new_unchecked(&mut fut) };
+            let waker = noop_raw_waker();
+            let mut cx = core::task::Context::from_waker(&waker);
+            loop {
+                if let core::task::Poll::Ready(val) = fut.as_mut().poll(&mut cx) {
+                    return val;
+                }
+                core::hint::spin_loop();
+            }
+        }
+
+        fn noop_raw_waker() -> core::task::Waker {
+            fn no_op(_: *const ()) {}
+            fn clone(p: *const ()) -> core::task::RawWaker {
+                core::task::RawWaker::new(p, &VTABLE)
+            }
+            static VTABLE: core::task::RawWakerVTable =
+                core::task::RawWakerVTable::new(clone, no_op, no_op, no_op);
+            let raw = core::task::RawWaker::new(core::ptr::null(), &VTABLE);
+            unsafe { core::task::Waker::from_raw(raw) }
+        }
+
+        #[test]
+        fn test_impl_async_iter_fn_send() {
+            let v = vec![1, 2, 3];
+            let rule = |val: &str, idx: usize, len: usize| {
+                let val = val.to_string();
+                async move { format!("[{}]", val) }
+            };
+            let fut = IteratorStringFnImplAsyncSend::iter_string_async_fn(v.iter(), &rule);
+            let result = block_on_impl(fut);
+            assert_eq!("[1][2][3]", result);
+        }
+
+        #[test]
+        fn test_impl_async_iter_fn_mut() {
+            let v = vec![1, 2, 3];
+            let mut counter = 0;
+            let mut rule = |val: &str, idx: usize, len: usize| {
+                counter += 1;
+                let c = counter;
+                let val = val.to_string();
+                async move { format!("{}#{}", val, c) }
+            };
+            let result = block_on_impl(IteratorStringFnMutImplAsync::iter_string_async_fn_mut(
+                v.iter(),
+                &mut rule,
+            ));
+            assert_eq!("1#12#23#3", result);
+        }
+
+        #[test]
+        fn test_impl_async_iter_with_state() {
+            let v = vec![1, 2, 3];
+            let mut state = 0;
+            let mut rule = |s: &mut &mut i32, val: &str, idx: usize, len: usize| {
+                **s += 1;
+                let val = val.to_string();
+                let current = **s;
+                async move { format!("{}({})", val, current) }
+            };
+            let result = block_on_impl(
+                IteratorStringWithStateImplAsync::iter_string_with_state_async(
+                    v.iter(),
+                    &mut state,
+                    &mut rule,
+                ),
+            );
+            assert_eq!("1(1)2(2)3(3)", result);
+        }
+    }
+
+    // --- Покрытие для Rayon + dyn_async ---
+    #[cfg(all(feature = "rayon", feature = "dyn_async"))]
+    mod rayon_dyn_async_coverage {
+        use super::*;
+        use alloc::boxed::Box;
+        use core::future::Future;
+        use rayon::prelude::*;
+
+        fn block_on_dyn<'a, T>(fut: Box<dyn Future<Output = T> + 'a>) -> T {
+            let mut pin_future = Box::into_pin(fut);
+            let mut fut = pin_future.as_mut();
+            let waker = unsafe { core::task::Waker::from_raw(noop_raw_waker()) };
+            let mut cx = core::task::Context::from_waker(&waker);
+            loop {
+                if let core::task::Poll::Ready(val) = fut.as_mut().poll(&mut cx) {
+                    return val;
+                }
+                core::hint::spin_loop();
+            }
+        }
+
+        fn noop_raw_waker() -> core::task::RawWaker {
+            fn no_op(_: *const ()) {}
+            fn clone(p: *const ()) -> core::task::RawWaker {
+                core::task::RawWaker::new(p, &VTABLE)
+            }
+            static VTABLE: core::task::RawWakerVTable =
+                core::task::RawWakerVTable::new(clone, no_op, no_op, no_op);
+            core::task::RawWaker::new(core::ptr::null(), &VTABLE)
+        }
+
+        #[test]
+        fn test_rayon_dyn_async_fn_ptr() {
+            let v = vec![1, 2, 3];
+            fn my_fmt(val: &str, idx: usize, len: usize) -> String {
+                let val = val.to_string();
+                format!("[{}]", val)
+            }
+            let result = block_on_dyn(ParIteratorStringFnPtrAsync::par_iter_string_async_fn_ptr(
+                v.par_iter(),
+                my_fmt,
+            ));
+            assert_eq!("[1][2][3]", result);
+        }
+    }
+
+    // --- Покрытие для Rayon + impl_async ---
+    #[cfg(all(feature = "rayon", feature = "impl_async"))]
+    mod rayon_impl_async_coverage {
+        use super::*;
+        use core::future::Future;
+        use rayon::prelude::*;
+
+        fn block_on_impl<F: Future>(mut fut: F) -> F::Output {
+            let mut fut = unsafe { core::pin::Pin::new_unchecked(&mut fut) };
+            let waker = noop_raw_waker();
+            let mut cx = core::task::Context::from_waker(&waker);
+            loop {
+                if let core::task::Poll::Ready(val) = fut.as_mut().poll(&mut cx) {
+                    return val;
+                }
+                core::hint::spin_loop();
+            }
+        }
+
+        fn noop_raw_waker() -> core::task::Waker {
+            fn no_op(_: *const ()) {}
+            fn clone(p: *const ()) -> core::task::RawWaker {
+                core::task::RawWaker::new(p, &VTABLE)
+            }
+            static VTABLE: core::task::RawWakerVTable =
+                core::task::RawWakerVTable::new(clone, no_op, no_op, no_op);
+            let raw = core::task::RawWaker::new(core::ptr::null(), &VTABLE);
+            unsafe { core::task::Waker::from_raw(raw) }
+        }
+
+        #[test]
+        fn test_rayon_impl_async_fn() {
+            let v = vec![1, 2, 3];
+            let fmt = |value: &str, index: usize, length: usize| {
+                let value = value.to_string();
+                async move { format!("[{}]", value) }
+            };
+            let result = block_on_impl(ParIteratorStringFnImplAsync::par_iter_string_async_fn(
+                v.par_iter(),
+                &fmt,
+            ));
+            assert_eq!("[1][2][3]", result);
+        }
+
+        #[test]
+        fn test_rayon_impl_async_fn_send() {
+            let v = vec![1, 2, 3];
+            let fmt = |value: &str, index: usize, length: usize| {
+                let value = value.to_string();
+                async move { format!("[{}]", value) }
+            };
+            let result = block_on_impl(ParIteratorStringFnImplAsyncSend::par_iter_string_async_fn(
+                v.par_iter(),
+                &fmt,
+            ));
+            assert_eq!("[1][2][3]", result);
+        }
+
+        #[test]
+        fn test_rayon_impl_async_fn_ptr() {
+            let v = vec![1, 2, 3];
+            fn my_fmt(
+                val: &str,
+                idx: usize,
+                len: usize,
+            ) -> impl core::future::Future<Output = String> {
+                let val = val.to_string();
+                async move { format!("[{}]", val) }
+            }
+            let result = block_on_impl(
+                ParIteratorStringFnPtrImplAsync::par_iter_string_async_fn_ptr(v.par_iter(), my_fmt),
+            );
+            assert_eq!("[1][2][3]", result);
+        }
+    }
+}

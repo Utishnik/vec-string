@@ -5926,7 +5926,7 @@ mod additional_tests {
         let v = vec![1, 2, 3];
         let mut state = 0;
         let rule = |s: &mut &mut i32, val: &str, idx: usize, len: usize| {
-            *s += 1;
+            **s += 1;
             format!("{}#{}", val, s)
         };
         assert_eq!(
@@ -6300,7 +6300,7 @@ mod additional_tests {
             let v = vec![1, 2, 3];
             let mut state = 0;
             let rule = |s: &mut &mut i32, val: &str, idx: usize, len: usize| {
-                *s += 1;
+                **s += 1;
                 format!("{}#{}", val, s)
             };
             assert_eq!(
@@ -6348,7 +6348,7 @@ mod additional_tests {
             let v = vec![1, 2, 3];
             let mut state = 100;
             let mut rule = |s: &mut &mut i32, val: &str, idx: usize, len: usize| {
-                *s += 10;
+                **s += 10;
                 format!("{}+{}", val, s)
             };
             assert_eq!(
@@ -6413,7 +6413,8 @@ mod additional_tests {
                 let val = val.to_string();
                 async move { format!("[{}]", val) }
             };
-            let result = block_on_dyn(v.vec_string_async_fn(&rule));
+            let fut = VecStringFnAsync::vec_string_async_fn(&v, &rule);
+            let result = block_on_dyn(fut);
             assert_eq!("[1][2][3]", result);
         }
 
@@ -6421,13 +6422,14 @@ mod additional_tests {
         fn test_vec_string_fn_mut_async_basic() {
             let v = vec![1, 2, 3];
             let mut counter = 0;
-            let rule = |val: &str, idx: usize, len: usize| {
+            let mut rule = |val: &str, idx: usize, len: usize| {
                 counter += 1;
                 let c = counter;
                 let val = val.to_string();
                 async move { format!("{}#{}", val, c) }
             };
-            let result = block_on_dyn(v.vec_string_async_fn_mut(&mut rule));
+            let fut = VecStringFnMutImplAsyncSend::vec_string_async_fn_mut(&v, &mut rule);
+            let result = block_on_dyn(Box::new(fut));
             assert_eq!("1#12#23#3", result);
         }
 
@@ -6435,13 +6437,15 @@ mod additional_tests {
         fn test_vec_string_with_state_async_basic() {
             let v = vec![1, 2, 3];
             let mut state = 0;
-            let rule = |s: &mut i32, val: &str, idx: usize, len: usize| {
-                *s += 1;
+            let mut rule = |s: &mut &mut i32, val: &str, idx: usize, len: usize| {
+                **s += 1;
                 let val = val.to_string();
-                let current = *s;
+                let current = **s;
                 async move { format!("{}({})", val, current) }
             };
-            let result = block_on_dyn(v.vec_string_with_state_async(&mut state, &mut rule));
+            let fut =
+                VecStringWithStateImplAsync::vec_string_with_state_async(&v, &mut state, &mut rule);
+            let result = block_on_dyn(Box::new(fut));
             assert_eq!("1(1)2(2)3(3)", result);
         }
     }
@@ -6481,7 +6485,8 @@ mod additional_tests {
                 let val = val.to_string();
                 async move { format!("[{}]", val) }
             };
-            let result = block_on_impl(v.vec_string_async_fn(&rule));
+            let fut = VecStringFnImplAsyncSend::vec_string_async_fn(&v, &rule);
+            let result = block_on_impl(fut);
             assert_eq!("[1][2][3]", result);
         }
 
@@ -6495,8 +6500,10 @@ mod additional_tests {
                 let val = val.to_string();
                 async move { format!("{}#{}", val, c) }
             };
-            
-            let result = block_on_impl(VecStringFnMutImplAsync::vec_string_async_fn_mut(&v, &mut rule));
+
+            let result = block_on_impl(VecStringFnMutImplAsync::vec_string_async_fn_mut(
+                &v, &mut rule,
+            ));
             assert_eq!("1#12#23#3", result);
         }
 
@@ -6522,7 +6529,7 @@ mod additional_tests {
     // ========================================================================
     #[test]
     fn test_custom_format_rule_csv() {
-        let v = vec![1, 2, 3];
+        let v = [1, 2, 3];
         let rule = |val: &str, idx: usize, len: usize| {
             if idx == len - 1 {
                 val.to_string()
@@ -6535,7 +6542,7 @@ mod additional_tests {
 
     #[test]
     fn test_custom_format_rule_json_array() {
-        let v = vec!["a", "b", "c"];
+        let v = ["a", "b", "c"];
         let rule = |val: &str, idx: usize, len: usize| {
             if len == 0 {
                 return String::new();
@@ -6558,7 +6565,7 @@ mod additional_tests {
 
     #[test]
     fn test_custom_format_rule_numbered() {
-        let v = vec!["x", "y", "z"];
+        let v = ["x", "y", "z"];
         let rule = |val: &str, idx: usize, len: usize| format!("{}. {} ", idx + 1, val);
         assert_eq!("1. x 2. y 3. z ", v.vec_string(rule));
     }
@@ -6568,14 +6575,14 @@ mod additional_tests {
     // ========================================================================
     #[test]
     fn test_iterator_with_map() {
-        let v = vec![1, 2, 3];
+        let v = [1, 2, 3];
         let result = v.iter().map(|x| x * 2).iter_string(DEFAULT_FORMAT_RULE);
         assert_eq!("[2, 4, 6]", result);
     }
 
     #[test]
     fn test_iterator_with_filter() {
-        let v = vec![1, 2, 3, 4, 5, 6];
+        let v = [1, 2, 3, 4, 5, 6];
         let result = v
             .iter()
             .filter(|&&x| x % 2 == 0)
@@ -6585,7 +6592,7 @@ mod additional_tests {
 
     #[test]
     fn test_iterator_with_filter_map() {
-        let v = vec![1, 2, 3, 4, 5];
+        let v = [1, 2, 3, 4, 5];
         let result = v
             .iter()
             .filter_map(|&x| if x % 2 == 0 { Some(x) } else { None })
@@ -6595,7 +6602,7 @@ mod additional_tests {
 
     #[test]
     fn test_iterator_with_enumerate() {
-        let v = vec!["a", "b", "c"];
+        let v = ["a", "b", "c"];
         let result = v
             .iter()
             .enumerate()
@@ -6606,30 +6613,30 @@ mod additional_tests {
 
     #[test]
     fn test_iterator_with_take() {
-        let v = vec![1, 2, 3, 4, 5];
+        let v = [1, 2, 3, 4, 5];
         let result = v.iter().take(3).iter_string(DEFAULT_FORMAT_RULE);
         assert_eq!("[1, 2, 3]", result);
     }
 
     #[test]
     fn test_iterator_with_skip() {
-        let v = vec![1, 2, 3, 4, 5];
+        let v = [1, 2, 3, 4, 5];
         let result = v.iter().skip(2).iter_string(DEFAULT_FORMAT_RULE);
         assert_eq!("[3, 4, 5]", result);
     }
 
     #[test]
     fn test_iterator_with_chain() {
-        let v1 = vec![1, 2];
-        let v2 = vec![3, 4];
+        let v1 = [1, 2];
+        let v2 = [3, 4];
         let result = v1.iter().chain(v2.iter()).iter_string(DEFAULT_FORMAT_RULE);
         assert_eq!("[1, 2, 3, 4]", result);
     }
 
     #[test]
     fn test_iterator_with_zip() {
-        let v1 = vec![1, 2, 3];
-        let v2 = vec!["a", "b", "c"];
+        let v1 = [1, 2, 3];
+        let v2 = ["a", "b", "c"];
         let result = v1
             .iter()
             .zip(v2.iter())
@@ -6674,14 +6681,14 @@ mod additional_tests {
 
     #[test]
     fn test_stable_iter_map() {
-        let v = vec![1, 2, 3];
+        let v = [1, 2, 3];
         fn assert_stable<I: StableIter>(_: &I) {}
         assert_stable(&v.iter().map(|x| x));
     }
 
     #[test]
     fn test_stable_iter_filter() {
-        let v = vec![1, 2, 3];
+        let v = [1, 2, 3];
         fn assert_stable<I: StableIter>(_: &I) {}
         assert_stable(&v.iter().filter(|&&x| x > 1));
     }
@@ -6698,16 +6705,16 @@ mod additional_tests {
 
     #[test]
     fn test_extended_display_iter() {
-        let v = vec![1, 2, 3];
+        let v = [1, 2, 3];
         fn assert_extended<T: ExtendedDisplay>(_: &T) {}
         assert_extended(&v.iter());
     }
 
     #[test]
     fn test_extended_display_map_iter() {
-        let v = vec![1, 2, 3];
+        let v = [1, 2, 3];
         fn assert_extended<T: ExtendedDisplay>(_: &T) {}
-        assert_extended(&v.iter().map(|x| x));
+        assert_extended(&v.iter());
     }
 
     // ========================================================================
@@ -6792,7 +6799,7 @@ mod additional_tests {
     // ========================================================================
     #[test]
     fn test_nested_format_rules() {
-        let v = vec![vec![1, 2], vec![3, 4]];
+        let v = [vec![1, 2], vec![3, 4]];
         let inner_rule = |val: &str, idx: usize, len: usize| {
             if idx == len - 1 {
                 val.to_string()
@@ -6816,7 +6823,7 @@ mod additional_tests {
 
     #[test]
     fn test_chained_operations() {
-        let v = vec![1, 2, 3, 4, 5, 6];
+        let v = [1, 2, 3, 4, 5, 6];
         let result = v
             .iter()
             .filter(|&&x| x % 2 == 0)
@@ -6827,7 +6834,7 @@ mod additional_tests {
 
     #[test]
     fn test_multiple_stateful_operations() {
-        let v = vec![1, 2, 3];
+        let v = [1, 2, 3];
         let mut sum = 0;
         let rule = |s: &mut &mut i32, val: &str, idx: usize, len: usize| {
             let num: i32 = val.parse().unwrap_or(0);

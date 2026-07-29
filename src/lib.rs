@@ -5658,3 +5658,1188 @@ mod tests {
         assert_eq!(col_res, exact_res);
     }
 }
+
+#[cfg(test)]
+mod additional_tests {
+    use super::*;
+    use alloc::format;
+    use alloc::string::String;
+    use alloc::vec;
+
+    // ========================================================================
+    // Edge Cases
+    // ========================================================================
+    #[test]
+    fn test_empty_vec() {
+        let v: Vec<i32> = vec![];
+        assert_eq!("", v.vec_string(DEFAULT_FORMAT_RULE));
+        assert_eq!("", v.vec_string_fn(DEFAULT_FORMAT_RULE));
+        assert_eq!("", v.vec_string_fn_mut(DEFAULT_FORMAT_RULE));
+    }
+
+    #[test]
+    fn test_single_element_vec() {
+        let v = vec![42];
+        assert_eq!("[42]", v.vec_string(DEFAULT_FORMAT_RULE));
+    }
+
+    #[test]
+    fn test_large_vec() {
+        let v: Vec<i32> = (0..100).collect();
+        let result = v.vec_string(DEFAULT_FORMAT_RULE);
+        assert!(result.starts_with("[0, 1, 2"));
+        assert!(result.ends_with(", 99]"));
+    }
+
+    #[test]
+    fn test_two_elements_vec() {
+        let v = vec![1, 2];
+        assert_eq!("[1, 2]", v.vec_string(DEFAULT_FORMAT_RULE));
+    }
+
+    // ========================================================================
+    // VecStringWithState Tests
+    // ========================================================================
+    #[test]
+    fn test_vec_string_with_state_basic() {
+        let v = vec![1, 2, 3];
+        let mut counter = 0;
+        let result = v.vec_string_with_state(&mut counter, |state, val, idx, len| {
+            **state += 1;
+            format!("{}({})", val, state)
+        });
+        assert_eq!(result, "1(1)2(2)3(3)");
+    }
+
+    #[test]
+    fn test_vec_string_with_state_fn_basic() {
+        let v = vec![1, 2, 3];
+        let prefix = "item";
+        let result = v.vec_string_with_state_fn(&prefix, |state, val, idx, len| {
+            format!("{}: {}", state, val)
+        });
+        assert_eq!(result, "item: 1item: 2item: 3");
+    }
+
+    #[test]
+    fn test_vec_string_with_state_fn_ptr_basic() {
+        fn my_rule(state: &String, val: &str, idx: usize, len: usize) -> String {
+            format!("{}={}", state, val)
+        }
+        let v = vec![1, 2, 3];
+        let prefix = "val".to_string();
+        let result = v.vec_string_with_state_fn_ptr(&prefix, my_rule);
+        assert_eq!(result, "val=1val=2val=3");
+    }
+
+    // ========================================================================
+    // Rule Owned Tests
+    // ========================================================================
+    #[test]
+    fn test_vec_string_rule_owned_basic() {
+        let v = vec![1, 2, 3];
+        let rule = |val: &str, idx: usize, len: usize| format!("[{}]", val);
+        assert_eq!("[1][2][3]", v.vec_string_rule_owned(rule));
+    }
+
+    #[test]
+    fn test_vec_string_mut_rule_owned_basic() {
+        let v = vec![1, 2, 3];
+        let mut counter = 0;
+        let rule = |val: &str, idx: usize, len: usize| {
+            counter += 1;
+            format!("{}#{}", val, counter)
+        };
+        assert_eq!("1#12#23#3", v.vec_string_mut_rule_owned(rule));
+    }
+
+    #[test]
+    fn test_vec_string_with_state_rule_owned_basic() {
+        let v = vec![1, 2, 3];
+        let state = "prefix";
+        let rule = |s: &&str, val: &str, idx: usize, len: usize| format!("{}:{}", s, val);
+        assert_eq!(
+            "prefix:1prefix:2prefix:3",
+            v.vec_string_with_state_rule_owned(&state, rule)
+        );
+    }
+
+    #[test]
+    fn test_vec_string_with_state_mut_rule_owned_basic() {
+        let v = vec![1, 2, 3];
+        let mut state = 0;
+        let rule = |s: &mut &mut i32, val: &str, idx: usize, len: usize| {
+            **s += 1;
+            format!("{}#{}", val, s)
+        };
+        assert_eq!(
+            "1#12#23#3",
+            v.vec_string_with_state_mut_rule_owned(&mut state, rule)
+        );
+    }
+
+    // ========================================================================
+    // Rule Ref Tests
+    // ========================================================================
+    #[test]
+    fn test_vec_string_rule_ref_basic() {
+        let v = vec![1, 2, 3];
+        let rule = |val: &str, idx: usize, len: usize| format!("({})", val);
+        assert_eq!("(1)(2)(3)", v.vec_string_rule_ref(&rule));
+    }
+
+    #[test]
+    fn test_vec_string_mut_rule_ref_basic() {
+        let v = vec![1, 2, 3];
+        let mut counter = 0;
+        let mut rule = |val: &str, idx: usize, len: usize| {
+            counter += 1;
+            format!("{}[{}]", val, counter)
+        };
+        assert_eq!("1[1]2[2]3[3]", v.vec_string_mut_rule_ref(&mut rule));
+    }
+
+    #[test]
+    fn test_vec_string_with_state_rule_ref_basic() {
+        let v = vec![1, 2, 3];
+        let state = "key";
+        let rule = |s: &&str, val: &str, idx: usize, len: usize| format!("{}={}", s, val);
+        assert_eq!(
+            "key=1key=2key=3",
+            v.vec_string_with_state_rule_ref(&state, &rule)
+        );
+    }
+
+    #[test]
+    fn test_vec_string_with_state_mut_rule_ref_basic() {
+        let v = vec![1, 2, 3];
+        let mut state = 100;
+        let mut rule = |s: &mut &mut i32, val: &str, idx: usize, len: usize| {
+            **s += 10;
+            format!("{}+{}", val, s)
+        };
+        assert_eq!(
+            "1+1102+1203+130",
+            v.vec_string_with_state_mut_rule_ref(&mut state, &mut rule)
+        );
+    }
+
+    // ========================================================================
+    // Iterator Tests
+    // ========================================================================
+    #[test]
+    fn test_iterator_string_basic() {
+        let v = vec![1, 2, 3];
+        assert_eq!("[1, 2, 3]", v.iter().iter_string(DEFAULT_FORMAT_RULE));
+    }
+
+    #[test]
+    fn test_iterator_string_fn_basic() {
+        let v = vec![1, 2, 3];
+        let rule = |val: &str, idx: usize, len: usize| format!("{{{}}}", val);
+        assert_eq!("{1}{2}{3}", v.iter().iter_string_fn(rule));
+    }
+
+    #[test]
+    fn test_iterator_string_fn_mut_basic() {
+        let v = vec![1, 2, 3];
+        let mut counter = 0;
+        let rule = |val: &str, idx: usize, len: usize| {
+            counter += 1;
+            format!("{}#{}", val, counter)
+        };
+        assert_eq!("1#12#23#3", v.iter().iter_string_fn_mut(rule));
+    }
+
+    #[test]
+    fn test_iterator_string_with_state_basic() {
+        let v = vec![1, 2, 3];
+        let mut state = 0;
+        let rule = |s: &mut &mut i32, val: &str, idx: usize, len: usize| {
+            **s += 1;
+            format!("{}({})", val, s)
+        };
+        assert_eq!(
+            "1(1)2(2)3(3)",
+            v.iter().iter_string_with_state(&mut state, rule)
+        );
+    }
+
+    #[test]
+    fn test_iterator_string_with_state_fn_basic() {
+        let v = vec![1, 2, 3];
+        let prefix = "item";
+        let rule = |s: &&str, val: &str, idx: usize, len: usize| format!("{}: {}", s, val);
+        assert_eq!(
+            "item: 1item: 2item: 3",
+            v.iter().iter_string_with_state_fn(&prefix, rule)
+        );
+    }
+
+    #[test]
+    fn test_iterator_string_with_state_fn_ptr_basic() {
+        fn my_rule(state: &String, val: &str, idx: usize, len: usize) -> String {
+            format!("{}={}", state, val)
+        }
+        let v = vec![1, 2, 3];
+        let prefix = "val".to_string();
+        assert_eq!(
+            "val=1val=2val=3",
+            v.iter().iter_string_with_state_fn_ptr(&prefix, my_rule)
+        );
+    }
+
+    // ========================================================================
+    // Iterator Rule Tests
+    // ========================================================================
+    #[test]
+    fn test_iterator_string_rule_owned_basic() {
+        let v = vec![1, 2, 3];
+        let rule = |val: &str, idx: usize, len: usize| format!("[{}]", val);
+        assert_eq!("[1][2][3]", v.iter().iter_string_rule_owned(rule));
+    }
+
+    #[test]
+    fn test_iterator_string_mut_rule_owned_basic() {
+        let v = vec![1, 2, 3];
+        let mut counter = 0;
+        let rule = |val: &str, idx: usize, len: usize| {
+            counter += 1;
+            format!("{}#{}", val, counter)
+        };
+        assert_eq!("1#12#23#3", v.iter().iter_string_mut_rule_owned(rule));
+    }
+
+    #[test]
+    fn test_iterator_string_with_state_rule_owned_basic() {
+        let v = vec![1, 2, 3];
+        let state = "prefix";
+        let rule = |s: &&str, val: &str, idx: usize, len: usize| format!("{}:{}", s, val);
+        assert_eq!(
+            "prefix:1prefix:2prefix:3",
+            v.iter().iter_string_with_state_rule_owned(&state, rule)
+        );
+    }
+
+    #[test]
+    fn test_iterator_string_with_state_mut_rule_owned_basic() {
+        let v = vec![1, 2, 3];
+        let mut state = 0;
+        let rule = |s: &mut &mut i32, val: &str, idx: usize, len: usize| {
+            *s += 1;
+            format!("{}#{}", val, s)
+        };
+        assert_eq!(
+            "1#12#23#3",
+            v.iter()
+                .iter_string_with_state_mut_rule_owned(&mut state, rule)
+        );
+    }
+
+    #[test]
+    fn test_iterator_string_rule_ref_basic() {
+        let v = vec![1, 2, 3];
+        let rule = |val: &str, idx: usize, len: usize| format!("({})", val);
+        assert_eq!("(1)(2)(3)", v.iter().iter_string_rule_ref(&rule));
+    }
+
+    #[test]
+    fn test_iterator_string_mut_rule_ref_basic() {
+        let v = vec![1, 2, 3];
+        let mut counter = 0;
+        let mut rule = |val: &str, idx: usize, len: usize| {
+            counter += 1;
+            format!("{}[{}]", val, counter)
+        };
+        assert_eq!("1[1]2[2]3[3]", v.iter().iter_string_mut_rule_ref(&mut rule));
+    }
+
+    #[test]
+    fn test_iterator_string_with_state_rule_ref_basic() {
+        let v = vec![1, 2, 3];
+        let state = "key";
+        let rule = |s: &&str, val: &str, idx: usize, len: usize| format!("{}={}", s, val);
+        assert_eq!(
+            "key=1key=2key=3",
+            v.iter().iter_string_with_state_rule_ref(&state, &rule)
+        );
+    }
+
+    #[test]
+    fn test_iterator_string_with_state_mut_rule_ref_basic() {
+        let v = vec![1, 2, 3];
+        let mut state = 100;
+        let mut rule = |s: &mut &mut i32, val: &str, idx: usize, len: usize| {
+            **s += 10;
+            format!("{}+{}", val, s)
+        };
+        assert_eq!(
+            "1+1102+1203+130",
+            v.iter()
+                .iter_string_with_state_mut_rule_ref(&mut state, &mut rule)
+        );
+    }
+
+    // ========================================================================
+    // ExactSizeIterator Tests
+    // ========================================================================
+    #[test]
+    fn test_iterator_string_exact_basic() {
+        let v = vec![1, 2, 3];
+        assert_eq!("[1, 2, 3]", v.iter().iter_string_exact(DEFAULT_FORMAT_RULE));
+    }
+
+    #[test]
+    fn test_iterator_string_fn_exact_basic() {
+        let v = vec![1, 2, 3];
+        let rule = |val: &str, idx: usize, len: usize| format!("{{{}}}", val);
+        assert_eq!("{1}{2}{3}", v.iter().iter_string_fn_exact(rule));
+    }
+
+    #[test]
+    fn test_iterator_string_fn_mut_exact_basic() {
+        let v = vec![1, 2, 3];
+        let mut counter = 0;
+        let rule = |val: &str, idx: usize, len: usize| {
+            counter += 1;
+            format!("{}#{}", val, counter)
+        };
+        assert_eq!("1#12#23#3", v.iter().iter_string_fn_mut_exact(rule));
+    }
+
+    #[test]
+    fn test_iterator_string_with_state_exact_basic() {
+        let v = vec![1, 2, 3];
+        let mut state = 0;
+        let rule = |s: &mut &mut i32, val: &str, idx: usize, len: usize| {
+            **s += 1;
+            format!("{}({})", val, s)
+        };
+        assert_eq!(
+            "1(1)2(2)3(3)",
+            v.iter().iter_string_with_state_exact(&mut state, rule)
+        );
+    }
+
+    #[test]
+    fn test_iterator_string_with_state_fn_exact_basic() {
+        let v = vec![1, 2, 3];
+        let prefix = "item";
+        let rule = |s: &&str, val: &str, idx: usize, len: usize| format!("{}: {}", s, val);
+        assert_eq!(
+            "item: 1item: 2item: 3",
+            v.iter().iter_string_with_state_fn_exact(&prefix, rule)
+        );
+    }
+
+    #[test]
+    fn test_iterator_string_with_state_fn_ptr_exact_basic() {
+        fn my_rule(state: &String, val: &str, idx: usize, len: usize) -> String {
+            format!("{}={}", state, val)
+        }
+        let v = vec![1, 2, 3];
+        let prefix = "val".to_string();
+        assert_eq!(
+            "val=1val=2val=3",
+            v.iter()
+                .iter_string_with_state_fn_ptr_exact(&prefix, my_rule)
+        );
+    }
+
+    #[test]
+    fn test_iterator_string_rule_owned_exact_basic() {
+        let v = vec![1, 2, 3];
+        let rule = |val: &str, idx: usize, len: usize| format!("[{}]", val);
+        assert_eq!("[1][2][3]", v.iter().iter_string_rule_owned_exact(rule));
+    }
+
+    #[test]
+    fn test_iterator_string_mut_rule_owned_exact_basic() {
+        let v = vec![1, 2, 3];
+        let mut counter = 0;
+        let rule = |val: &str, idx: usize, len: usize| {
+            counter += 1;
+            format!("{}#{}", val, counter)
+        };
+        assert_eq!("1#12#23#3", v.iter().iter_string_mut_rule_owned_exact(rule));
+    }
+
+    #[test]
+    fn test_iterator_string_with_state_rule_owned_exact_basic() {
+        let v = vec![1, 2, 3];
+        let state = "prefix";
+        let rule = |s: &&str, val: &str, idx: usize, len: usize| format!("{}:{}", s, val);
+        assert_eq!(
+            "prefix:1prefix:2prefix:3",
+            v.iter()
+                .iter_string_with_state_rule_owned_exact(&state, rule)
+        );
+    }
+
+    #[test]
+    fn test_iterator_string_with_state_mut_rule_owned_exact_basic() {
+        let v = vec![1, 2, 3];
+        let mut state = 0;
+        let rule = |s: &mut &mut i32, val: &str, idx: usize, len: usize| {
+            **s += 1;
+            format!("{}#{}", val, s)
+        };
+        assert_eq!(
+            "1#12#23#3",
+            v.iter()
+                .iter_string_with_state_mut_rule_owned_exact(&mut state, rule)
+        );
+    }
+
+    #[test]
+    fn test_iterator_string_rule_ref_exact_basic() {
+        let v = vec![1, 2, 3];
+        let rule = |val: &str, idx: usize, len: usize| format!("({})", val);
+        assert_eq!("(1)(2)(3)", v.iter().iter_string_rule_ref_exact(&rule));
+    }
+
+    #[test]
+    fn test_iterator_string_mut_rule_ref_exact_basic() {
+        let v = vec![1, 2, 3];
+        let mut counter = 0;
+        let mut rule = |val: &str, idx: usize, len: usize| {
+            counter += 1;
+            format!("{}[{}]", val, counter)
+        };
+        assert_eq!(
+            "1[1]2[2]3[3]",
+            v.iter().iter_string_mut_rule_ref_exact(&mut rule)
+        );
+    }
+
+    #[test]
+    fn test_iterator_string_with_state_rule_ref_exact_basic() {
+        let v = vec![1, 2, 3];
+        let state = "key";
+        let rule = |s: &&str, val: &str, idx: usize, len: usize| format!("{}={}", s, val);
+        assert_eq!(
+            "key=1key=2key=3",
+            v.iter()
+                .iter_string_with_state_rule_ref_exact(&state, &rule)
+        );
+    }
+
+    #[test]
+    fn test_iterator_string_with_state_mut_rule_ref_exact_basic() {
+        let v = vec![1, 2, 3];
+        let mut state = 100;
+        let mut rule = |s: &mut &mut i32, val: &str, idx: usize, len: usize| {
+            **s += 10;
+            format!("{}+{}", val, s)
+        };
+        assert_eq!(
+            "1+1102+1203+130",
+            v.iter()
+                .iter_string_with_state_mut_rule_ref_exact(&mut state, &mut rule)
+        );
+    }
+
+    // ========================================================================
+    // Display Trait Tests
+    // ========================================================================
+    struct DisplayWrapper<'a, T>(&'a Vec<T>);
+
+    impl<'a, T: core::fmt::Display> core::fmt::Display for DisplayWrapper<'a, T> {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+            DisplayVecString::fmt(self.0, f, DEFAULT_FORMAT_RULE)
+        }
+    }
+
+    #[test]
+    fn test_display_vec_string() {
+        let v = vec![1, 2, 3];
+        let wrapper = DisplayWrapper(&v);
+        assert_eq!("[1, 2, 3]", format!("{}", wrapper));
+    }
+
+    struct DisplayFnWrapper<'a, T, F>(&'a Vec<T>, F)
+    where
+        F: Fn(&str, usize, usize) -> String;
+
+    impl<'a, T: core::fmt::Display, F: Fn(&str, usize, usize) -> String> core::fmt::Display
+        for DisplayFnWrapper<'a, T, F>
+    {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+            DisplayVecStringFn::fmt(self.0, f, &self.1)
+        }
+    }
+
+    #[test]
+    fn test_display_vec_string_fn() {
+        let v = vec![1, 2, 3];
+        let rule = |val: &str, idx: usize, len: usize| format!("{{{}}}", val);
+        let wrapper = DisplayFnWrapper(&v, rule);
+        assert_eq!("{1}{2}{3}", format!("{}", wrapper));
+    }
+
+    // ========================================================================
+    // Rayon Tests (если feature активен)
+    // ========================================================================
+    #[cfg(feature = "rayon")]
+    mod rayon_tests {
+        use super::*;
+        use rayon::prelude::*;
+
+        #[test]
+        fn test_par_iter_string_basic() {
+            let v = vec![1, 2, 3];
+            assert_eq!(
+                "[1, 2, 3]",
+                v.par_iter().par_iter_string(DEFAULT_FORMAT_RULE)
+            );
+        }
+
+        #[test]
+        fn test_par_iter_string_fn_basic() {
+            let v = vec![1, 2, 3];
+            let rule = |val: &str, idx: usize, len: usize| format!("{{{}}}", val);
+            assert_eq!("{1}{2}{3}", v.par_iter().par_iter_string_fn(rule));
+        }
+
+        #[test]
+        fn test_par_iter_string_fn_mut_basic() {
+            let v = vec![1, 2, 3];
+            let mut counter = 0;
+            let rule = |val: &str, idx: usize, len: usize| {
+                counter += 1;
+                format!("{}#{}", val, counter)
+            };
+            assert_eq!("1#12#23#3", v.par_iter().par_iter_string_fn_mut(rule));
+        }
+
+        #[test]
+        fn test_par_iter_string_fn_ptr_basic() {
+            fn my_rule(val: &str, idx: usize, len: usize) -> String {
+                format!("[{}]", val)
+            }
+            let v = vec![1, 2, 3];
+            assert_eq!("[1][2][3]", v.par_iter().par_iter_string_fn_ptr(my_rule));
+        }
+
+        #[test]
+        fn test_par_iter_string_with_state_basic() {
+            let v = vec![1, 2, 3];
+            let mut state = 0;
+            let mut i = 0;
+            let rule = |s: &mut &mut i32, val: &str, idx: usize, len: usize| {
+                **s += 1;
+                i += 1;
+                format!("{}({})", val, s)
+            };
+            assert_eq!(
+                "1(1)2(2)3(3)",
+                v.par_iter().par_iter_string_with_state(&mut state, rule)
+            );
+        }
+
+        #[test]
+        fn test_par_iter_string_with_state_fn_basic() {
+            let v = vec![1, 2, 3];
+            let prefix = "item";
+            let rule = |s: &&str, val: &str, idx: usize, len: usize| format!("{}: {}", s, val);
+            assert_eq!(
+                "item: 1item: 2item: 3",
+                v.par_iter().par_iter_string_with_state_fn(&prefix, rule)
+            );
+        }
+
+        #[test]
+        fn test_par_iter_string_with_state_fn_ptr_basic() {
+            fn my_rule(state: &String, val: &str, idx: usize, len: usize) -> String {
+                format!("{}={}", state, val)
+            }
+            let v = vec![1, 2, 3];
+            let prefix = "val".to_string();
+            assert_eq!(
+                "val=1val=2val=3",
+                v.par_iter()
+                    .par_iter_string_with_state_fn_ptr(&prefix, my_rule)
+            );
+        }
+
+        #[test]
+        fn test_par_iter_string_rule_owned_basic() {
+            let v = vec![1, 2, 3];
+            let rule = |val: &str, idx: usize, len: usize| format!("[{}]", val);
+            assert_eq!("[1][2][3]", v.par_iter().par_iter_string_rule_owned(rule));
+        }
+
+        #[test]
+        fn test_par_iter_string_mut_rule_owned_basic() {
+            let v = vec![1, 2, 3];
+            let mut counter = 0;
+            let rule = |val: &str, idx: usize, len: usize| {
+                counter += 1;
+                format!("{}#{}", val, counter)
+            };
+            assert_eq!(
+                "1#12#23#3",
+                v.par_iter().par_iter_string_mut_rule_owned(rule)
+            );
+        }
+
+        #[test]
+        fn test_par_iter_string_with_state_rule_owned_basic() {
+            let v = vec![1, 2, 3];
+            let state = "prefix";
+            let rule = |s: &&str, val: &str, idx: usize, len: usize| format!("{}:{}", s, val);
+            assert_eq!(
+                "prefix:1prefix:2prefix:3",
+                v.par_iter()
+                    .par_iter_string_with_state_rule_owned(&state, rule)
+            );
+        }
+
+        #[test]
+        fn test_par_iter_string_with_state_mut_rule_owned_basic() {
+            let v = vec![1, 2, 3];
+            let mut state = 0;
+            let rule = |s: &mut &mut i32, val: &str, idx: usize, len: usize| {
+                *s += 1;
+                format!("{}#{}", val, s)
+            };
+            assert_eq!(
+                "1#12#23#3",
+                v.par_iter()
+                    .par_iter_string_with_state_mut_rule_owned(&mut state, rule)
+            );
+        }
+
+        #[test]
+        fn test_par_iter_string_rule_ref_basic() {
+            let v = vec![1, 2, 3];
+            let rule = |val: &str, idx: usize, len: usize| format!("({})", val);
+            assert_eq!("(1)(2)(3)", v.par_iter().par_iter_string_rule_ref(&rule));
+        }
+
+        #[test]
+        fn test_par_iter_string_mut_rule_ref_basic() {
+            let v = vec![1, 2, 3];
+            let mut counter = 0;
+            let mut rule = |val: &str, idx: usize, len: usize| {
+                counter += 1;
+                format!("{}[{}]", val, counter)
+            };
+            assert_eq!(
+                "1[1]2[2]3[3]",
+                v.par_iter().par_iter_string_mut_rule_ref(&mut rule)
+            );
+        }
+
+        #[test]
+        fn test_par_iter_string_with_state_rule_ref_basic() {
+            let v = vec![1, 2, 3];
+            let state = "key";
+            let rule = |s: &&str, val: &str, idx: usize, len: usize| format!("{}={}", s, val);
+            assert_eq!(
+                "key=1key=2key=3",
+                v.par_iter()
+                    .par_iter_string_with_state_rule_ref(&state, &rule)
+            );
+        }
+
+        #[test]
+        fn test_par_iter_string_with_state_mut_rule_ref_basic() {
+            let v = vec![1, 2, 3];
+            let mut state = 100;
+            let mut rule = |s: &mut &mut i32, val: &str, idx: usize, len: usize| {
+                *s += 10;
+                format!("{}+{}", val, s)
+            };
+            assert_eq!(
+                "1+1102+1203+130",
+                v.par_iter()
+                    .par_iter_string_with_state_mut_rule_ref(&mut state, &mut rule)
+            );
+        }
+    }
+
+    // ========================================================================
+    // Async Tests (если feature активен)
+    // ========================================================================
+    #[cfg(feature = "dyn_async")]
+    mod dyn_async_tests {
+        use super::*;
+        use alloc::boxed::Box;
+        use core::future::Future;
+
+        #[cfg(any(feature = "dyn_async", feature = "impl_async"))]
+        fn noop_raw_waker() -> core::task::RawWaker {
+            fn no_op(_: *const ()) {}
+            fn clone(p: *const ()) -> core::task::RawWaker {
+                core::task::RawWaker::new(p, &VTABLE)
+            }
+            static VTABLE: core::task::RawWakerVTable =
+                core::task::RawWakerVTable::new(clone, no_op, no_op, no_op);
+            core::task::RawWaker::new(core::ptr::null(), &VTABLE)
+        }
+
+        #[cfg(any(feature = "dyn_async", feature = "impl_async"))]
+        fn block_on<F: core::future::Future>(mut fut: F) -> F::Output {
+            let mut fut = unsafe { core::pin::Pin::new_unchecked(&mut fut) };
+            let waker = unsafe { core::task::Waker::from_raw(noop_raw_waker()) };
+            let mut cx = core::task::Context::from_waker(&waker);
+            loop {
+                if let core::task::Poll::Ready(val) = fut.as_mut().poll(&mut cx) {
+                    return val;
+                }
+                core::hint::spin_loop();
+            }
+        }
+
+        #[cfg(feature = "dyn_async")]
+        fn block_on_dyn<'a, T>(fut: Box<dyn Future<Output = T> + 'a>) -> T {
+            let mut pin_future = Box::into_pin(fut);
+            let mut fut = pin_future.as_mut();
+            let waker = unsafe { core::task::Waker::from_raw(noop_raw_waker()) };
+            let mut cx = core::task::Context::from_waker(&waker);
+            loop {
+                if let core::task::Poll::Ready(val) = fut.as_mut().poll(&mut cx) {
+                    return val;
+                }
+                core::hint::spin_loop();
+            }
+        }
+
+        #[test]
+        fn test_vec_string_fn_async_basic() {
+            let v = vec![1, 2, 3];
+            let rule = |val: &str, idx: usize, len: usize| {
+                let val = val.to_string();
+                async move { format!("[{}]", val) }
+            };
+            let result = block_on_dyn(v.vec_string_async_fn(&rule));
+            assert_eq!("[1][2][3]", result);
+        }
+
+        #[test]
+        fn test_vec_string_fn_mut_async_basic() {
+            let v = vec![1, 2, 3];
+            let mut counter = 0;
+            let rule = |val: &str, idx: usize, len: usize| {
+                counter += 1;
+                let c = counter;
+                let val = val.to_string();
+                async move { format!("{}#{}", val, c) }
+            };
+            let result = block_on_dyn(v.vec_string_async_fn_mut(&mut rule));
+            assert_eq!("1#12#23#3", result);
+        }
+
+        #[test]
+        fn test_vec_string_with_state_async_basic() {
+            let v = vec![1, 2, 3];
+            let mut state = 0;
+            let rule = |s: &mut i32, val: &str, idx: usize, len: usize| {
+                *s += 1;
+                let val = val.to_string();
+                let current = *s;
+                async move { format!("{}({})", val, current) }
+            };
+            let result = block_on_dyn(v.vec_string_with_state_async(&mut state, &mut rule));
+            assert_eq!("1(1)2(2)3(3)", result);
+        }
+    }
+
+    #[cfg(feature = "impl_async")]
+    mod impl_async_tests {
+        use super::*;
+        use core::future::Future;
+
+        fn block_on_impl<F: Future>(mut fut: F) -> F::Output {
+            let mut fut = unsafe { core::pin::Pin::new_unchecked(&mut fut) };
+            let waker = noop_raw_waker();
+            let mut cx = core::task::Context::from_waker(&waker);
+            loop {
+                if let core::task::Poll::Ready(val) = fut.as_mut().poll(&mut cx) {
+                    return val;
+                }
+                core::hint::spin_loop();
+            }
+        }
+
+        fn noop_raw_waker() -> core::task::Waker {
+            fn no_op(_: *const ()) {}
+            fn clone(p: *const ()) -> core::task::RawWaker {
+                core::task::RawWaker::new(p, &VTABLE)
+            }
+            static VTABLE: core::task::RawWakerVTable =
+                core::task::RawWakerVTable::new(clone, no_op, no_op, no_op);
+            let raw = core::task::RawWaker::new(core::ptr::null(), &VTABLE);
+            unsafe { core::task::Waker::from_raw(raw) }
+        }
+
+        #[test]
+        fn test_vec_string_fn_impl_async_basic() {
+            let v = vec![1, 2, 3];
+            let rule = |val: &str, idx: usize, len: usize| {
+                let val = val.to_string();
+                async move { format!("[{}]", val) }
+            };
+            let result = block_on_impl(v.vec_string_async_fn(&rule));
+            assert_eq!("[1][2][3]", result);
+        }
+
+        #[test]
+        fn test_vec_string_fn_mut_impl_async_basic() {
+            let v = vec![1, 2, 3];
+            let mut counter = 0;
+            let mut rule = |val: &str, idx: usize, len: usize| {
+                counter += 1;
+                let c = counter;
+                let val = val.to_string();
+                async move { format!("{}#{}", val, c) }
+            };
+            
+            let result = block_on_impl(VecStringFnMutImplAsync::vec_string_async_fn_mut(&v, &mut rule));
+            assert_eq!("1#12#23#3", result);
+        }
+
+        #[test]
+        fn test_vec_string_with_state_impl_async_basic() {
+            let v = vec![1, 2, 3];
+            let mut state = 0;
+            let mut rule = |s: &mut &mut i32, val: &str, idx: usize, len: usize| {
+                **s += 1;
+                let val = val.to_string();
+                let current = **s;
+                async move { format!("{}({})", val, current) }
+            };
+            let fut =
+                VecStringWithStateImplAsync::vec_string_with_state_async(&v, &mut state, &mut rule);
+            let result = block_on_impl(fut);
+            assert_eq!("1(1)2(2)3(3)", result);
+        }
+    }
+
+    // ========================================================================
+    // Custom Format Rules Tests
+    // ========================================================================
+    #[test]
+    fn test_custom_format_rule_csv() {
+        let v = vec![1, 2, 3];
+        let rule = |val: &str, idx: usize, len: usize| {
+            if idx == len - 1 {
+                val.to_string()
+            } else {
+                format!("{}, ", val)
+            }
+        };
+        assert_eq!("1, 2, 3", v.vec_string(rule));
+    }
+
+    #[test]
+    fn test_custom_format_rule_json_array() {
+        let v = vec!["a", "b", "c"];
+        let rule = |val: &str, idx: usize, len: usize| {
+            if len == 0 {
+                return String::new();
+            }
+            let is_last = idx == len - 1;
+            if idx == 0 {
+                if is_last {
+                    format!("[\"{}\"]", val)
+                } else {
+                    format!("[\"{}\", ", val)
+                }
+            } else if is_last {
+                format!("\"{}\"]", val)
+            } else {
+                format!("\"{}\", ", val)
+            }
+        };
+        assert_eq!("[\"a\", \"b\", \"c\"]", v.vec_string(rule));
+    }
+
+    #[test]
+    fn test_custom_format_rule_numbered() {
+        let v = vec!["x", "y", "z"];
+        let rule = |val: &str, idx: usize, len: usize| format!("{}. {} ", idx + 1, val);
+        assert_eq!("1. x 2. y 3. z ", v.vec_string(rule));
+    }
+
+    // ========================================================================
+    // Iterator Adapter Tests
+    // ========================================================================
+    #[test]
+    fn test_iterator_with_map() {
+        let v = vec![1, 2, 3];
+        let result = v.iter().map(|x| x * 2).iter_string(DEFAULT_FORMAT_RULE);
+        assert_eq!("[2, 4, 6]", result);
+    }
+
+    #[test]
+    fn test_iterator_with_filter() {
+        let v = vec![1, 2, 3, 4, 5, 6];
+        let result = v
+            .iter()
+            .filter(|&&x| x % 2 == 0)
+            .iter_string(DEFAULT_FORMAT_RULE);
+        assert_eq!("[2, 4, 6]", result);
+    }
+
+    #[test]
+    fn test_iterator_with_filter_map() {
+        let v = vec![1, 2, 3, 4, 5];
+        let result = v
+            .iter()
+            .filter_map(|&x| if x % 2 == 0 { Some(x) } else { None })
+            .iter_string(DEFAULT_FORMAT_RULE);
+        assert_eq!("[2, 4]", result);
+    }
+
+    #[test]
+    fn test_iterator_with_enumerate() {
+        let v = vec!["a", "b", "c"];
+        let result = v
+            .iter()
+            .enumerate()
+            .map(|(i, s)| format!("{}:{}", i, s))
+            .iter_string(DEFAULT_FORMAT_RULE);
+        assert_eq!("[0:a, 1:b, 2:c]", result);
+    }
+
+    #[test]
+    fn test_iterator_with_take() {
+        let v = vec![1, 2, 3, 4, 5];
+        let result = v.iter().take(3).iter_string(DEFAULT_FORMAT_RULE);
+        assert_eq!("[1, 2, 3]", result);
+    }
+
+    #[test]
+    fn test_iterator_with_skip() {
+        let v = vec![1, 2, 3, 4, 5];
+        let result = v.iter().skip(2).iter_string(DEFAULT_FORMAT_RULE);
+        assert_eq!("[3, 4, 5]", result);
+    }
+
+    #[test]
+    fn test_iterator_with_chain() {
+        let v1 = vec![1, 2];
+        let v2 = vec![3, 4];
+        let result = v1.iter().chain(v2.iter()).iter_string(DEFAULT_FORMAT_RULE);
+        assert_eq!("[1, 2, 3, 4]", result);
+    }
+
+    #[test]
+    fn test_iterator_with_zip() {
+        let v1 = vec![1, 2, 3];
+        let v2 = vec!["a", "b", "c"];
+        let result = v1
+            .iter()
+            .zip(v2.iter())
+            .map(|(n, s)| format!("{}:{}", n, s))
+            .iter_string(DEFAULT_FORMAT_RULE);
+        assert_eq!("[1:a, 2:b, 3:c]", result);
+    }
+
+    // ========================================================================
+    // IntoIter Tests
+    // ========================================================================
+    #[test]
+    fn test_into_iter() {
+        let v = vec![1, 2, 3];
+        let result = v.into_iter().iter_string(DEFAULT_FORMAT_RULE);
+        assert_eq!("[1, 2, 3]", result);
+    }
+
+    #[test]
+    fn test_array_into_iter() {
+        let arr = [1, 2, 3];
+        let result = arr.into_iter().iter_string(DEFAULT_FORMAT_RULE);
+        assert_eq!("[1, 2, 3]", result);
+    }
+
+    // ========================================================================
+    // StableIter Marker Tests
+    // ========================================================================
+    #[test]
+    fn test_stable_iter_slice_iter() {
+        let v = [1, 2, 3];
+        fn assert_stable<I: StableIter>(_: &I) {}
+        assert_stable(&v.iter());
+    }
+
+    #[test]
+    fn test_stable_iter_vec_into_iter() {
+        let v = vec![1, 2, 3];
+        fn assert_stable<I: StableIter>(_: &I) {}
+        assert_stable(&v.into_iter());
+    }
+
+    #[test]
+    fn test_stable_iter_map() {
+        let v = vec![1, 2, 3];
+        fn assert_stable<I: StableIter>(_: &I) {}
+        assert_stable(&v.iter().map(|x| x));
+    }
+
+    #[test]
+    fn test_stable_iter_filter() {
+        let v = vec![1, 2, 3];
+        fn assert_stable<I: StableIter>(_: &I) {}
+        assert_stable(&v.iter().filter(|&&x| x > 1));
+    }
+
+    // ========================================================================
+    // ExtendedDisplay Tests
+    // ========================================================================
+    #[test]
+    fn test_extended_display_vec() {
+        let v = vec![1, 2, 3];
+        fn assert_extended<T: ExtendedDisplay>(_: &T) {}
+        assert_extended(&v);
+    }
+
+    #[test]
+    fn test_extended_display_iter() {
+        let v = vec![1, 2, 3];
+        fn assert_extended<T: ExtendedDisplay>(_: &T) {}
+        assert_extended(&v.iter());
+    }
+
+    #[test]
+    fn test_extended_display_map_iter() {
+        let v = vec![1, 2, 3];
+        fn assert_extended<T: ExtendedDisplay>(_: &T) {}
+        assert_extended(&v.iter().map(|x| x));
+    }
+
+    // ========================================================================
+    // Format Rule Trait Tests
+    // ========================================================================
+    #[test]
+    fn test_format_rule_no_state() {
+        let rule = |val: &str, idx: usize, len: usize| format!("[{}]", val);
+        let result = rule.format("test", 0, 1);
+        assert_eq!("[test]", result);
+    }
+
+    #[test]
+    fn test_format_rule_no_state_owned() {
+        let rule = |val: &str, idx: usize, len: usize| format!("[{}]", val);
+        let result = rule.format("test", 0, 1);
+        assert_eq!("[test]", result);
+    }
+
+    #[test]
+    fn test_format_rule_mut_no_state() {
+        let mut counter = 0;
+        let mut rule = |val: &&str, idx: usize, len: usize| {
+            counter += 1;
+            format!("{}#{}", val, counter)
+        };
+        let str = "test";
+        let result = rule(&str, 0, 1);
+        assert_eq!("test#1", result);
+    }
+
+    #[test]
+    fn test_format_rule_with_state() {
+        let rule =
+            |state: &String, val: &str, idx: usize, len: usize| format!("{}: {}", state, val);
+        let state = "prefix".to_string();
+        let result = rule.format(&state, "test", 0, 1);
+        assert_eq!("prefix: test", result);
+    }
+
+    #[test]
+    fn test_format_rule_mut_with_state() {
+        let mut state = 0;
+        let mut rule = |s: &mut i32, val: &str, idx: usize, len: usize| {
+            *s += 1;
+            format!("{}#{}", val, s)
+        };
+        let result = rule.format(&mut state, "test", 0, 1);
+        assert_eq!("test#1", result);
+    }
+
+    // ========================================================================
+    // Default Format Rule Tests
+    // ========================================================================
+    #[test]
+    fn test_default_format_rule_empty() {
+        assert_eq!("", DEFAULT_FORMAT_RULE("test", 0, 0));
+    }
+
+    #[test]
+    fn test_default_format_rule_single() {
+        assert_eq!("[test]", DEFAULT_FORMAT_RULE("test", 0, 1));
+    }
+
+    #[test]
+    fn test_default_format_rule_first() {
+        assert_eq!("[test", DEFAULT_FORMAT_RULE("test", 0, 3));
+    }
+
+    #[test]
+    fn test_default_format_rule_middle() {
+        assert_eq!(", test", DEFAULT_FORMAT_RULE("test", 1, 3));
+    }
+
+    #[test]
+    fn test_default_format_rule_last() {
+        assert_eq!(", test]", DEFAULT_FORMAT_RULE("test", 2, 3));
+    }
+
+    // ========================================================================
+    // Complex Scenario Tests
+    // ========================================================================
+    #[test]
+    fn test_nested_format_rules() {
+        let v = vec![vec![1, 2], vec![3, 4]];
+        let inner_rule = |val: &str, idx: usize, len: usize| {
+            if idx == len - 1 {
+                val.to_string()
+            } else {
+                format!("{}, ", val)
+            }
+        };
+        let outer_rule = |val: &str, idx: usize, len: usize| {
+            if idx == len - 1 {
+                val.to_string()
+            } else {
+                format!("{}, ", val)
+            }
+        };
+
+        let result: Vec<String> = v.iter().map(|inner| inner.vec_string(inner_rule)).collect();
+
+        let final_result = result.iter().map(|s| s.as_str()).iter_string(outer_rule);
+        assert_eq!("1, 2, 3, 4", final_result);
+    }
+
+    #[test]
+    fn test_chained_operations() {
+        let v = vec![1, 2, 3, 4, 5, 6];
+        let result = v
+            .iter()
+            .filter(|&&x| x % 2 == 0)
+            .map(|&x| x * 10)
+            .iter_string(DEFAULT_FORMAT_RULE);
+        assert_eq!("[20, 40, 60]", result);
+    }
+
+    #[test]
+    fn test_multiple_stateful_operations() {
+        let v = vec![1, 2, 3];
+        let mut sum = 0;
+        let rule = |s: &mut &mut i32, val: &str, idx: usize, len: usize| {
+            let num: i32 = val.parse().unwrap_or(0);
+            **s += num;
+            if idx == len - 1 {
+                format!("{} (sum={})", val, s)
+            } else {
+                format!("{}, ", val)
+            }
+        };
+        let result = v.iter().iter_string_with_state(&mut sum, rule);
+        assert_eq!("1, 2, 3 (sum=6)", result);
+        assert_eq!(6, sum);
+    }
+}

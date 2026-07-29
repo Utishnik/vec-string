@@ -23,3 +23,6 @@ rayon = ["dep:rayon"]
 dyn_async = []
 impl_async = []
 ambassador_delegatable = []
+
+[dev-dependencies]
+pollster = "1.0.1"

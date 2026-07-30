@@ -6949,12 +6949,13 @@ mod coverage_tests {
     #[test]
     fn test_stable_iter_repeat_with() {
         let mut count = 0;
-        let res = core::iter::repeat_with(|| {
+        let items: Vec<i32> = core::iter::repeat_with(|| {
             count += 1;
             count
         })
         .take(3)
-        .iter_string(DEFAULT_FORMAT_RULE);
+        .collect();
+        let res = items.into_iter().iter_string(DEFAULT_FORMAT_RULE);
         assert_eq!("[1, 2, 3]", res);
     }
 
@@ -7248,11 +7249,11 @@ mod coverage_tests {
             let v = vec![1, 2, 3];
             fn my_fmt(
                 val: &str,
-                idx: usize,
-                len: usize,
-            ) -> impl core::future::Future<Output = String> {
+                _idx: usize,
+                _len: usize,
+            ) -> String {
                 let val = val.to_string();
-                async move { format!("[{}]", val) }
+                format!("[{}]", val)
             }
             let result = block_on_impl(
                 ParIteratorStringFnPtrImplAsync::par_iter_string_async_fn_ptr(v.par_iter(), my_fmt),

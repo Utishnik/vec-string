@@ -1,4 +1,6 @@
 #![cfg_attr(not(feature = "std"), no_std)]
+#![feature(auto_traits, negative_impls)]
+#![feature(allocator_api)]
 extern crate alloc;
 #[cfg(any(feature = "dyn_async", feature = "impl_async"))]
 use alloc::boxed::Box;
@@ -9,105 +11,20 @@ use alloc::vec::Vec;
 use rayon::prelude::*;
 
 // ============================================================================
-// StableIter
+// NotVec - auto trait implemented for all types except Vec<T>.
+// On nightly, we use auto_traits + negative_impls to guarantee Vec<T> is excluded.
+// This replaces StableIter from the stable branch, allowing direct impls
+// on any Iterator without manually listing every adapter.
 // ============================================================================
-#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
-pub trait StableIter: Iterator {}
-impl<'a, T> StableIter for core::slice::Iter<'a, T> {}
-impl<'a, T> StableIter for core::slice::IterMut<'a, T> {}
-impl<T> StableIter for alloc::vec::IntoIter<T> {}
-impl<T, const N: usize> StableIter for core::array::IntoIter<T, N> {}
-impl<I, F, B> StableIter for core::iter::Map<I, F>
-where
-    I: StableIter,
-    F: FnMut(I::Item) -> B,
-{
-}
-impl<I, P> StableIter for core::iter::Filter<I, P>
-where
-    I: StableIter,
-    P: FnMut(&I::Item) -> bool,
-{
-}
-impl<I, F, B> StableIter for core::iter::FilterMap<I, F>
-where
-    I: StableIter,
-    F: FnMut(I::Item) -> Option<B>,
-{
-}
-impl<I> StableIter for core::iter::Take<I> where I: StableIter {}
-impl<I> StableIter for core::iter::Skip<I> where I: StableIter {}
-impl<I, P> StableIter for core::iter::TakeWhile<I, P>
-where
-    I: StableIter,
-    P: FnMut(&I::Item) -> bool,
-{
-}
-impl<I, P> StableIter for core::iter::SkipWhile<I, P>
-where
-    I: StableIter,
-    P: FnMut(&I::Item) -> bool,
-{
-}
-impl<'a, I, T> StableIter for core::iter::Cloned<I>
-where
-    I: StableIter<Item = &'a T>,
-    T: Clone + 'a,
-{
-}
-impl<'a, I, T> StableIter for core::iter::Copied<I>
-where
-    I: StableIter<Item = &'a T>,
-    T: Copy + 'a,
-{
-}
-impl<I, U> StableIter for core::iter::Chain<I, U>
-where
-    I: StableIter,
-    U: StableIter<Item = I::Item>,
-{
-}
-impl<I, U> StableIter for core::iter::Zip<I, U>
-where
-    I: StableIter,
-    U: StableIter,
-{
-}
-impl<I> StableIter for core::iter::Enumerate<I> where I: StableIter {}
-impl<I, U, F> StableIter for core::iter::FlatMap<I, U, F>
-where
-    I: StableIter,
-    F: FnMut(I::Item) -> U,
-    U: IntoIterator,
-{
-}
-impl<I> StableIter for core::iter::Flatten<I>
-where
-    I: StableIter,
-    I::Item: IntoIterator,
-{
-}
-impl<I> StableIter for core::iter::Fuse<I> where I: StableIter {}
-impl<I> StableIter for core::iter::Peekable<I> where I: StableIter {}
-impl<I> StableIter for core::iter::StepBy<I> where I: StableIter {}
-impl<I> StableIter for core::iter::Cycle<I> where I: StableIter + Clone {}
-impl<I> StableIter for core::iter::Rev<I> where I: StableIter + DoubleEndedIterator {}
-impl<T> StableIter for core::iter::Once<T> {}
-impl<T> StableIter for core::iter::Empty<T> {}
-impl<F> StableIter for core::iter::RepeatWith<F> where F: FnMut() {}
-impl<T> StableIter for core::iter::Repeat<T> where T: Clone {}
-impl<I, F> StableIter for core::iter::Inspect<I, F>
-where
-    I: StableIter,
-    F: FnMut(&I::Item),
-{
-}
-impl<I, St, F, B> StableIter for core::iter::Scan<I, St, F>
-where
-    I: StableIter,
-    F: FnMut(&mut St, I::Item) -> Option<B>,
-{
-}
+pub auto trait NotVec {}
+impl<T, A: core::alloc::Allocator> !NotVec for Vec<T, A> {}
+// Pointer/marker types should not propagate !NotVec from their type parameter.
+// Without these, IntoIter<Vec<T>> would be !NotVec because it contains
+// NonNull<Vec<T>>, PhantomData<Vec<T>>, and *const Vec<T> internally.
+impl<T: ?Sized> NotVec for core::marker::PhantomData<T> {}
+impl<T: ?Sized> NotVec for core::ptr::NonNull<T> {}
+impl<T: ?Sized> NotVec for *const T {}
+impl<T: ?Sized> NotVec for *mut T {}
 
 // ============================================================================
 // ExtendedDisplay
@@ -157,7 +74,7 @@ where
 
 impl<I> ExtendedDisplay for I
 where
-    I: StableIter,
+    I: Iterator + NotVec,
     I::Item: core::fmt::Display,
     I: IteratorString,
     I: IteratorStringFn<fn(&str, usize, usize) -> String>,
@@ -388,7 +305,7 @@ pub trait IteratorStringFnMutNested<F: FnMut(&str, usize, usize) -> String> {
     fn iter_string_fn_mut_nested(self, format_rule: F) -> String;
 }
 
-impl<I: StableIter> IteratorStringNested for I
+impl<I: Iterator + NotVec> IteratorStringNested for I
 where
     I::Item: VecString,
 {
@@ -403,7 +320,7 @@ where
     }
 }
 
-impl<I: StableIter, F: Fn(&str, usize, usize) -> String> IteratorStringFnNested<F> for I
+impl<I: Iterator + NotVec, F: Fn(&str, usize, usize) -> String> IteratorStringFnNested<F> for I
 where
     I::Item: VecString,
 {
@@ -418,7 +335,8 @@ where
     }
 }
 
-impl<I: StableIter, F: FnMut(&str, usize, usize) -> String> IteratorStringFnMutNested<F> for I
+impl<I: Iterator + NotVec, F: FnMut(&str, usize, usize) -> String> IteratorStringFnMutNested<F>
+    for I
 where
     I::Item: VecString,
 {
@@ -458,7 +376,7 @@ pub trait IteratorStringWithStateNested<S, F: FnMut(&mut S, &str, usize, usize) 
     fn iter_string_with_state_nested(self, st: S, f: F) -> String;
 }
 
-impl<I: StableIter, S, F: FnMut(&mut S, &str, usize, usize) -> String>
+impl<I: Iterator + NotVec, S, F: FnMut(&mut S, &str, usize, usize) -> String>
     IteratorStringWithStateNested<S, F> for I
 where
     I::Item: VecString,
@@ -499,7 +417,7 @@ pub trait IteratorStringWithStateFnNested<S, F: Fn(&S, &str, usize, usize) -> St
     fn iter_string_with_state_fn_nested(self, st: &S, f: F) -> String;
 }
 
-impl<I: StableIter, S, F: Fn(&S, &str, usize, usize) -> String>
+impl<I: Iterator + NotVec, S, F: Fn(&S, &str, usize, usize) -> String>
     IteratorStringWithStateFnNested<S, F> for I
 where
     I::Item: VecString,
@@ -550,7 +468,7 @@ pub trait IteratorStringWithStateFnPtrNested<S> {
     ) -> String;
 }
 
-impl<I: StableIter, S> IteratorStringWithStateFnPtrNested<S> for I
+impl<I: Iterator + NotVec, S> IteratorStringWithStateFnPtrNested<S> for I
 where
     I::Item: VecString,
 {
@@ -595,7 +513,7 @@ pub trait IteratorStringRuleOwnedNested<R: FormatRuleNoStateOwned> {
     fn iter_string_rule_owned_nested(self, rule: R) -> String;
 }
 
-impl<I: StableIter, R: FormatRuleNoStateOwned + Clone> IteratorStringRuleOwnedNested<R> for I
+impl<I: Iterator + NotVec, R: FormatRuleNoStateOwned + Clone> IteratorStringRuleOwnedNested<R> for I
 where
     I::Item: VecString,
 {
@@ -632,7 +550,7 @@ pub trait IteratorStringMutRuleOwnedNested<R: FormatRuleMutNoState> {
     fn iter_string_mut_rule_owned_nested(self, rule: R) -> String;
 }
 
-impl<I: StableIter, R: FormatRuleMutNoState> IteratorStringMutRuleOwnedNested<R> for I
+impl<I: Iterator + NotVec, R: FormatRuleMutNoState> IteratorStringMutRuleOwnedNested<R> for I
 where
     I::Item: VecString,
 {
@@ -670,7 +588,7 @@ pub trait IteratorStringWithStateRuleOwnedNested<S, R: FormatRule<S>> {
     fn iter_string_with_state_rule_owned_nested(self, st: &S, rule: R) -> String;
 }
 
-impl<I: StableIter, S, R: FormatRule<S>> IteratorStringWithStateRuleOwnedNested<S, R> for I
+impl<I: Iterator + NotVec, S, R: FormatRule<S>> IteratorStringWithStateRuleOwnedNested<S, R> for I
 where
     I::Item: VecString,
 {
@@ -708,7 +626,8 @@ pub trait IteratorStringWithStateMutRuleOwnedNested<S, R: FormatRuleMut<S>> {
     fn iter_string_with_state_mut_rule_owned_nested(self, st: S, rule: R) -> String;
 }
 
-impl<I: StableIter, S, R: FormatRuleMut<S>> IteratorStringWithStateMutRuleOwnedNested<S, R> for I
+impl<I: Iterator + NotVec, S, R: FormatRuleMut<S>> IteratorStringWithStateMutRuleOwnedNested<S, R>
+    for I
 where
     I::Item: VecString,
 {
@@ -745,7 +664,7 @@ pub trait IteratorStringRuleRefNested<'a, R: FormatRuleNoState<'a>> {
     fn iter_string_rule_ref_nested(self, rule: &'a R) -> String;
 }
 
-impl<'a, I: StableIter, R: FormatRuleNoState<'a>> IteratorStringRuleRefNested<'a, R> for I
+impl<'a, I: Iterator + NotVec, R: FormatRuleNoState<'a>> IteratorStringRuleRefNested<'a, R> for I
 where
     I::Item: VecString,
 {
@@ -782,7 +701,7 @@ pub trait IteratorStringMutRuleRefNested<R: FormatRuleMutNoState> {
     fn iter_string_mut_rule_ref_nested(self, rule: &mut R) -> String;
 }
 
-impl<I: StableIter, R: FormatRuleMutNoState> IteratorStringMutRuleRefNested<R> for I
+impl<I: Iterator + NotVec, R: FormatRuleMutNoState> IteratorStringMutRuleRefNested<R> for I
 where
     I::Item: VecString,
 {
@@ -820,7 +739,7 @@ pub trait IteratorStringWithStateRuleRefNested<S, R: FormatRule<S>> {
     fn iter_string_with_state_rule_ref_nested(self, st: &S, rule: &R) -> String;
 }
 
-impl<I: StableIter, S, R: FormatRule<S>> IteratorStringWithStateRuleRefNested<S, R> for I
+impl<I: Iterator + NotVec, S, R: FormatRule<S>> IteratorStringWithStateRuleRefNested<S, R> for I
 where
     I::Item: VecString,
 {
@@ -858,7 +777,8 @@ pub trait IteratorStringWithStateMutRuleRefNested<S, R: FormatRuleMut<S>> {
     fn iter_string_with_state_mut_rule_ref_nested(self, st: S, rule: &mut R) -> String;
 }
 
-impl<I: StableIter, S, R: FormatRuleMut<S>> IteratorStringWithStateMutRuleRefNested<S, R> for I
+impl<I: Iterator + NotVec, S, R: FormatRuleMut<S>> IteratorStringWithStateMutRuleRefNested<S, R>
+    for I
 where
     I::Item: VecString,
 {
@@ -879,7 +799,7 @@ pub trait IteratorStringExactNested {
     fn iter_string_exact_nested(self, format_rule: FormatRuleFn) -> String;
 }
 
-impl<I: StableIter + ExactSizeIterator> IteratorStringExactNested for I
+impl<I: Iterator + NotVec + ExactSizeIterator> IteratorStringExactNested for I
 where
     I::Item: VecString,
 {
@@ -898,7 +818,7 @@ pub trait IteratorStringFnExactNested<F: Fn(&str, usize, usize) -> String> {
     fn iter_string_fn_exact_nested(self, format_rule: F) -> String;
 }
 
-impl<I: StableIter + ExactSizeIterator, F: Fn(&str, usize, usize) -> String>
+impl<I: Iterator + NotVec + ExactSizeIterator, F: Fn(&str, usize, usize) -> String>
     IteratorStringFnExactNested<F> for I
 where
     I::Item: VecString,
@@ -918,7 +838,7 @@ pub trait IteratorStringFnMutExactNested<F: FnMut(&str, usize, usize) -> String>
     fn iter_string_fn_mut_exact_nested(self, format_rule: F) -> String;
 }
 
-impl<I: StableIter + ExactSizeIterator, F: FnMut(&str, usize, usize) -> String>
+impl<I: Iterator + NotVec + ExactSizeIterator, F: FnMut(&str, usize, usize) -> String>
     IteratorStringFnMutExactNested<F> for I
 where
     I::Item: VecString,
@@ -938,8 +858,11 @@ pub trait IteratorStringWithStateExactNested<S, F: FnMut(&mut S, &str, usize, us
     fn iter_string_with_state_exact_nested(self, st: S, f: F) -> String;
 }
 
-impl<I: StableIter + ExactSizeIterator, S, F: FnMut(&mut S, &str, usize, usize) -> String>
-    IteratorStringWithStateExactNested<S, F> for I
+impl<
+        I: Iterator + NotVec + ExactSizeIterator,
+        S,
+        F: FnMut(&mut S, &str, usize, usize) -> String,
+    > IteratorStringWithStateExactNested<S, F> for I
 where
     I::Item: VecString,
 {
@@ -959,7 +882,7 @@ pub trait IteratorStringWithStateFnExactNested<S, F: Fn(&S, &str, usize, usize) 
     fn iter_string_with_state_fn_exact_nested(self, st: &S, f: F) -> String;
 }
 
-impl<I: StableIter + ExactSizeIterator, S, F: Fn(&S, &str, usize, usize) -> String>
+impl<I: Iterator + NotVec + ExactSizeIterator, S, F: Fn(&S, &str, usize, usize) -> String>
     IteratorStringWithStateFnExactNested<S, F> for I
 where
     I::Item: VecString,
@@ -984,7 +907,7 @@ pub trait IteratorStringWithStateFnPtrExactNested<S> {
     ) -> String;
 }
 
-impl<I: StableIter + ExactSizeIterator, S> IteratorStringWithStateFnPtrExactNested<S> for I
+impl<I: Iterator + NotVec + ExactSizeIterator, S> IteratorStringWithStateFnPtrExactNested<S> for I
 where
     I::Item: VecString,
 {
@@ -1162,7 +1085,7 @@ impl<T: core::fmt::Display, S, R: FormatRuleMut<S>> DisplayVecStringWithStateMut
 pub trait DisplayIteratorString {
     fn fmt(self, f: &mut core::fmt::Formatter<'_>, rule: FormatRuleFn) -> core::fmt::Result;
 }
-impl<I: StableIter> DisplayIteratorString for I
+impl<I: Iterator + NotVec> DisplayIteratorString for I
 where
     I::Item: core::fmt::Display,
 {
@@ -1174,7 +1097,7 @@ where
 pub trait DisplayIteratorStringFn<F: Fn(&str, usize, usize) -> String> {
     fn fmt(self, f: &mut core::fmt::Formatter<'_>, rule: F) -> core::fmt::Result;
 }
-impl<I: StableIter, F: Fn(&str, usize, usize) -> String> DisplayIteratorStringFn<F> for I
+impl<I: Iterator + NotVec, F: Fn(&str, usize, usize) -> String> DisplayIteratorStringFn<F> for I
 where
     I::Item: core::fmt::Display,
 {
@@ -1186,7 +1109,8 @@ where
 pub trait DisplayIteratorStringFnMut<F: FnMut(&str, usize, usize) -> String> {
     fn fmt(self, f: &mut core::fmt::Formatter<'_>, rule: F) -> core::fmt::Result;
 }
-impl<I: StableIter, F: FnMut(&str, usize, usize) -> String> DisplayIteratorStringFnMut<F> for I
+impl<I: Iterator + NotVec, F: FnMut(&str, usize, usize) -> String> DisplayIteratorStringFnMut<F>
+    for I
 where
     I::Item: core::fmt::Display,
 {
@@ -1198,7 +1122,7 @@ where
 pub trait DisplayIteratorStringWithState<S, F: FnMut(&mut S, &str, usize, usize) -> String> {
     fn fmt(self, f: &mut core::fmt::Formatter<'_>, st: S, rule: F) -> core::fmt::Result;
 }
-impl<I: StableIter, S, F: FnMut(&mut S, &str, usize, usize) -> String>
+impl<I: Iterator + NotVec, S, F: FnMut(&mut S, &str, usize, usize) -> String>
     DisplayIteratorStringWithState<S, F> for I
 where
     I::Item: core::fmt::Display,
@@ -1211,7 +1135,7 @@ where
 pub trait DisplayIteratorStringWithStateFn<S, F: Fn(&S, &str, usize, usize) -> String> {
     fn fmt(self, f: &mut core::fmt::Formatter<'_>, st: &S, rule: F) -> core::fmt::Result;
 }
-impl<I: StableIter, S, F: Fn(&S, &str, usize, usize) -> String>
+impl<I: Iterator + NotVec, S, F: Fn(&S, &str, usize, usize) -> String>
     DisplayIteratorStringWithStateFn<S, F> for I
 where
     I::Item: core::fmt::Display,
@@ -1229,7 +1153,7 @@ pub trait DisplayIteratorStringWithStateFnPtr<S> {
         rule: fn(&S, &str, usize, usize) -> String,
     ) -> core::fmt::Result;
 }
-impl<I: StableIter, S> DisplayIteratorStringWithStateFnPtr<S> for I
+impl<I: Iterator + NotVec, S> DisplayIteratorStringWithStateFnPtr<S> for I
 where
     I::Item: core::fmt::Display,
 {
@@ -1246,7 +1170,8 @@ where
 pub trait DisplayIteratorStringRuleOwned<R: FormatRuleNoStateOwned> {
     fn fmt(self, f: &mut core::fmt::Formatter<'_>, rule: R) -> core::fmt::Result;
 }
-impl<I: StableIter, R: FormatRuleNoStateOwned + Clone> DisplayIteratorStringRuleOwned<R> for I
+impl<I: Iterator + NotVec, R: FormatRuleNoStateOwned + Clone> DisplayIteratorStringRuleOwned<R>
+    for I
 where
     I::Item: core::fmt::Display,
 {
@@ -1258,7 +1183,7 @@ where
 pub trait DisplayIteratorStringMutRuleOwned<R: FormatRuleMutNoState> {
     fn fmt(self, f: &mut core::fmt::Formatter<'_>, rule: R) -> core::fmt::Result;
 }
-impl<I: StableIter, R: FormatRuleMutNoState> DisplayIteratorStringMutRuleOwned<R> for I
+impl<I: Iterator + NotVec, R: FormatRuleMutNoState> DisplayIteratorStringMutRuleOwned<R> for I
 where
     I::Item: core::fmt::Display,
 {
@@ -1270,7 +1195,7 @@ where
 pub trait DisplayIteratorStringWithStateRuleOwned<S, R: FormatRule<S>> {
     fn fmt(self, f: &mut core::fmt::Formatter<'_>, st: &S, rule: R) -> core::fmt::Result;
 }
-impl<I: StableIter, S, R: FormatRule<S>> DisplayIteratorStringWithStateRuleOwned<S, R> for I
+impl<I: Iterator + NotVec, S, R: FormatRule<S>> DisplayIteratorStringWithStateRuleOwned<S, R> for I
 where
     I::Item: core::fmt::Display,
 {
@@ -1282,7 +1207,8 @@ where
 pub trait DisplayIteratorStringWithStateMutRuleOwned<S, R: FormatRuleMut<S>> {
     fn fmt(self, f: &mut core::fmt::Formatter<'_>, st: S, rule: R) -> core::fmt::Result;
 }
-impl<I: StableIter, S, R: FormatRuleMut<S>> DisplayIteratorStringWithStateMutRuleOwned<S, R> for I
+impl<I: Iterator + NotVec, S, R: FormatRuleMut<S>> DisplayIteratorStringWithStateMutRuleOwned<S, R>
+    for I
 where
     I::Item: core::fmt::Display,
 {
@@ -1298,7 +1224,7 @@ where
 pub trait DisplayIteratorStringRuleRef<'a, R: FormatRuleNoState<'a>> {
     fn fmt(self, f: &mut core::fmt::Formatter<'_>, rule: &'a R) -> core::fmt::Result;
 }
-impl<'a, I: StableIter, R: FormatRuleNoState<'a>> DisplayIteratorStringRuleRef<'a, R> for I
+impl<'a, I: Iterator + NotVec, R: FormatRuleNoState<'a>> DisplayIteratorStringRuleRef<'a, R> for I
 where
     I::Item: core::fmt::Display,
 {
@@ -1310,7 +1236,7 @@ where
 pub trait DisplayIteratorStringMutRuleRef<R: FormatRuleMutNoState> {
     fn fmt(self, f: &mut core::fmt::Formatter<'_>, rule: &mut R) -> core::fmt::Result;
 }
-impl<I: StableIter, R: FormatRuleMutNoState> DisplayIteratorStringMutRuleRef<R> for I
+impl<I: Iterator + NotVec, R: FormatRuleMutNoState> DisplayIteratorStringMutRuleRef<R> for I
 where
     I::Item: core::fmt::Display,
 {
@@ -1322,7 +1248,7 @@ where
 pub trait DisplayIteratorStringWithStateRuleRef<S, R: FormatRule<S>> {
     fn fmt(self, f: &mut core::fmt::Formatter<'_>, st: &S, rule: &R) -> core::fmt::Result;
 }
-impl<I: StableIter, S, R: FormatRule<S>> DisplayIteratorStringWithStateRuleRef<S, R> for I
+impl<I: Iterator + NotVec, S, R: FormatRule<S>> DisplayIteratorStringWithStateRuleRef<S, R> for I
 where
     I::Item: core::fmt::Display,
 {
@@ -1334,7 +1260,8 @@ where
 pub trait DisplayIteratorStringWithStateMutRuleRef<S, R: FormatRuleMut<S>> {
     fn fmt(self, f: &mut core::fmt::Formatter<'_>, st: S, rule: &mut R) -> core::fmt::Result;
 }
-impl<I: StableIter, S, R: FormatRuleMut<S>> DisplayIteratorStringWithStateMutRuleRef<S, R> for I
+impl<I: Iterator + NotVec, S, R: FormatRuleMut<S>> DisplayIteratorStringWithStateMutRuleRef<S, R>
+    for I
 where
     I::Item: core::fmt::Display,
 {
@@ -1358,7 +1285,7 @@ pub trait IteratorStringFnMut<F: FnMut(&str, usize, usize) -> String> {
     fn iter_string_fn_mut(self, format_rule: F) -> String;
 }
 
-impl<I: StableIter> IteratorString for I
+impl<I: Iterator + NotVec> IteratorString for I
 where
     I::Item: core::fmt::Display,
 {
@@ -1373,7 +1300,7 @@ where
     }
 }
 
-impl<I: StableIter, F: Fn(&str, usize, usize) -> String> IteratorStringFn<F> for I
+impl<I: Iterator + NotVec, F: Fn(&str, usize, usize) -> String> IteratorStringFn<F> for I
 where
     I::Item: core::fmt::Display,
 {
@@ -1388,7 +1315,7 @@ where
     }
 }
 
-impl<I: StableIter, F: FnMut(&str, usize, usize) -> String> IteratorStringFnMut<F> for I
+impl<I: Iterator + NotVec, F: FnMut(&str, usize, usize) -> String> IteratorStringFnMut<F> for I
 where
     I::Item: core::fmt::Display,
 {
@@ -1427,8 +1354,8 @@ impl<T: core::fmt::Display, S, F: FnMut(&mut S, &str, usize, usize) -> String>
     }
 }
 
-impl<I: StableIter, S, F: FnMut(&mut S, &str, usize, usize) -> String> IteratorStringWithState<S, F>
-    for I
+impl<I: Iterator + NotVec, S, F: FnMut(&mut S, &str, usize, usize) -> String>
+    IteratorStringWithState<S, F> for I
 where
     I::Item: core::fmt::Display,
 {
@@ -1467,8 +1394,8 @@ impl<T: core::fmt::Display, S, F: Fn(&S, &str, usize, usize) -> String> VecStrin
     }
 }
 
-impl<I: StableIter, S, F: Fn(&S, &str, usize, usize) -> String> IteratorStringWithStateFn<S, F>
-    for I
+impl<I: Iterator + NotVec, S, F: Fn(&S, &str, usize, usize) -> String>
+    IteratorStringWithStateFn<S, F> for I
 where
     I::Item: core::fmt::Display,
 {
@@ -1517,7 +1444,7 @@ impl<T: core::fmt::Display, S> VecStringWithStateFnPtr<S> for [T] {
     }
 }
 
-impl<I: StableIter, S> IteratorStringWithStateFnPtr<S> for I
+impl<I: Iterator + NotVec, S> IteratorStringWithStateFnPtr<S> for I
 where
     I::Item: core::fmt::Display,
 {
@@ -1576,7 +1503,7 @@ pub trait IteratorStringRuleOwned<R: FormatRuleNoStateOwned> {
     fn iter_string_rule_owned(self, rule: R) -> String;
 }
 
-impl<I: StableIter, R: FormatRuleNoStateOwned + Clone> IteratorStringRuleOwned<R> for I
+impl<I: Iterator + NotVec, R: FormatRuleNoStateOwned + Clone> IteratorStringRuleOwned<R> for I
 where
     I::Item: core::fmt::Display,
 {
@@ -1596,7 +1523,7 @@ pub trait IteratorStringMutRuleOwned<R: FormatRuleMutNoState> {
     fn iter_string_mut_rule_owned(self, rule: R) -> String;
 }
 
-impl<I: StableIter, R: FormatRuleMutNoState> IteratorStringMutRuleOwned<R> for I
+impl<I: Iterator + NotVec, R: FormatRuleMutNoState> IteratorStringMutRuleOwned<R> for I
 where
     I::Item: core::fmt::Display,
 {
@@ -1633,7 +1560,7 @@ pub trait IteratorStringWithStateRuleOwned<S, R: FormatRule<S>> {
     fn iter_string_with_state_rule_owned(self, st: &S, rule: R) -> String;
 }
 
-impl<I: StableIter, S, R: FormatRule<S>> IteratorStringWithStateRuleOwned<S, R> for I
+impl<I: Iterator + NotVec, S, R: FormatRule<S>> IteratorStringWithStateRuleOwned<S, R> for I
 where
     I::Item: core::fmt::Display,
 {
@@ -1670,7 +1597,7 @@ pub trait IteratorStringWithStateMutRuleOwned<S, R: FormatRuleMut<S>> {
     fn iter_string_with_state_mut_rule_owned(self, st: S, rule: R) -> String;
 }
 
-impl<I: StableIter, S, R: FormatRuleMut<S>> IteratorStringWithStateMutRuleOwned<S, R> for I
+impl<I: Iterator + NotVec, S, R: FormatRuleMut<S>> IteratorStringWithStateMutRuleOwned<S, R> for I
 where
     I::Item: core::fmt::Display,
 {
@@ -1722,7 +1649,7 @@ pub trait IteratorStringRuleRef<'a, R: FormatRuleNoState<'a>> {
     fn iter_string_rule_ref(self, rule: &'a R) -> String;
 }
 
-impl<'a, I: StableIter, R: FormatRuleNoState<'a>> IteratorStringRuleRef<'a, R> for I
+impl<'a, I: Iterator + NotVec, R: FormatRuleNoState<'a>> IteratorStringRuleRef<'a, R> for I
 where
     I::Item: core::fmt::Display,
 {
@@ -1742,7 +1669,7 @@ pub trait IteratorStringMutRuleRef<R: FormatRuleMutNoState> {
     fn iter_string_mut_rule_ref(self, rule: &mut R) -> String;
 }
 
-impl<I: StableIter, R: FormatRuleMutNoState> IteratorStringMutRuleRef<R> for I
+impl<I: Iterator + NotVec, R: FormatRuleMutNoState> IteratorStringMutRuleRef<R> for I
 where
     I::Item: core::fmt::Display,
 {
@@ -1779,7 +1706,7 @@ pub trait IteratorStringWithStateRuleRef<S, R: FormatRule<S>> {
     fn iter_string_with_state_rule_ref(self, st: &S, rule: &R) -> String;
 }
 
-impl<I: StableIter, S, R: FormatRule<S>> IteratorStringWithStateRuleRef<S, R> for I
+impl<I: Iterator + NotVec, S, R: FormatRule<S>> IteratorStringWithStateRuleRef<S, R> for I
 where
     I::Item: core::fmt::Display,
 {
@@ -1816,7 +1743,7 @@ pub trait IteratorStringWithStateMutRuleRef<S, R: FormatRuleMut<S>> {
     fn iter_string_with_state_mut_rule_ref(self, st: S, rule: &mut R) -> String;
 }
 
-impl<I: StableIter, S, R: FormatRuleMut<S>> IteratorStringWithStateMutRuleRef<S, R> for I
+impl<I: Iterator + NotVec, S, R: FormatRuleMut<S>> IteratorStringWithStateMutRuleRef<S, R> for I
 where
     I::Item: core::fmt::Display,
 {
@@ -1849,7 +1776,7 @@ pub trait IteratorStringFnMutExact<F: FnMut(&str, usize, usize) -> String> {
     fn iter_string_fn_mut_exact(self, format_rule: F) -> String;
 }
 
-impl<I: StableIter + ExactSizeIterator> IteratorStringExact for I
+impl<I: Iterator + NotVec + ExactSizeIterator> IteratorStringExact for I
 where
     I::Item: core::fmt::Display,
 {
@@ -1863,7 +1790,7 @@ where
     }
 }
 
-impl<I: StableIter + ExactSizeIterator, F: Fn(&str, usize, usize) -> String>
+impl<I: Iterator + NotVec + ExactSizeIterator, F: Fn(&str, usize, usize) -> String>
     IteratorStringFnExact<F> for I
 where
     I::Item: core::fmt::Display,
@@ -1878,7 +1805,7 @@ where
     }
 }
 
-impl<I: StableIter + ExactSizeIterator, F: FnMut(&str, usize, usize) -> String>
+impl<I: Iterator + NotVec + ExactSizeIterator, F: FnMut(&str, usize, usize) -> String>
     IteratorStringFnMutExact<F> for I
 where
     I::Item: core::fmt::Display,
@@ -1898,8 +1825,11 @@ pub trait IteratorStringWithStateExact<S, F: FnMut(&mut S, &str, usize, usize) -
     fn iter_string_with_state_exact(self, st: S, f: F) -> String;
 }
 
-impl<I: StableIter + ExactSizeIterator, S, F: FnMut(&mut S, &str, usize, usize) -> String>
-    IteratorStringWithStateExact<S, F> for I
+impl<
+        I: Iterator + NotVec + ExactSizeIterator,
+        S,
+        F: FnMut(&mut S, &str, usize, usize) -> String,
+    > IteratorStringWithStateExact<S, F> for I
 where
     I::Item: core::fmt::Display,
 {
@@ -1919,7 +1849,7 @@ pub trait IteratorStringWithStateFnExact<S, F: Fn(&S, &str, usize, usize) -> Str
     fn iter_string_with_state_fn_exact(self, st: &S, f: F) -> String;
 }
 
-impl<I: StableIter + ExactSizeIterator, S, F: Fn(&S, &str, usize, usize) -> String>
+impl<I: Iterator + NotVec + ExactSizeIterator, S, F: Fn(&S, &str, usize, usize) -> String>
     IteratorStringWithStateFnExact<S, F> for I
 where
     I::Item: core::fmt::Display,
@@ -1944,7 +1874,7 @@ pub trait IteratorStringWithStateFnPtrExact<S> {
     ) -> String;
 }
 
-impl<I: StableIter + ExactSizeIterator, S> IteratorStringWithStateFnPtrExact<S> for I
+impl<I: Iterator + NotVec + ExactSizeIterator, S> IteratorStringWithStateFnPtrExact<S> for I
 where
     I::Item: core::fmt::Display,
 {
@@ -1968,7 +1898,7 @@ pub trait IteratorStringRuleOwnedExact<R: FormatRuleNoStateOwned> {
     fn iter_string_rule_owned_exact(self, rule: R) -> String;
 }
 
-impl<I: StableIter + ExactSizeIterator, R: FormatRuleNoStateOwned + Clone>
+impl<I: Iterator + NotVec + ExactSizeIterator, R: FormatRuleNoStateOwned + Clone>
     IteratorStringRuleOwnedExact<R> for I
 where
     I::Item: core::fmt::Display,
@@ -1988,8 +1918,8 @@ pub trait IteratorStringMutRuleOwnedExact<R: FormatRuleMutNoState> {
     fn iter_string_mut_rule_owned_exact(self, rule: R) -> String;
 }
 
-impl<I: StableIter + ExactSizeIterator, R: FormatRuleMutNoState> IteratorStringMutRuleOwnedExact<R>
-    for I
+impl<I: Iterator + NotVec + ExactSizeIterator, R: FormatRuleMutNoState>
+    IteratorStringMutRuleOwnedExact<R> for I
 where
     I::Item: core::fmt::Display,
 {
@@ -2008,7 +1938,7 @@ pub trait IteratorStringWithStateRuleOwnedExact<S, R: FormatRule<S>> {
     fn iter_string_with_state_rule_owned_exact(self, st: &S, rule: R) -> String;
 }
 
-impl<I: StableIter + ExactSizeIterator, S, R: FormatRule<S>>
+impl<I: Iterator + NotVec + ExactSizeIterator, S, R: FormatRule<S>>
     IteratorStringWithStateRuleOwnedExact<S, R> for I
 where
     I::Item: core::fmt::Display,
@@ -2029,7 +1959,7 @@ pub trait IteratorStringWithStateMutRuleOwnedExact<S, R: FormatRuleMut<S>> {
     fn iter_string_with_state_mut_rule_owned_exact(self, st: S, rule: R) -> String;
 }
 
-impl<I: StableIter + ExactSizeIterator, S, R: FormatRuleMut<S>>
+impl<I: Iterator + NotVec + ExactSizeIterator, S, R: FormatRuleMut<S>>
     IteratorStringWithStateMutRuleOwnedExact<S, R> for I
 where
     I::Item: core::fmt::Display,
@@ -2050,7 +1980,7 @@ pub trait IteratorStringRuleRefExact<'a, R: FormatRuleNoState<'a>> {
     fn iter_string_rule_ref_exact(self, rule: &'a R) -> String;
 }
 
-impl<'a, I: StableIter + ExactSizeIterator, R: FormatRuleNoState<'a>>
+impl<'a, I: Iterator + NotVec + ExactSizeIterator, R: FormatRuleNoState<'a>>
     IteratorStringRuleRefExact<'a, R> for I
 where
     I::Item: core::fmt::Display,
@@ -2070,8 +2000,8 @@ pub trait IteratorStringMutRuleRefExact<R: FormatRuleMutNoState> {
     fn iter_string_mut_rule_ref_exact(self, rule: &mut R) -> String;
 }
 
-impl<I: StableIter + ExactSizeIterator, R: FormatRuleMutNoState> IteratorStringMutRuleRefExact<R>
-    for I
+impl<I: Iterator + NotVec + ExactSizeIterator, R: FormatRuleMutNoState>
+    IteratorStringMutRuleRefExact<R> for I
 where
     I::Item: core::fmt::Display,
 {
@@ -2090,7 +2020,7 @@ pub trait IteratorStringWithStateRuleRefExact<S, R: FormatRule<S>> {
     fn iter_string_with_state_rule_ref_exact(self, st: &S, rule: &R) -> String;
 }
 
-impl<I: StableIter + ExactSizeIterator, S, R: FormatRule<S>>
+impl<I: Iterator + NotVec + ExactSizeIterator, S, R: FormatRule<S>>
     IteratorStringWithStateRuleRefExact<S, R> for I
 where
     I::Item: core::fmt::Display,
@@ -2111,7 +2041,7 @@ pub trait IteratorStringWithStateMutRuleRefExact<S, R: FormatRuleMut<S>> {
     fn iter_string_with_state_mut_rule_ref_exact(self, st: S, rule: &mut R) -> String;
 }
 
-impl<I: StableIter + ExactSizeIterator, S, R: FormatRuleMut<S>>
+impl<I: Iterator + NotVec + ExactSizeIterator, S, R: FormatRuleMut<S>>
     IteratorStringWithStateMutRuleRefExact<S, R> for I
 where
     I::Item: core::fmt::Display,
@@ -3295,7 +3225,7 @@ pub trait IteratorStringFnAsync<
 #[cfg(feature = "dyn_async")]
 impl<
         'a,
-        I: StableIter,
+        I: Iterator + NotVec,
         F: Fn(&str, usize, usize) -> Fut,
         Fut: core::future::Future<Output = String> + 'a,
     > IteratorStringFnAsync<'a, F, Fut> for I
@@ -3338,7 +3268,7 @@ pub trait IteratorStringFnAsyncSend<
 #[cfg(feature = "dyn_async")]
 impl<
         'a,
-        I: StableIter + Send,
+        I: Iterator + NotVec + Send,
         F: Fn(&str, usize, usize) -> Fut + Sync,
         Fut: core::future::Future<Output = String> + 'a + Send,
     > IteratorStringFnAsyncSend<'a, F, Fut> for I
@@ -3384,7 +3314,7 @@ pub trait IteratorStringFnMutAsync<
 #[cfg(feature = "dyn_async")]
 impl<
         'a,
-        I: StableIter,
+        I: Iterator + NotVec,
         F: FnMut(&str, usize, usize) -> Fut,
         Fut: core::future::Future<Output = String> + 'a,
     > IteratorStringFnMutAsync<'a, F, Fut> for I
@@ -3430,7 +3360,7 @@ pub trait IteratorStringFnMutAsyncSend<
 #[cfg(feature = "dyn_async")]
 impl<
         'a,
-        I: StableIter + Send,
+        I: Iterator + NotVec + Send,
         F: FnMut(&str, usize, usize) -> Fut + Send,
         Fut: core::future::Future<Output = String> + 'a + Send,
     > IteratorStringFnMutAsyncSend<'a, F, Fut> for I
@@ -3478,7 +3408,7 @@ pub trait IteratorStringWithStateAsync<
 #[cfg(feature = "dyn_async")]
 impl<
         'a,
-        I: StableIter,
+        I: Iterator + NotVec,
         S: 'a,
         F: FnMut(&mut S, &str, usize, usize) -> Fut,
         Fut: core::future::Future<Output = String> + 'a,
@@ -3529,7 +3459,7 @@ pub trait IteratorStringFnAsyncExact<
 #[cfg(feature = "dyn_async")]
 impl<
         'a,
-        I: StableIter + ExactSizeIterator,
+        I: Iterator + NotVec + ExactSizeIterator,
         F: Fn(&str, usize, usize) -> Fut,
         Fut: core::future::Future<Output = String> + 'a,
     > IteratorStringFnAsyncExact<'a, F, Fut> for I
@@ -3575,7 +3505,7 @@ pub trait IteratorStringFnAsyncSendExact<
 #[cfg(feature = "dyn_async")]
 impl<
         'a,
-        I: StableIter + ExactSizeIterator + Send,
+        I: Iterator + NotVec + ExactSizeIterator + Send,
         F: Fn(&str, usize, usize) -> Fut + Sync,
         Fut: core::future::Future<Output = String> + 'a + Send,
     > IteratorStringFnAsyncSendExact<'a, F, Fut> for I
@@ -3621,7 +3551,7 @@ pub trait IteratorStringFnMutAsyncExact<
 #[cfg(feature = "dyn_async")]
 impl<
         'a,
-        I: StableIter + ExactSizeIterator,
+        I: Iterator + NotVec + ExactSizeIterator,
         F: FnMut(&str, usize, usize) -> Fut,
         Fut: core::future::Future<Output = String> + 'a,
     > IteratorStringFnMutAsyncExact<'a, F, Fut> for I
@@ -3667,7 +3597,7 @@ pub trait IteratorStringFnMutAsyncSendExact<
 #[cfg(feature = "dyn_async")]
 impl<
         'a,
-        I: StableIter + ExactSizeIterator + Send,
+        I: Iterator + NotVec + ExactSizeIterator + Send,
         F: FnMut(&str, usize, usize) -> Fut + Send,
         Fut: core::future::Future<Output = String> + 'a + Send,
     > IteratorStringFnMutAsyncSendExact<'a, F, Fut> for I
@@ -3715,7 +3645,7 @@ pub trait IteratorStringWithStateAsyncExact<
 #[cfg(feature = "dyn_async")]
 impl<
         'a,
-        I: StableIter + ExactSizeIterator,
+        I: Iterator + NotVec + ExactSizeIterator,
         S: 'a,
         F: FnMut(&mut S, &str, usize, usize) -> Fut,
         Fut: core::future::Future<Output = String> + 'a,
@@ -4293,7 +4223,7 @@ pub trait IteratorStringFnImplAsync<
 
 #[cfg(feature = "impl_async")]
 impl<
-        I: StableIter,
+        I: Iterator + NotVec,
         F: Fn(&str, usize, usize) -> Fut,
         Fut: core::future::Future<Output = String>,
     > IteratorStringFnImplAsync<F, Fut> for I
@@ -4338,7 +4268,7 @@ pub trait IteratorStringFnImplAsyncSend<
 
 #[cfg(feature = "impl_async")]
 impl<
-        I: StableIter + Send,
+        I: Iterator + NotVec + Send,
         F: Fn(&str, usize, usize) -> Fut + Sync,
         Fut: core::future::Future<Output = String> + Send,
     > IteratorStringFnImplAsyncSend<F, Fut> for I
@@ -4386,7 +4316,7 @@ pub trait IteratorStringFnMutImplAsync<
 
 #[cfg(feature = "impl_async")]
 impl<
-        I: StableIter,
+        I: Iterator + NotVec,
         F: FnMut(&str, usize, usize) -> Fut,
         Fut: core::future::Future<Output = String>,
     > IteratorStringFnMutImplAsync<F, Fut> for I
@@ -4434,7 +4364,7 @@ pub trait IteratorStringFnMutImplAsyncSend<
 
 #[cfg(feature = "impl_async")]
 impl<
-        I: StableIter + Send,
+        I: Iterator + NotVec + Send,
         F: FnMut(&str, usize, usize) -> Fut + Send,
         Fut: core::future::Future<Output = String> + Send,
     > IteratorStringFnMutImplAsyncSend<F, Fut> for I
@@ -4485,7 +4415,7 @@ pub trait IteratorStringWithStateImplAsync<
 
 #[cfg(feature = "impl_async")]
 impl<
-        I: StableIter,
+        I: Iterator + NotVec,
         S,
         F: FnMut(&mut S, &str, usize, usize) -> Fut,
         Fut: core::future::Future<Output = String>,
@@ -4539,7 +4469,7 @@ pub trait IteratorStringFnImplAsyncExact<
 
 #[cfg(feature = "impl_async")]
 impl<
-        I: StableIter + ExactSizeIterator,
+        I: Iterator + NotVec + ExactSizeIterator,
         F: Fn(&str, usize, usize) -> Fut,
         Fut: core::future::Future<Output = String>,
     > IteratorStringFnImplAsyncExact<F, Fut> for I
@@ -4587,7 +4517,7 @@ pub trait IteratorStringFnImplAsyncSendExact<
 
 #[cfg(feature = "impl_async")]
 impl<
-        I: StableIter + ExactSizeIterator + Send,
+        I: Iterator + NotVec + ExactSizeIterator + Send,
         F: Fn(&str, usize, usize) -> Fut + Sync,
         Fut: core::future::Future<Output = String> + Send,
     > IteratorStringFnImplAsyncSendExact<F, Fut> for I
@@ -4635,7 +4565,7 @@ pub trait IteratorStringFnMutImplAsyncExact<
 
 #[cfg(feature = "impl_async")]
 impl<
-        I: StableIter + ExactSizeIterator,
+        I: Iterator + NotVec + ExactSizeIterator,
         F: FnMut(&str, usize, usize) -> Fut,
         Fut: core::future::Future<Output = String>,
     > IteratorStringFnMutImplAsyncExact<F, Fut> for I
@@ -4683,7 +4613,7 @@ pub trait IteratorStringFnMutImplAsyncSendExact<
 
 #[cfg(feature = "impl_async")]
 impl<
-        I: StableIter + ExactSizeIterator + Send,
+        I: Iterator + NotVec + ExactSizeIterator + Send,
         F: FnMut(&str, usize, usize) -> Fut + Send,
         Fut: core::future::Future<Output = String> + Send,
     > IteratorStringFnMutImplAsyncSendExact<F, Fut> for I
@@ -4734,7 +4664,7 @@ pub trait IteratorStringWithStateImplAsyncExact<
 
 #[cfg(feature = "impl_async")]
 impl<
-        I: StableIter + ExactSizeIterator,
+        I: Iterator + NotVec + ExactSizeIterator,
         S,
         F: FnMut(&mut S, &str, usize, usize) -> Fut,
         Fut: core::future::Future<Output = String>,
@@ -6195,7 +6125,7 @@ mod tests {
     #[test]
     fn test_display_iterator_string() {
         struct W<I: Clone>(I);
-        impl<I: StableIter + Clone> core::fmt::Display for W<I>
+        impl<I: Iterator + NotVec + Clone> core::fmt::Display for W<I>
         where
             I::Item: core::fmt::Display,
         {
@@ -6211,8 +6141,8 @@ mod tests {
     fn test_display_iterator_string_fn() {
         let rule = |v: &str, i: usize, l: usize| DEFAULT_FORMAT_RULE(v, i, l);
         struct W<I: Clone, F: Clone>(I, F);
-        impl<I: StableIter + Clone, F: Fn(&str, usize, usize) -> String + Clone> core::fmt::Display
-            for W<I, F>
+        impl<I: Iterator + NotVec + Clone, F: Fn(&str, usize, usize) -> String + Clone>
+            core::fmt::Display for W<I, F>
         where
             I::Item: core::fmt::Display,
         {
@@ -6228,7 +6158,7 @@ mod tests {
     fn test_display_iterator_string_fn_mut() {
         let rule = |v: &str, i: usize, l: usize| DEFAULT_FORMAT_RULE(v, i, l);
         struct W<I: Clone, F: Clone>(I, F);
-        impl<I: StableIter + Clone, F: FnMut(&str, usize, usize) -> String + Clone>
+        impl<I: Iterator + NotVec + Clone, F: FnMut(&str, usize, usize) -> String + Clone>
             core::fmt::Display for W<I, F>
         where
             I::Item: core::fmt::Display,
@@ -6249,7 +6179,7 @@ mod tests {
         };
         struct W<I: Clone, S: Clone, F: Clone>(I, S, F);
         impl<
-                I: StableIter + Clone,
+                I: Iterator + NotVec + Clone,
                 S: Clone,
                 F: FnMut(&mut S, &str, usize, usize) -> String + Clone,
             > core::fmt::Display for W<I, S, F>
@@ -6273,7 +6203,7 @@ mod tests {
     fn test_display_iterator_string_with_state_fn() {
         let rule = |_s: &i32, v: &str, i: usize, l: usize| DEFAULT_FORMAT_RULE(v, i, l);
         struct W<I: Clone, S, F: Clone>(I, S, F);
-        impl<I: StableIter + Clone, S, F: Fn(&S, &str, usize, usize) -> String + Clone>
+        impl<I: Iterator + NotVec + Clone, S, F: Fn(&S, &str, usize, usize) -> String + Clone>
             core::fmt::Display for W<I, S, F>
         where
             I::Item: core::fmt::Display,
@@ -6289,7 +6219,7 @@ mod tests {
     #[test]
     fn test_display_iterator_string_with_state_fn_ptr() {
         struct W<I: Clone>(I, i32);
-        impl<I: StableIter + Clone> core::fmt::Display for W<I>
+        impl<I: Iterator + NotVec + Clone> core::fmt::Display for W<I>
         where
             I::Item: core::fmt::Display,
         {
@@ -6305,7 +6235,7 @@ mod tests {
     fn test_display_iterator_string_rule_owned() {
         let rule = |v: &str, i: usize, l: usize| DEFAULT_FORMAT_RULE(v, i, l);
         struct W<I: Clone, R: Clone>(I, R);
-        impl<I: StableIter + Clone, R: FormatRuleNoStateOwned + Clone> core::fmt::Display for W<I, R>
+        impl<I: Iterator + NotVec + Clone, R: FormatRuleNoStateOwned + Clone> core::fmt::Display for W<I, R>
         where
             I::Item: core::fmt::Display,
         {
@@ -6321,7 +6251,7 @@ mod tests {
     fn test_display_iterator_string_mut_rule_owned() {
         let rule = |v: &str, i: usize, l: usize| DEFAULT_FORMAT_RULE(v, i, l);
         struct W<I: Clone, R: Clone>(I, R);
-        impl<I: StableIter + Clone, R: FormatRuleMutNoState + Clone> core::fmt::Display for W<I, R>
+        impl<I: Iterator + NotVec + Clone, R: FormatRuleMutNoState + Clone> core::fmt::Display for W<I, R>
         where
             I::Item: core::fmt::Display,
         {
@@ -6337,7 +6267,7 @@ mod tests {
     fn test_display_iterator_string_with_state_rule_owned() {
         let rule = |_s: &i32, v: &str, i: usize, l: usize| DEFAULT_FORMAT_RULE(v, i, l);
         struct W<I: Clone, S, R: Clone>(I, S, R);
-        impl<I: StableIter + Clone, S, R: FormatRule<S> + Clone> core::fmt::Display for W<I, S, R>
+        impl<I: Iterator + NotVec + Clone, S, R: FormatRule<S> + Clone> core::fmt::Display for W<I, S, R>
         where
             I::Item: core::fmt::Display,
         {
@@ -6361,7 +6291,8 @@ mod tests {
             DEFAULT_FORMAT_RULE(v, i, l)
         };
         struct W<I: Clone, S: Clone, R: Clone>(I, S, R);
-        impl<I: StableIter + Clone, S: Clone, R: FormatRuleMut<S> + Clone> core::fmt::Display for W<I, S, R>
+        impl<I: Iterator + NotVec + Clone, S: Clone, R: FormatRuleMut<S> + Clone> core::fmt::Display
+            for W<I, S, R>
         where
             I::Item: core::fmt::Display,
         {
@@ -6382,7 +6313,7 @@ mod tests {
     fn test_display_iterator_string_rule_ref() {
         let rule = |v: &str, i: usize, l: usize| DEFAULT_FORMAT_RULE(v, i, l);
         struct W<'a, I: Clone, R>(&'a I, &'a R);
-        impl<'a, I: StableIter + Clone, R: FormatRuleNoState<'a>> core::fmt::Display for W<'a, I, R>
+        impl<'a, I: Iterator + NotVec + Clone, R: FormatRuleNoState<'a>> core::fmt::Display for W<'a, I, R>
         where
             I::Item: core::fmt::Display,
         {
@@ -6398,7 +6329,7 @@ mod tests {
     fn test_display_iterator_string_mut_rule_ref() {
         let mut rule = |v: &str, i: usize, l: usize| DEFAULT_FORMAT_RULE(v, i, l);
         struct W<I: Clone, R>(I, *mut R);
-        impl<I: StableIter + Clone, R: FormatRuleMutNoState> core::fmt::Display for W<I, R>
+        impl<I: Iterator + NotVec + Clone, R: FormatRuleMutNoState> core::fmt::Display for W<I, R>
         where
             I::Item: core::fmt::Display,
         {
@@ -6414,7 +6345,7 @@ mod tests {
     fn test_display_iterator_string_with_state_rule_ref() {
         let rule = |_s: &i32, v: &str, i: usize, l: usize| DEFAULT_FORMAT_RULE(v, i, l);
         struct W<'b, I: Clone, S, R>(&'b I, S, R);
-        impl<'b, I: StableIter + Clone, S, R: FormatRule<S>> core::fmt::Display for W<'b, I, S, R>
+        impl<'b, I: Iterator + NotVec + Clone, S, R: FormatRule<S>> core::fmt::Display for W<'b, I, S, R>
         where
             I::Item: core::fmt::Display,
         {
@@ -6433,7 +6364,7 @@ mod tests {
             DEFAULT_FORMAT_RULE(v, i, l)
         };
         struct W<I: Clone, S: Clone, R>(I, S, *mut R);
-        impl<I: StableIter + Clone, S: Clone, R: FormatRuleMut<S>> core::fmt::Display for W<I, S, R>
+        impl<I: Iterator + NotVec + Clone, S: Clone, R: FormatRuleMut<S>> core::fmt::Display for W<I, S, R>
         where
             I::Item: core::fmt::Display,
         {
@@ -7646,34 +7577,34 @@ mod additional_tests {
     }
 
     // ========================================================================
-    // StableIter Marker Tests
+    // NotVec Marker Tests
     // ========================================================================
     #[test]
-    fn test_stable_iter_slice_iter() {
+    fn test_not_vec_slice_iter() {
         let v = [1, 2, 3];
-        fn assert_stable<I: StableIter>(_: &I) {}
-        assert_stable(&v.iter());
+        fn assert_not_vec<I: NotVec>(_: &I) {}
+        assert_not_vec(&v.iter());
     }
 
     #[test]
-    fn test_stable_iter_vec_into_iter() {
+    fn test_not_vec_vec_into_iter() {
         let v = vec![1, 2, 3];
-        fn assert_stable<I: StableIter>(_: &I) {}
-        assert_stable(&v.into_iter());
+        fn assert_not_vec<I: NotVec>(_: &I) {}
+        assert_not_vec(&v.into_iter());
     }
 
     #[test]
-    fn test_stable_iter_map() {
+    fn test_not_vec_map() {
         let v = [1, 2, 3];
-        fn assert_stable<I: StableIter>(_: &I) {}
-        assert_stable(&v.iter().map(|x| x));
+        fn assert_not_vec<I: NotVec>(_: &I) {}
+        assert_not_vec(&v.iter().map(|x| x));
     }
 
     #[test]
-    fn test_stable_iter_filter() {
+    fn test_not_vec_filter() {
         let v = [1, 2, 3];
-        fn assert_stable<I: StableIter>(_: &I) {}
-        assert_stable(&v.iter().filter(|&&x| x > 1));
+        fn assert_not_vec<I: NotVec>(_: &I) {}
+        assert_not_vec(&v.iter().filter(|&&x| x > 1));
     }
 
     // ========================================================================
@@ -7842,12 +7773,12 @@ mod coverage_tests {
     use super::*;
     use alloc::vec;
 
-    // --- Тесты для непокрытых адаптеров StableIter ---
+    // --- Тесты для различных адаптеров итераторов ---
     #[test]
     fn test_stable_iter_iter_mut() {
         let mut v = [1, 2, 3];
-        fn assert_stable<I: StableIter>(_: &I) {}
-        assert_stable(&v.iter_mut());
+        fn assert_not_vec<I: NotVec>(_: &I) {}
+        assert_not_vec(&v.iter_mut());
         let res = v.iter_mut().iter_string(DEFAULT_FORMAT_RULE);
         assert_eq!("[1, 2, 3]", res);
     }

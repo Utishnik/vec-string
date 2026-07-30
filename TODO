@@ -1,0 +1,12 @@
+/*
+ * Nightly
+ * impl<T: VecString> VecString for Vec<T> {
+    fn vec_string(&self, f: FormatRuleFn) -> String {
+        let mut s = String::new();
+        let l = self.len();
+        for (i, x) in self.iter().enumerate() {
+            s.push_str(&f(&format!("{}", x), i, l));
+        }
+        s
+    }
+} */

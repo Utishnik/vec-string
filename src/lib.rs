@@ -4487,8 +4487,12 @@ impl<
 #[cfg(feature = "orx_parallel")]
 #[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait OrxParIteratorStringWithStateFnCloneNested<S, F: Fn(&S, &str, usize, usize) -> String> {
-    fn orx_par_iter_string_with_state_fn_clone_nested(self, inner_rule: FormatRuleFn, st: S, f: F)
-        -> String;
+    fn orx_par_iter_string_with_state_fn_clone_nested(
+        self,
+        inner_rule: FormatRuleFn,
+        st: S,
+        f: F,
+    ) -> String;
 }
 
 #[cfg(feature = "orx_parallel")]
@@ -4518,7 +4522,8 @@ impl<
 #[cfg(feature = "orx_parallel")]
 #[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
 pub trait OrxParIteratorStringRuleRefCloneNested<R: FormatRuleNoState> {
-    fn orx_par_iter_string_rule_ref_clone_nested(self, inner_rule: FormatRuleFn, rule: R) -> String;
+    fn orx_par_iter_string_rule_ref_clone_nested(self, inner_rule: FormatRuleFn, rule: R)
+        -> String;
 }
 
 #[cfg(feature = "orx_parallel")]
@@ -4552,12 +4557,8 @@ pub trait OrxParIteratorStringWithStateRuleRefCloneNested<S, R: FormatRule<S>> {
 }
 
 #[cfg(feature = "orx_parallel")]
-impl<
-        P: orx_parallel::ParIter<Item = T>,
-        T: VecString,
-        S: Clone,
-        R: FormatRule<S> + Clone,
-    > OrxParIteratorStringWithStateRuleRefCloneNested<S, R> for P
+impl<P: orx_parallel::ParIter<Item = T>, T: VecString, S: Clone, R: FormatRule<S> + Clone>
+    OrxParIteratorStringWithStateRuleRefCloneNested<S, R> for P
 {
     fn orx_par_iter_string_with_state_rule_ref_clone_nested(
         self,
@@ -11611,7 +11612,6 @@ mod nested_tests {
         }
     }
 
-
     // ========================================================================
     // 10c. ORX CLONE TRAITS
     // ========================================================================
@@ -11620,23 +11620,33 @@ mod nested_tests {
     fn test_orx_par_clone_traits() {
         use orx_parallel::*;
         let f = |val: &str, i: usize, l: usize| {
-            if i == l - 1 { format!("{}]", val) } else { format!("{}, ", val) }
+            if i == l - 1 {
+                format!("{}]", val)
+            } else {
+                format!("{}, ", val)
+            }
         };
         let result: String = vec![10, 20, 30].into_par().orx_par_iter_string_fn_clone(f);
         assert_eq!("10, 20, 30]", result);
 
         let st = "S".to_string();
         let f2 = |s: &String, val: &str, _i: usize, _l: usize| format!("{}{}", s, val);
-        let result2: String = vec![10, 20, 30].into_par().orx_par_iter_string_with_state_fn_clone(st, f2);
+        let result2: String = vec![10, 20, 30]
+            .into_par()
+            .orx_par_iter_string_with_state_fn_clone(st, f2);
         assert_eq!("S10S20S30", result2);
 
         let rule = |val: &str, _i: usize, _l: usize| format!("<{}>", val);
-        let result3: String = vec![10, 20, 30].into_par().orx_par_iter_string_rule_ref_clone(rule);
+        let result3: String = vec![10, 20, 30]
+            .into_par()
+            .orx_par_iter_string_rule_ref_clone(rule);
         assert_eq!("<10><20><30>", result3);
 
         let st2 = "P".to_string();
         let rule2 = |s: &String, val: &str, _i: usize, _l: usize| format!("{}{}", s, val);
-        let result4: String = vec![10, 20, 30].into_par().orx_par_iter_string_with_state_rule_ref_clone(st2, rule2);
+        let result4: String = vec![10, 20, 30]
+            .into_par()
+            .orx_par_iter_string_with_state_rule_ref_clone(st2, rule2);
         assert_eq!("P10P20P30", result4);
     }
 
@@ -11645,21 +11655,29 @@ mod nested_tests {
     fn test_orx_par_nested_clone_traits() {
         use orx_parallel::*;
         let f = |val: &str, _i: usize, _l: usize| format!("{}|", val);
-        let result: String = vec![vec![1, 2], vec![3]].into_par().orx_par_iter_string_fn_clone_nested(DEFAULT_FORMAT_RULE, f);
+        let result: String = vec![vec![1, 2], vec![3]]
+            .into_par()
+            .orx_par_iter_string_fn_clone_nested(DEFAULT_FORMAT_RULE, f);
         assert_eq!("[1, 2]|[3]|", result);
 
         let st = "X".to_string();
         let f2 = |s: &String, val: &str, _i: usize, _l: usize| format!("{}{}", s, val);
-        let result2: String = vec![vec![1, 2], vec![3]].into_par().orx_par_iter_string_with_state_fn_clone_nested(DEFAULT_FORMAT_RULE, st, f2);
+        let result2: String = vec![vec![1, 2], vec![3]]
+            .into_par()
+            .orx_par_iter_string_with_state_fn_clone_nested(DEFAULT_FORMAT_RULE, st, f2);
         assert_eq!("X[1, 2]X[3]", result2);
 
         let rule = |val: &str, _i: usize, _l: usize| format!("<{}>", val);
-        let result3: String = vec![vec![1, 2], vec![3]].into_par().orx_par_iter_string_rule_ref_clone_nested(DEFAULT_FORMAT_RULE, rule);
+        let result3: String = vec![vec![1, 2], vec![3]]
+            .into_par()
+            .orx_par_iter_string_rule_ref_clone_nested(DEFAULT_FORMAT_RULE, rule);
         assert_eq!("<[1, 2]><[3]>", result3);
 
         let st2 = "Y".to_string();
         let rule2 = |s: &String, val: &str, _i: usize, _l: usize| format!("{}{}", s, val);
-        let result4: String = vec![vec![1, 2], vec![3]].into_par().orx_par_iter_string_with_state_rule_ref_clone_nested(DEFAULT_FORMAT_RULE, st2, rule2);
+        let result4: String = vec![vec![1, 2], vec![3]]
+            .into_par()
+            .orx_par_iter_string_with_state_rule_ref_clone_nested(DEFAULT_FORMAT_RULE, st2, rule2);
         assert_eq!("Y[1, 2]Y[3]", result4);
     }
 
@@ -11700,7 +11718,10 @@ mod nested_tests {
                 async move { format!("[{}]", val) }
             };
             let result = block_on_dyn(
-                OrxParIteratorStringFnAsyncClone::orx_par_iter_string_async_fn_clone(vec![1, 2, 3].into_par(), f),
+                OrxParIteratorStringFnAsyncClone::orx_par_iter_string_async_fn_clone(
+                    vec![1, 2, 3].into_par(),
+                    f,
+                ),
             );
             assert_eq!("[1][2][3]", result);
         }
@@ -11712,7 +11733,10 @@ mod nested_tests {
                 async move { format!("[{}]", val) }
             };
             let result = block_on_dyn(
-                OrxParIteratorStringFnAsyncCloneSend::orx_par_iter_string_async_fn_clone(vec![1, 2, 3].into_par(), f),
+                OrxParIteratorStringFnAsyncCloneSend::orx_par_iter_string_async_fn_clone(
+                    vec![1, 2, 3].into_par(),
+                    f,
+                ),
             );
             assert_eq!("[1][2][3]", result);
         }
@@ -11724,7 +11748,10 @@ mod nested_tests {
                 async move { format!("[{}]", val) }
             };
             let result = block_on_dyn(
-                OrxParIteratorStringFnMutAsyncClone::orx_par_iter_string_async_fn_mut_clone(vec![1, 2, 3].into_par(), f),
+                OrxParIteratorStringFnMutAsyncClone::orx_par_iter_string_async_fn_mut_clone(
+                    vec![1, 2, 3].into_par(),
+                    f,
+                ),
             );
             assert_eq!("[1][2][3]", result);
         }
@@ -11736,7 +11763,10 @@ mod nested_tests {
                 async move { format!("[{}]", val) }
             };
             let result = block_on_dyn(
-                OrxParIteratorStringFnMutAsyncCloneSend::orx_par_iter_string_async_fn_mut_clone(vec![1, 2, 3].into_par(), f),
+                OrxParIteratorStringFnMutAsyncCloneSend::orx_par_iter_string_async_fn_mut_clone(
+                    vec![1, 2, 3].into_par(),
+                    f,
+                ),
             );
             assert_eq!("[1][2][3]", result);
         }
@@ -11778,7 +11808,10 @@ mod nested_tests {
                 async move { format!("[{}]", val) }
             };
             let result = block_on_impl(
-                OrxParIteratorStringFnImplAsyncClone::orx_par_iter_string_async_fn_clone(vec![1, 2, 3].into_par(), f),
+                OrxParIteratorStringFnImplAsyncClone::orx_par_iter_string_async_fn_clone(
+                    vec![1, 2, 3].into_par(),
+                    f,
+                ),
             );
             assert_eq!("[1][2][3]", result);
         }
@@ -11790,7 +11823,10 @@ mod nested_tests {
                 async move { format!("[{}]", val) }
             };
             let result = block_on_impl(
-                OrxParIteratorStringFnImplAsyncCloneSend::orx_par_iter_string_async_fn_clone(vec![1, 2, 3].into_par(), f),
+                OrxParIteratorStringFnImplAsyncCloneSend::orx_par_iter_string_async_fn_clone(
+                    vec![1, 2, 3].into_par(),
+                    f,
+                ),
             );
             assert_eq!("[1][2][3]", result);
         }
@@ -11802,7 +11838,10 @@ mod nested_tests {
                 async move { format!("[{}]", val) }
             };
             let result = block_on_impl(
-                OrxParIteratorStringFnMutImplAsyncClone::orx_par_iter_string_async_fn_mut_clone(vec![1, 2, 3].into_par(), f),
+                OrxParIteratorStringFnMutImplAsyncClone::orx_par_iter_string_async_fn_mut_clone(
+                    vec![1, 2, 3].into_par(),
+                    f,
+                ),
             );
             assert_eq!("[1][2][3]", result);
         }
@@ -11814,7 +11853,10 @@ mod nested_tests {
                 async move { format!("[{}]", val) }
             };
             let result = block_on_impl(
-                OrxParIteratorStringFnMutImplAsyncCloneSend::orx_par_iter_string_async_fn_mut_clone(vec![1, 2, 3].into_par(), f),
+                OrxParIteratorStringFnMutImplAsyncCloneSend::orx_par_iter_string_async_fn_mut_clone(
+                    vec![1, 2, 3].into_par(),
+                    f,
+                ),
             );
             assert_eq!("[1][2][3]", result);
         }

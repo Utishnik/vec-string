@@ -15,11 +15,17 @@ categories = ["util"]
 [dependencies]
 ambassador = "0.5.1"
 rayon = { version = "1.10", optional = true }
+orx-parallel = { version = "3", optional = true }
+itertools = { version = "0.14", optional = true }
+itermore = { version = "0.8", optional = true, features = ["full"] }
 
 [features]
-default = ["std","rayon","dyn_async","impl_async","ambassador_delegatable"]
+default = ["std","rayon","orx_parallel","itertools","itermore","dyn_async","impl_async","ambassador_delegatable"]
 std = []
 rayon = ["dep:rayon"]
+orx_parallel = ["dep:orx-parallel"]
+itertools = ["dep:itertools"]
+itermore = ["dep:itermore"]
 dyn_async = []
 impl_async = []
 ambassador_delegatable = []

@@ -5,6 +5,8 @@ use alloc::boxed::Box;
 use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
+#[cfg(feature = "orx_parallel")]
+use orx_parallel::*;
 #[cfg(feature = "rayon")]
 use rayon::prelude::*;
 
@@ -106,6 +108,257 @@ impl<I, St, F, B> StableIter for core::iter::Scan<I, St, F>
 where
     I: StableIter,
     F: FnMut(&mut St, I::Item) -> Option<B>,
+{
+}
+
+// ============================================================================
+// StableIter impls for itertools
+// ============================================================================
+#[cfg(feature = "itertools")]
+impl<I, J> StableIter for itertools::Interleave<I, J>
+where
+    I: StableIter,
+    J: StableIter<Item = I::Item>,
+{
+}
+#[cfg(feature = "itertools")]
+impl<I, J> StableIter for itertools::InterleaveShortest<I, J>
+where
+    I: StableIter,
+    J: StableIter<Item = I::Item>,
+{
+}
+#[cfg(feature = "itertools")]
+impl<I, J> StableIter for itertools::Product<I, J>
+where
+    I: StableIter,
+    I::Item: Clone,
+    J: StableIter + Clone,
+{
+}
+#[cfg(feature = "itertools")]
+impl<I, F, B> StableIter for itertools::Batching<I, F>
+where
+    I: StableIter,
+    F: FnMut(&mut I) -> Option<B>,
+{
+}
+#[cfg(feature = "itertools")]
+impl<I, T> StableIter for itertools::WhileSome<I> where I: StableIter<Item = Option<T>> {}
+#[cfg(feature = "itertools")]
+impl<I, F, T, E> StableIter for itertools::FilterOk<I, F>
+where
+    I: StableIter<Item = Result<T, E>>,
+    F: FnMut(&T) -> bool,
+{
+}
+#[cfg(feature = "itertools")]
+impl<I, F, T, E, U> StableIter for itertools::FilterMapOk<I, F>
+where
+    I: StableIter<Item = Result<T, E>>,
+    F: FnMut(T) -> Option<U>,
+{
+}
+#[cfg(feature = "itertools")]
+impl<I, F> StableIter for itertools::Positions<I, F>
+where
+    I: StableIter,
+    F: FnMut(I::Item) -> bool,
+{
+}
+#[cfg(feature = "itertools")]
+impl<I, F> StableIter for itertools::Update<I, F>
+where
+    I: StableIter,
+    F: FnMut(&mut I::Item),
+{
+}
+#[cfg(feature = "itertools")]
+impl<I> StableIter for itertools::Combinations<I>
+where
+    I: StableIter,
+    I::Item: Clone,
+{
+}
+#[cfg(feature = "itertools")]
+impl<I, const K: usize> StableIter for itertools::ArrayCombinations<I, K>
+where
+    I: StableIter,
+    I::Item: Clone,
+{
+}
+#[cfg(feature = "itertools")]
+impl<I> StableIter for itertools::CombinationsWithReplacement<I>
+where
+    I: StableIter,
+    I::Item: Clone + Ord,
+{
+}
+#[cfg(feature = "itertools")]
+impl<I, F> StableIter for itertools::PadUsing<I, F>
+where
+    I: StableIter,
+    F: FnMut(usize) -> I::Item,
+{
+}
+#[cfg(feature = "itertools")]
+impl<'a, I, F> StableIter for itertools::PeekingTakeWhile<'a, I, F>
+where
+    I: itertools::PeekingNext,
+    F: FnMut(&I::Item) -> bool,
+{
+}
+#[cfg(feature = "itertools")]
+impl<I> StableIter for itertools::Permutations<I>
+where
+    I: StableIter,
+    I::Item: Clone,
+{
+}
+#[cfg(feature = "itertools")]
+impl<I> StableIter for itertools::Powerset<I>
+where
+    I: StableIter,
+    I::Item: Clone,
+{
+}
+#[cfg(feature = "itertools")]
+impl<'a, I, T, E> StableIter for itertools::ProcessResults<'a, I, E> where
+    I: StableIter<Item = Result<T, E>>
+{
+}
+#[cfg(feature = "itertools")]
+impl<I> StableIter for itertools::Tee<I>
+where
+    I: StableIter,
+    I::Item: Clone,
+{
+}
+#[cfg(feature = "itertools")]
+impl<I> StableIter for itertools::Unique<I>
+where
+    I: StableIter,
+    I::Item: Clone + Eq + core::hash::Hash,
+{
+}
+#[cfg(feature = "itertools")]
+impl<I, V, F> StableIter for itertools::UniqueBy<I, V, F>
+where
+    I: StableIter,
+    V: Eq + core::hash::Hash,
+    F: FnMut(&I::Item) -> V,
+{
+}
+#[cfg(feature = "itertools")]
+impl<I> StableIter for itertools::WithPosition<I> where I: StableIter {}
+#[cfg(feature = "itertools")]
+impl<I, J> StableIter for itertools::ZipEq<I, J>
+where
+    I: StableIter,
+    J: StableIter,
+{
+}
+#[cfg(feature = "itertools")]
+impl<T, U> StableIter for itertools::ZipLongest<T, U>
+where
+    T: StableIter,
+    U: StableIter,
+{
+}
+#[cfg(feature = "itertools")]
+impl<I, R> StableIter for itertools::MapInto<I, R>
+where
+    I: StableIter,
+    R: From<I::Item>,
+{
+}
+#[cfg(feature = "itertools")]
+impl<I, T, E> StableIter for itertools::FlattenOk<I, T, E>
+where
+    I: StableIter<Item = Result<T, E>>,
+    T: IntoIterator,
+{
+}
+#[cfg(feature = "itertools")]
+impl<I> StableIter for itertools::MultiProduct<I>
+where
+    I: StableIter + Clone,
+    I::Item: Clone,
+{
+}
+#[cfg(feature = "itertools")]
+impl<I> StableIter for itertools::structs::PutBack<I> where I: StableIter {}
+#[cfg(feature = "itertools")]
+impl<I> StableIter for itertools::PutBackN<I> where I: StableIter {}
+#[cfg(feature = "itertools")]
+impl<I, F> StableIter for itertools::structs::TakeWhileInclusive<I, F>
+where
+    I: StableIter,
+    F: FnMut(&I::Item) -> bool,
+{
+}
+#[cfg(feature = "itertools")]
+impl<I> StableIter for itertools::structs::ExactlyOneError<I> where I: StableIter {}
+#[cfg(feature = "itertools")]
+impl<A: Clone> StableIter for itertools::structs::RepeatN<A> {}
+#[cfg(feature = "itertools")]
+impl<I> StableIter for itertools::structs::MultiPeek<I> where I: StableIter {}
+#[cfg(feature = "itertools")]
+impl<I> StableIter for itertools::structs::PeekNth<I> where I: StableIter {}
+
+// ============================================================================
+// StableIter impls for itermore
+// ============================================================================
+#[cfg(feature = "itermore")]
+impl<I, const N: usize> StableIter for itermore::ArrayChunks<I, N> where I: StableIter {}
+#[cfg(feature = "itermore")]
+impl<I, const N: usize> StableIter for itermore::ArrayWindows<I, N>
+where
+    I: StableIter,
+    I::Item: Clone,
+{
+}
+#[cfg(feature = "itermore")]
+impl<I, const K: usize> StableIter for itermore::ArrayCombinations<I, K>
+where
+    I: StableIter,
+    I::Item: Clone,
+{
+}
+#[cfg(feature = "itermore")]
+impl<I, const K: usize> StableIter for itermore::ArrayCombinationsWithReps<I, K>
+where
+    I: StableIter,
+    I::Item: Clone,
+{
+}
+#[cfg(feature = "itermore")]
+impl<I, J> StableIter for itermore::CartesianProduct<I, J>
+where
+    I: StableIter,
+    I::Item: Clone,
+    J: StableIter + Clone,
+{
+}
+#[cfg(feature = "itermore")]
+impl<I, const N: usize> StableIter for itermore::CircularArrayWindows<I, N>
+where
+    I: StableIter + Clone,
+    I::Item: Clone,
+{
+}
+#[cfg(feature = "itermore")]
+impl<I> StableIter for itermore::Combinations<I>
+where
+    I: StableIter,
+    I::Item: Clone,
+{
+}
+#[cfg(feature = "itermore")]
+impl<I> StableIter for itermore::CombinationsWithReps<I>
+where
+    I: StableIter,
+    I::Item: Clone,
 {
 }
 
@@ -3298,6 +3551,773 @@ where
     I: rayon::iter::ParallelIterator<Item = T>,
 {
     fn par_iter_string_with_state_mut_rule_ref_nested(
+        self,
+        inner_rule: FormatRuleFn,
+        mut st: S,
+        rule: &mut R,
+    ) -> String {
+        let items: Vec<String> = self.map(|x| x.vec_string(inner_rule)).collect();
+        let l = items.len();
+        let mut r = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            r.push_str(&rule.format(&mut st, &s, i, l));
+        }
+        r
+    }
+}
+
+// ============================================================================
+// ORX-PARALLEL SYNC
+// ============================================================================
+#[cfg(feature = "orx_parallel")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
+pub trait OrxParIteratorString {
+    fn orx_par_iter_string(self, f: FormatRuleFn) -> String;
+}
+
+#[cfg(feature = "orx_parallel")]
+impl<P: orx_parallel::ParIter<Item = T>, T: core::fmt::Display> OrxParIteratorString for P {
+    fn orx_par_iter_string(self, f: FormatRuleFn) -> String {
+        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let l = items.len();
+        let mut r = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            r.push_str(&f(&s, i, l));
+        }
+        r
+    }
+}
+
+#[cfg(feature = "orx_parallel")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
+pub trait OrxParIteratorStringFn<F: Fn(&str, usize, usize) -> String> {
+    fn orx_par_iter_string_fn(self, f: F) -> String;
+}
+
+#[cfg(feature = "orx_parallel")]
+impl<
+        P: orx_parallel::ParIter<Item = T>,
+        T: core::fmt::Display,
+        F: Fn(&str, usize, usize) -> String + Sync + Clone,
+    > OrxParIteratorStringFn<F> for P
+{
+    fn orx_par_iter_string_fn(self, f: F) -> String {
+        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let l = items.len();
+        let mut r = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            r.push_str(&f(&s, i, l));
+        }
+        r
+    }
+}
+
+#[cfg(feature = "orx_parallel")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
+pub trait OrxParIteratorStringFnMut<F: FnMut(&str, usize, usize) -> String> {
+    fn orx_par_iter_string_fn_mut(self, f: F) -> String;
+}
+
+#[cfg(feature = "orx_parallel")]
+impl<
+        P: orx_parallel::ParIter<Item = T>,
+        T: core::fmt::Display,
+        F: FnMut(&str, usize, usize) -> String,
+    > OrxParIteratorStringFnMut<F> for P
+{
+    fn orx_par_iter_string_fn_mut(self, mut f: F) -> String {
+        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let l = items.len();
+        let mut r = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            r.push_str(&f(&s, i, l));
+        }
+        r
+    }
+}
+
+#[cfg(feature = "orx_parallel")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
+pub trait OrxParIteratorStringFnPtr {
+    fn orx_par_iter_string_fn_ptr(self, f: FormatRuleFn) -> String;
+}
+
+#[cfg(feature = "orx_parallel")]
+impl<P: orx_parallel::ParIter<Item = T>, T: core::fmt::Display> OrxParIteratorStringFnPtr for P {
+    fn orx_par_iter_string_fn_ptr(self, f: FormatRuleFn) -> String {
+        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let l = items.len();
+        let mut r = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            r.push_str(&f(&s, i, l));
+        }
+        r
+    }
+}
+
+#[cfg(feature = "orx_parallel")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
+pub trait OrxParIteratorStringWithState<S, F: FnMut(&mut S, &str, usize, usize) -> String> {
+    fn orx_par_iter_string_with_state(self, st: S, f: F) -> String;
+}
+
+#[cfg(feature = "orx_parallel")]
+impl<
+        P: orx_parallel::ParIter<Item = T>,
+        T: core::fmt::Display,
+        S,
+        F: FnMut(&mut S, &str, usize, usize) -> String,
+    > OrxParIteratorStringWithState<S, F> for P
+{
+    fn orx_par_iter_string_with_state(self, mut st: S, mut f: F) -> String {
+        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let l = items.len();
+        let mut r = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            r.push_str(&f(&mut st, &s, i, l));
+        }
+        r
+    }
+}
+
+#[cfg(feature = "orx_parallel")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
+pub trait OrxParIteratorStringWithStateFn<S, F: Fn(&S, &str, usize, usize) -> String> {
+    fn orx_par_iter_string_with_state_fn(self, st: &S, f: F) -> String;
+}
+
+#[cfg(feature = "orx_parallel")]
+impl<
+        P: orx_parallel::ParIter<Item = T>,
+        T: core::fmt::Display,
+        S: Sync,
+        F: Fn(&S, &str, usize, usize) -> String + Sync + Clone,
+    > OrxParIteratorStringWithStateFn<S, F> for P
+{
+    fn orx_par_iter_string_with_state_fn(self, st: &S, f: F) -> String {
+        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let l = items.len();
+        let mut r = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            r.push_str(&f(st, &s, i, l));
+        }
+        r
+    }
+}
+
+#[cfg(feature = "orx_parallel")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
+pub trait OrxParIteratorStringWithStateFnPtr<S> {
+    fn orx_par_iter_string_with_state_fn_ptr(
+        self,
+        st: &S,
+        f: fn(&S, &str, usize, usize) -> String,
+    ) -> String;
+}
+
+#[cfg(feature = "orx_parallel")]
+impl<P: orx_parallel::ParIter<Item = T>, T: core::fmt::Display, S: Sync>
+    OrxParIteratorStringWithStateFnPtr<S> for P
+{
+    fn orx_par_iter_string_with_state_fn_ptr(
+        self,
+        st: &S,
+        f: fn(&S, &str, usize, usize) -> String,
+    ) -> String {
+        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let l = items.len();
+        let mut r = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            r.push_str(&f(st, &s, i, l));
+        }
+        r
+    }
+}
+
+#[cfg(feature = "orx_parallel")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
+pub trait OrxParIteratorStringRuleOwned<R: FormatRuleNoStateOwned> {
+    fn orx_par_iter_string_rule_owned(self, rule: R) -> String;
+}
+
+#[cfg(feature = "orx_parallel")]
+impl<
+        P: orx_parallel::ParIter<Item = T>,
+        T: core::fmt::Display,
+        R: FormatRuleNoStateOwned + Clone + Sync,
+    > OrxParIteratorStringRuleOwned<R> for P
+{
+    fn orx_par_iter_string_rule_owned(self, rule: R) -> String {
+        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let l = items.len();
+        let mut r = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            r.push_str(&rule.clone().format(&s, i, l));
+        }
+        r
+    }
+}
+
+#[cfg(feature = "orx_parallel")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
+pub trait OrxParIteratorStringMutRuleOwned<R: FormatRuleMutNoState> {
+    fn orx_par_iter_string_mut_rule_owned(self, rule: R) -> String;
+}
+
+#[cfg(feature = "orx_parallel")]
+impl<P: orx_parallel::ParIter<Item = T>, T: core::fmt::Display, R: FormatRuleMutNoState>
+    OrxParIteratorStringMutRuleOwned<R> for P
+{
+    fn orx_par_iter_string_mut_rule_owned(self, mut rule: R) -> String {
+        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let l = items.len();
+        let mut r = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            r.push_str(&rule.format(&s, i, l));
+        }
+        r
+    }
+}
+
+#[cfg(feature = "orx_parallel")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
+pub trait OrxParIteratorStringWithStateRuleOwned<S, R: FormatRule<S>> {
+    fn orx_par_iter_string_with_state_rule_owned(self, st: &S, rule: R) -> String;
+}
+
+#[cfg(feature = "orx_parallel")]
+impl<
+        P: orx_parallel::ParIter<Item = T>,
+        T: core::fmt::Display,
+        S: Sync,
+        R: FormatRule<S> + Clone + Sync,
+    > OrxParIteratorStringWithStateRuleOwned<S, R> for P
+{
+    fn orx_par_iter_string_with_state_rule_owned(self, st: &S, rule: R) -> String {
+        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let l = items.len();
+        let mut r = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            r.push_str(&rule.format(st, &s, i, l));
+        }
+        r
+    }
+}
+
+#[cfg(feature = "orx_parallel")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
+pub trait OrxParIteratorStringWithStateMutRuleOwned<S, R: FormatRuleMut<S>> {
+    fn orx_par_iter_string_with_state_mut_rule_owned(self, st: S, rule: R) -> String;
+}
+
+#[cfg(feature = "orx_parallel")]
+impl<P: orx_parallel::ParIter<Item = T>, T: core::fmt::Display, S, R: FormatRuleMut<S>>
+    OrxParIteratorStringWithStateMutRuleOwned<S, R> for P
+{
+    fn orx_par_iter_string_with_state_mut_rule_owned(self, mut st: S, mut rule: R) -> String {
+        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let l = items.len();
+        let mut r = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            r.push_str(&rule.format(&mut st, &s, i, l));
+        }
+        r
+    }
+}
+
+#[cfg(feature = "orx_parallel")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
+pub trait OrxParIteratorStringRuleRef<'a, R: FormatRuleNoState> {
+    fn orx_par_iter_string_rule_ref(self, rule: &'a R) -> String;
+}
+
+#[cfg(feature = "orx_parallel")]
+impl<
+        'a,
+        P: orx_parallel::ParIter<Item = T>,
+        T: core::fmt::Display,
+        R: FormatRuleNoState + Sync,
+    > OrxParIteratorStringRuleRef<'a, R> for P
+{
+    fn orx_par_iter_string_rule_ref(self, rule: &'a R) -> String {
+        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let l = items.len();
+        let mut r = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            r.push_str(&rule.format(&s, i, l));
+        }
+        r
+    }
+}
+
+#[cfg(feature = "orx_parallel")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
+pub trait OrxParIteratorStringMutRuleRef<R: FormatRuleMutNoState> {
+    fn orx_par_iter_string_mut_rule_ref(self, rule: &mut R) -> String;
+}
+
+#[cfg(feature = "orx_parallel")]
+impl<P: orx_parallel::ParIter<Item = T>, T: core::fmt::Display, R: FormatRuleMutNoState>
+    OrxParIteratorStringMutRuleRef<R> for P
+{
+    fn orx_par_iter_string_mut_rule_ref(self, rule: &mut R) -> String {
+        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let l = items.len();
+        let mut r = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            r.push_str(&rule.format(&s, i, l));
+        }
+        r
+    }
+}
+
+#[cfg(feature = "orx_parallel")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
+pub trait OrxParIteratorStringWithStateRuleRef<S, R: FormatRule<S>> {
+    fn orx_par_iter_string_with_state_rule_ref(self, st: &S, rule: &R) -> String;
+}
+
+#[cfg(feature = "orx_parallel")]
+impl<
+        P: orx_parallel::ParIter<Item = T>,
+        T: core::fmt::Display,
+        S: Sync,
+        R: FormatRule<S> + Sync,
+    > OrxParIteratorStringWithStateRuleRef<S, R> for P
+{
+    fn orx_par_iter_string_with_state_rule_ref(self, st: &S, rule: &R) -> String {
+        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let l = items.len();
+        let mut r = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            r.push_str(&rule.format(st, &s, i, l));
+        }
+        r
+    }
+}
+
+#[cfg(feature = "orx_parallel")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
+pub trait OrxParIteratorStringWithStateMutRuleRef<S, R: FormatRuleMut<S>> {
+    fn orx_par_iter_string_with_state_mut_rule_ref(self, st: S, rule: &mut R) -> String;
+}
+
+#[cfg(feature = "orx_parallel")]
+impl<P: orx_parallel::ParIter<Item = T>, T: core::fmt::Display, S, R: FormatRuleMut<S>>
+    OrxParIteratorStringWithStateMutRuleRef<S, R> for P
+{
+    fn orx_par_iter_string_with_state_mut_rule_ref(self, mut st: S, rule: &mut R) -> String {
+        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let l = items.len();
+        let mut r = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            r.push_str(&rule.format(&mut st, &s, i, l));
+        }
+        r
+    }
+}
+
+// ============================================================================
+// ORX-PARALLEL NESTED - recursive formatting for parallel iterators
+// ============================================================================
+#[cfg(feature = "orx_parallel")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
+pub trait OrxParIteratorStringNested {
+    fn orx_par_iter_string_nested(self, inner_rule: FormatRuleFn, f: FormatRuleFn) -> String;
+}
+
+#[cfg(feature = "orx_parallel")]
+impl<P: orx_parallel::ParIter<Item = T>, T: VecString> OrxParIteratorStringNested for P {
+    fn orx_par_iter_string_nested(self, inner_rule: FormatRuleFn, f: FormatRuleFn) -> String {
+        let items: Vec<String> = self.map(|x| x.vec_string(inner_rule)).collect();
+        let l = items.len();
+        let mut r = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            r.push_str(&f(&s, i, l));
+        }
+        r
+    }
+}
+
+#[cfg(feature = "orx_parallel")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
+pub trait OrxParIteratorStringFnNested<F: Fn(&str, usize, usize) -> String> {
+    fn orx_par_iter_string_fn_nested(self, inner_rule: FormatRuleFn, f: F) -> String;
+}
+
+#[cfg(feature = "orx_parallel")]
+impl<
+        P: orx_parallel::ParIter<Item = T>,
+        T: VecString,
+        F: Fn(&str, usize, usize) -> String + Sync + Clone,
+    > OrxParIteratorStringFnNested<F> for P
+{
+    fn orx_par_iter_string_fn_nested(self, inner_rule: FormatRuleFn, f: F) -> String {
+        let items: Vec<String> = self.map(|x| x.vec_string(inner_rule)).collect();
+        let l = items.len();
+        let mut r = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            r.push_str(&f(&s, i, l));
+        }
+        r
+    }
+}
+
+#[cfg(feature = "orx_parallel")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
+pub trait OrxParIteratorStringFnMutNested<F: FnMut(&str, usize, usize) -> String> {
+    fn orx_par_iter_string_fn_mut_nested(self, inner_rule: FormatRuleFn, f: F) -> String;
+}
+
+#[cfg(feature = "orx_parallel")]
+impl<P: orx_parallel::ParIter<Item = T>, T: VecString, F: FnMut(&str, usize, usize) -> String>
+    OrxParIteratorStringFnMutNested<F> for P
+{
+    fn orx_par_iter_string_fn_mut_nested(self, inner_rule: FormatRuleFn, mut f: F) -> String {
+        let items: Vec<String> = self.map(|x| x.vec_string(inner_rule)).collect();
+        let l = items.len();
+        let mut r = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            r.push_str(&f(&s, i, l));
+        }
+        r
+    }
+}
+
+#[cfg(feature = "orx_parallel")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
+pub trait OrxParIteratorStringFnPtrNested {
+    fn orx_par_iter_string_fn_ptr_nested(self, inner_rule: FormatRuleFn, f: FormatRuleFn)
+        -> String;
+}
+
+#[cfg(feature = "orx_parallel")]
+impl<P: orx_parallel::ParIter<Item = T>, T: VecString> OrxParIteratorStringFnPtrNested for P {
+    fn orx_par_iter_string_fn_ptr_nested(
+        self,
+        inner_rule: FormatRuleFn,
+        f: FormatRuleFn,
+    ) -> String {
+        let items: Vec<String> = self.map(|x| x.vec_string(inner_rule)).collect();
+        let l = items.len();
+        let mut r = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            r.push_str(&f(&s, i, l));
+        }
+        r
+    }
+}
+
+#[cfg(feature = "orx_parallel")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
+pub trait OrxParIteratorStringWithStateNested<S, F: FnMut(&mut S, &str, usize, usize) -> String> {
+    fn orx_par_iter_string_with_state_nested(self, inner_rule: FormatRuleFn, st: S, f: F)
+        -> String;
+}
+
+#[cfg(feature = "orx_parallel")]
+impl<
+        P: orx_parallel::ParIter<Item = T>,
+        T: VecString,
+        S,
+        F: FnMut(&mut S, &str, usize, usize) -> String,
+    > OrxParIteratorStringWithStateNested<S, F> for P
+{
+    fn orx_par_iter_string_with_state_nested(
+        self,
+        inner_rule: FormatRuleFn,
+        mut st: S,
+        mut f: F,
+    ) -> String {
+        let items: Vec<String> = self.map(|x| x.vec_string(inner_rule)).collect();
+        let l = items.len();
+        let mut r = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            r.push_str(&f(&mut st, &s, i, l));
+        }
+        r
+    }
+}
+
+#[cfg(feature = "orx_parallel")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
+pub trait OrxParIteratorStringWithStateFnNested<S, F: Fn(&S, &str, usize, usize) -> String> {
+    fn orx_par_iter_string_with_state_fn_nested(
+        self,
+        inner_rule: FormatRuleFn,
+        st: &S,
+        f: F,
+    ) -> String;
+}
+
+#[cfg(feature = "orx_parallel")]
+impl<
+        P: orx_parallel::ParIter<Item = T>,
+        T: VecString,
+        S: Sync,
+        F: Fn(&S, &str, usize, usize) -> String + Sync + Clone,
+    > OrxParIteratorStringWithStateFnNested<S, F> for P
+{
+    fn orx_par_iter_string_with_state_fn_nested(
+        self,
+        inner_rule: FormatRuleFn,
+        st: &S,
+        f: F,
+    ) -> String {
+        let items: Vec<String> = self.map(|x| x.vec_string(inner_rule)).collect();
+        let l = items.len();
+        let mut r = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            r.push_str(&f(st, &s, i, l));
+        }
+        r
+    }
+}
+
+#[cfg(feature = "orx_parallel")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
+pub trait OrxParIteratorStringWithStateFnPtrNested<S> {
+    fn orx_par_iter_string_with_state_fn_ptr_nested(
+        self,
+        inner_rule: FormatRuleFn,
+        st: &S,
+        f: fn(&S, &str, usize, usize) -> String,
+    ) -> String;
+}
+
+#[cfg(feature = "orx_parallel")]
+impl<P: orx_parallel::ParIter<Item = T>, T: VecString, S: Sync>
+    OrxParIteratorStringWithStateFnPtrNested<S> for P
+{
+    fn orx_par_iter_string_with_state_fn_ptr_nested(
+        self,
+        inner_rule: FormatRuleFn,
+        st: &S,
+        f: fn(&S, &str, usize, usize) -> String,
+    ) -> String {
+        let items: Vec<String> = self.map(|x| x.vec_string(inner_rule)).collect();
+        let l = items.len();
+        let mut r = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            r.push_str(&f(st, &s, i, l));
+        }
+        r
+    }
+}
+
+#[cfg(feature = "orx_parallel")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
+pub trait OrxParIteratorStringRuleOwnedNested<R: FormatRuleNoStateOwned> {
+    fn orx_par_iter_string_rule_owned_nested(self, inner_rule: FormatRuleFn, rule: R) -> String;
+}
+
+#[cfg(feature = "orx_parallel")]
+impl<
+        P: orx_parallel::ParIter<Item = T>,
+        T: VecString,
+        R: FormatRuleNoStateOwned + Clone + Sync,
+    > OrxParIteratorStringRuleOwnedNested<R> for P
+{
+    fn orx_par_iter_string_rule_owned_nested(self, inner_rule: FormatRuleFn, rule: R) -> String {
+        let items: Vec<String> = self.map(|x| x.vec_string(inner_rule)).collect();
+        let l = items.len();
+        let mut r = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            r.push_str(&rule.clone().format(&s, i, l));
+        }
+        r
+    }
+}
+
+#[cfg(feature = "orx_parallel")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
+pub trait OrxParIteratorStringMutRuleOwnedNested<R: FormatRuleMutNoState> {
+    fn orx_par_iter_string_mut_rule_owned_nested(self, inner_rule: FormatRuleFn, rule: R)
+        -> String;
+}
+
+#[cfg(feature = "orx_parallel")]
+impl<P: orx_parallel::ParIter<Item = T>, T: VecString, R: FormatRuleMutNoState>
+    OrxParIteratorStringMutRuleOwnedNested<R> for P
+{
+    fn orx_par_iter_string_mut_rule_owned_nested(
+        self,
+        inner_rule: FormatRuleFn,
+        mut rule: R,
+    ) -> String {
+        let items: Vec<String> = self.map(|x| x.vec_string(inner_rule)).collect();
+        let l = items.len();
+        let mut r = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            r.push_str(&rule.format(&s, i, l));
+        }
+        r
+    }
+}
+
+#[cfg(feature = "orx_parallel")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
+pub trait OrxParIteratorStringWithStateRuleOwnedNested<S, R: FormatRule<S>> {
+    fn orx_par_iter_string_with_state_rule_owned_nested(
+        self,
+        inner_rule: FormatRuleFn,
+        st: &S,
+        rule: R,
+    ) -> String;
+}
+
+#[cfg(feature = "orx_parallel")]
+impl<
+        P: orx_parallel::ParIter<Item = T>,
+        T: VecString,
+        S: Sync,
+        R: FormatRule<S> + Clone + Sync,
+    > OrxParIteratorStringWithStateRuleOwnedNested<S, R> for P
+{
+    fn orx_par_iter_string_with_state_rule_owned_nested(
+        self,
+        inner_rule: FormatRuleFn,
+        st: &S,
+        rule: R,
+    ) -> String {
+        let items: Vec<String> = self.map(|x| x.vec_string(inner_rule)).collect();
+        let l = items.len();
+        let mut r = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            r.push_str(&rule.format(st, &s, i, l));
+        }
+        r
+    }
+}
+
+#[cfg(feature = "orx_parallel")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
+pub trait OrxParIteratorStringWithStateMutRuleOwnedNested<S, R: FormatRuleMut<S>> {
+    fn orx_par_iter_string_with_state_mut_rule_owned_nested(
+        self,
+        inner_rule: FormatRuleFn,
+        st: S,
+        rule: R,
+    ) -> String;
+}
+
+#[cfg(feature = "orx_parallel")]
+impl<P: orx_parallel::ParIter<Item = T>, T: VecString, S, R: FormatRuleMut<S>>
+    OrxParIteratorStringWithStateMutRuleOwnedNested<S, R> for P
+{
+    fn orx_par_iter_string_with_state_mut_rule_owned_nested(
+        self,
+        inner_rule: FormatRuleFn,
+        mut st: S,
+        mut rule: R,
+    ) -> String {
+        let items: Vec<String> = self.map(|x| x.vec_string(inner_rule)).collect();
+        let l = items.len();
+        let mut r = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            r.push_str(&rule.format(&mut st, &s, i, l));
+        }
+        r
+    }
+}
+
+#[cfg(feature = "orx_parallel")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
+pub trait OrxParIteratorStringRuleRefNested<'a, R: FormatRuleNoState> {
+    fn orx_par_iter_string_rule_ref_nested(self, inner_rule: FormatRuleFn, rule: &'a R) -> String;
+}
+
+#[cfg(feature = "orx_parallel")]
+impl<'a, P: orx_parallel::ParIter<Item = T>, T: VecString, R: FormatRuleNoState + Sync>
+    OrxParIteratorStringRuleRefNested<'a, R> for P
+{
+    fn orx_par_iter_string_rule_ref_nested(self, inner_rule: FormatRuleFn, rule: &'a R) -> String {
+        let items: Vec<String> = self.map(|x| x.vec_string(inner_rule)).collect();
+        let l = items.len();
+        let mut r = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            r.push_str(&rule.format(&s, i, l));
+        }
+        r
+    }
+}
+
+#[cfg(feature = "orx_parallel")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
+pub trait OrxParIteratorStringMutRuleRefNested<R: FormatRuleMutNoState> {
+    fn orx_par_iter_string_mut_rule_ref_nested(
+        self,
+        inner_rule: FormatRuleFn,
+        rule: &mut R,
+    ) -> String;
+}
+
+#[cfg(feature = "orx_parallel")]
+impl<P: orx_parallel::ParIter<Item = T>, T: VecString, R: FormatRuleMutNoState>
+    OrxParIteratorStringMutRuleRefNested<R> for P
+{
+    fn orx_par_iter_string_mut_rule_ref_nested(
+        self,
+        inner_rule: FormatRuleFn,
+        rule: &mut R,
+    ) -> String {
+        let items: Vec<String> = self.map(|x| x.vec_string(inner_rule)).collect();
+        let l = items.len();
+        let mut r = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            r.push_str(&rule.format(&s, i, l));
+        }
+        r
+    }
+}
+
+#[cfg(feature = "orx_parallel")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
+pub trait OrxParIteratorStringWithStateRuleRefNested<S, R: FormatRule<S>> {
+    fn orx_par_iter_string_with_state_rule_ref_nested(
+        self,
+        inner_rule: FormatRuleFn,
+        st: &S,
+        rule: &R,
+    ) -> String;
+}
+
+#[cfg(feature = "orx_parallel")]
+impl<P: orx_parallel::ParIter<Item = T>, T: VecString, S: Sync, R: FormatRule<S> + Sync>
+    OrxParIteratorStringWithStateRuleRefNested<S, R> for P
+{
+    fn orx_par_iter_string_with_state_rule_ref_nested(
+        self,
+        inner_rule: FormatRuleFn,
+        st: &S,
+        rule: &R,
+    ) -> String {
+        let items: Vec<String> = self.map(|x| x.vec_string(inner_rule)).collect();
+        let l = items.len();
+        let mut r = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            r.push_str(&rule.format(st, &s, i, l));
+        }
+        r
+    }
+}
+
+#[cfg(feature = "orx_parallel")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
+pub trait OrxParIteratorStringWithStateMutRuleRefNested<S, R: FormatRuleMut<S>> {
+    fn orx_par_iter_string_with_state_mut_rule_ref_nested(
+        self,
+        inner_rule: FormatRuleFn,
+        st: S,
+        rule: &mut R,
+    ) -> String;
+}
+
+#[cfg(feature = "orx_parallel")]
+impl<P: orx_parallel::ParIter<Item = T>, T: VecString, S, R: FormatRuleMut<S>>
+    OrxParIteratorStringWithStateMutRuleRefNested<S, R> for P
+{
+    fn orx_par_iter_string_with_state_mut_rule_ref_nested(
         self,
         inner_rule: FormatRuleFn,
         mut st: S,
@@ -9572,6 +10592,487 @@ mod nested_tests {
                     )
             );
         }
+    }
+
+    // ========================================================================
+    // 10d. ITERTOOLS TRAITS
+    // ========================================================================
+    #[cfg(feature = "itertools")]
+    #[test]
+    fn test_itertools_interleave() {
+        use itertools::Itertools;
+        let a = vec![1, 3];
+        let b = vec![2, 4];
+        let res = a
+            .iter()
+            .interleave(b.iter())
+            .iter_string(DEFAULT_FORMAT_RULE);
+        assert_eq!("[1, 2, 3, 4]", res);
+    }
+
+    #[cfg(feature = "itertools")]
+    #[test]
+    fn test_itertools_interleave_shortest() {
+        use itertools::Itertools;
+        let a = vec![1, 3, 5];
+        let b = vec![2, 4];
+        let res = a
+            .iter()
+            .interleave_shortest(b.iter())
+            .iter_string(DEFAULT_FORMAT_RULE);
+        assert_eq!("[1, 2, 3, 4, 5]", res);
+    }
+
+    #[cfg(feature = "itertools")]
+    #[test]
+    fn test_itertools_unique() {
+        use itertools::Itertools;
+        let v = vec![1, 2, 2, 3, 1];
+        let res = v.iter().unique().iter_string(DEFAULT_FORMAT_RULE);
+        assert_eq!("[1, 2, 3]", res);
+    }
+
+    #[cfg(feature = "itertools")]
+    #[test]
+    fn test_itertools_pad_using() {
+        use itertools::Itertools;
+        let v = vec![1, 2];
+        let res = v
+            .iter()
+            .copied()
+            .pad_using(4, |i| i * 10)
+            .iter_string(DEFAULT_FORMAT_RULE);
+        assert_eq!("[1, 2, 20, 30]", res);
+    }
+
+    #[cfg(feature = "itertools")]
+    #[test]
+    fn test_itertools_positions() {
+        use itertools::Itertools;
+        let v = vec![1, 2, 3, 4];
+        let res = v
+            .iter()
+            .positions(|&x| x % 2 == 0)
+            .iter_string(DEFAULT_FORMAT_RULE);
+        assert_eq!("[1, 3]", res);
+    }
+
+    #[cfg(feature = "itertools")]
+    #[test]
+    fn test_itertools_update() {
+        use itertools::Itertools;
+        let v = vec![1, 2, 3];
+        let res = v
+            .into_iter()
+            .update(|x| *x *= 2)
+            .iter_string(DEFAULT_FORMAT_RULE);
+        assert_eq!("[2, 4, 6]", res);
+    }
+
+    #[cfg(feature = "itertools")]
+    #[test]
+    fn test_itertools_while_some() {
+        use itertools::Itertools;
+        let v = vec![Some(1), Some(2), None, Some(3)];
+        let res = v.into_iter().while_some().iter_string(DEFAULT_FORMAT_RULE);
+        assert_eq!("[1, 2]", res);
+    }
+
+    #[cfg(feature = "itertools")]
+    #[test]
+    fn test_itertools_batching() {
+        use itertools::Itertools;
+        let v = vec![1, 2, 3, 4, 5];
+        let res = v
+            .into_iter()
+            .batching(|it| it.next())
+            .iter_string(DEFAULT_FORMAT_RULE);
+        assert_eq!("[1, 2, 3, 4, 5]", res);
+    }
+
+    #[cfg(feature = "itertools")]
+    #[test]
+    fn test_itertools_put_back() {
+        use itertools::put_back;
+        let v = vec![1, 2, 3];
+        let mut it = put_back(v.into_iter());
+        it.next();
+        it.put_back(1);
+        let res = it.iter_string(DEFAULT_FORMAT_RULE);
+        assert_eq!("[1, 2, 3]", res);
+    }
+
+    #[cfg(feature = "itertools")]
+    #[test]
+    fn test_itertools_map_into() {
+        use itertools::Itertools;
+        let v = vec![1i32, 2, 3];
+        let res = v
+            .into_iter()
+            .map_into::<i64>()
+            .iter_string(DEFAULT_FORMAT_RULE);
+        assert_eq!("[1, 2, 3]", res);
+    }
+
+    #[cfg(feature = "itertools")]
+    #[test]
+    fn test_itertools_take_while_inclusive() {
+        use itertools::Itertools;
+        let v = vec![1, 2, 3, 4, 5];
+        let res = v
+            .into_iter()
+            .take_while_inclusive(|&x| x < 4)
+            .iter_string(DEFAULT_FORMAT_RULE);
+        assert_eq!("[1, 2, 3, 4]", res);
+    }
+
+    #[cfg(feature = "itertools")]
+    #[test]
+    fn test_itertools_stable_iter_non_display() {
+        use itertools::Itertools;
+        fn assert_stable<I: StableIter>(_: &I) {}
+        let v = vec![1, 2, 3];
+        // combinations yields Vec<&i32> - no Display, but StableIter
+        assert_stable(&v.iter().combinations(2));
+        // permutations yields Vec<&i32>
+        assert_stable(&v.iter().permutations(2));
+        // cartesian_product yields (&i32, &i32)
+        let a = vec![1, 2];
+        let b = vec![3, 4];
+        assert_stable(&a.iter().cartesian_product(b.iter()));
+        // zip_eq yields (&i32, &i32)
+        assert_stable(&a.iter().zip_eq(b.iter()));
+        // zip_longest yields EitherOrBoth
+        assert_stable(&a.iter().zip_longest(b.iter()));
+        // with_position yields Position<&i32>
+        assert_stable(&v.iter().with_position());
+        // powerset yields Vec<&i32>
+        assert_stable(&v.iter().powerset());
+        // combinations_with_replacement yields Vec<&i32>
+        assert_stable(&v.iter().combinations_with_replacement(2));
+        // multi_cartesian_product yields Vec<i32>
+        let vv = vec![vec![1, 2], vec![3, 4]];
+        assert_stable(&vv.into_iter().multi_cartesian_product());
+        // filter_ok yields Result<i32, &str>
+        let vr: Vec<Result<i32, &str>> = vec![Ok(1), Err("e")];
+        assert_stable(&vr.into_iter().filter_ok(|&x| x > 0));
+    }
+
+    // ========================================================================
+    // 10e. ITERMORE TRAITS
+    // ========================================================================
+    #[cfg(feature = "itermore")]
+    #[test]
+    fn test_itermore_stable_iter() {
+        use itermore::prelude::*;
+        fn assert_stable<I: StableIter>(_: &I) {}
+        let v = vec![1, 2, 3, 4];
+        // array_chunks yields [i32; 2]
+        assert_stable(&v.clone().into_iter().array_chunks::<2>());
+        // array_windows yields [i32; 2]
+        assert_stable(&v.clone().into_iter().array_windows::<2>());
+        // array_combinations yields [i32; 2]
+        assert_stable(&v.clone().into_iter().array_combinations::<2>());
+        // array_combinations_with_reps yields [i32; 2]
+        assert_stable(&v.clone().into_iter().array_combinations_with_reps::<2>());
+        // cartesian_product yields (i32, i32)
+        let a = vec![1, 2];
+        let b = vec![3, 4];
+        assert_stable(&a.clone().into_iter().cartesian_product(b));
+        // circular_array_windows yields [i32; 2]
+        assert_stable(&v.clone().into_iter().circular_array_windows::<2>());
+        // combinations yields Vec<i32>
+        assert_stable(&v.clone().into_iter().combinations(2));
+        // combinations_with_reps yields Vec<i32>
+        assert_stable(&v.into_iter().combinations_with_reps(2));
+    }
+
+    // ========================================================================
+    // 10b. ORX-PARALLEL TRAITS
+    // ========================================================================
+    #[cfg(feature = "orx_parallel")]
+    #[test]
+    fn test_orx_par_base_traits() {
+        use orx_parallel::*;
+        let v = vec![1, 2, 3];
+        assert_eq!(
+            "[1, 2, 3]",
+            v.clone()
+                .into_par()
+                .orx_par_iter_string(DEFAULT_FORMAT_RULE)
+        );
+        assert_eq!(
+            "[1, 2, 3]",
+            v.clone()
+                .into_par()
+                .orx_par_iter_string_fn(DEFAULT_FORMAT_RULE)
+        );
+        assert_eq!(
+            "[1, 2, 3]",
+            v.clone()
+                .into_par()
+                .orx_par_iter_string_fn_mut(DEFAULT_FORMAT_RULE)
+        );
+        assert_eq!(
+            "[1, 2, 3]",
+            v.into_par().orx_par_iter_string_fn_ptr(DEFAULT_FORMAT_RULE)
+        );
+    }
+
+    #[cfg(feature = "orx_parallel")]
+    #[test]
+    fn test_orx_par_with_state_traits() {
+        use orx_parallel::*;
+        let v = vec![1, 2, 3];
+        assert_eq!(
+            "[1, 2, 3]",
+            v.clone()
+                .into_par()
+                .orx_par_iter_string_with_state(0i32, |s, val, i, l| {
+                    *s += 1;
+                    DEFAULT_FORMAT_RULE(val, i, l)
+                })
+        );
+        assert_eq!(
+            "[1, 2, 3]",
+            v.clone()
+                .into_par()
+                .orx_par_iter_string_with_state_fn(&0i32, |_s, val, i, l| {
+                    DEFAULT_FORMAT_RULE(val, i, l)
+                })
+        );
+        fn ptr_rule(_s: &i32, v: &str, i: usize, l: usize) -> String {
+            DEFAULT_FORMAT_RULE(v, i, l)
+        }
+        assert_eq!(
+            "[1, 2, 3]",
+            v.into_par()
+                .orx_par_iter_string_with_state_fn_ptr(&0i32, ptr_rule)
+        );
+    }
+
+    #[cfg(feature = "orx_parallel")]
+    #[test]
+    fn test_orx_par_rule_owned_traits() {
+        use orx_parallel::*;
+        let v = vec![1, 2, 3];
+        let r = |val: &str, i: usize, l: usize| DEFAULT_FORMAT_RULE(val, i, l);
+        assert_eq!(
+            "[1, 2, 3]",
+            v.clone().into_par().orx_par_iter_string_rule_owned(r)
+        );
+        let mut mr = |val: &str, i: usize, l: usize| DEFAULT_FORMAT_RULE(val, i, l);
+        assert_eq!(
+            "[1, 2, 3]",
+            v.clone()
+                .into_par()
+                .orx_par_iter_string_mut_rule_owned(&mut mr)
+        );
+        let sr = |_s: &i32, val: &str, i: usize, l: usize| DEFAULT_FORMAT_RULE(val, i, l);
+        assert_eq!(
+            "[1, 2, 3]",
+            v.clone()
+                .into_par()
+                .orx_par_iter_string_with_state_rule_owned(&0i32, sr)
+        );
+        let mut smr = |s: &mut i32, val: &str, i: usize, l: usize| {
+            *s += 1;
+            DEFAULT_FORMAT_RULE(val, i, l)
+        };
+        assert_eq!(
+            "[1, 2, 3]",
+            v.into_par()
+                .orx_par_iter_string_with_state_mut_rule_owned(0i32, &mut smr)
+        );
+    }
+
+    #[cfg(feature = "orx_parallel")]
+    #[test]
+    fn test_orx_par_rule_ref_traits() {
+        use orx_parallel::*;
+        let v = vec![1, 2, 3];
+        let r = |val: &str, i: usize, l: usize| DEFAULT_FORMAT_RULE(val, i, l);
+        assert_eq!(
+            "[1, 2, 3]",
+            v.clone().into_par().orx_par_iter_string_rule_ref(&r)
+        );
+        let mut mr = |val: &str, i: usize, l: usize| DEFAULT_FORMAT_RULE(val, i, l);
+        assert_eq!(
+            "[1, 2, 3]",
+            v.clone()
+                .into_par()
+                .orx_par_iter_string_mut_rule_ref(&mut mr)
+        );
+        let sr = |_s: &i32, val: &str, i: usize, l: usize| DEFAULT_FORMAT_RULE(val, i, l);
+        assert_eq!(
+            "[1, 2, 3]",
+            v.clone()
+                .into_par()
+                .orx_par_iter_string_with_state_rule_ref(&0i32, &sr)
+        );
+        let mut smr = |s: &mut i32, val: &str, i: usize, l: usize| {
+            *s += 1;
+            DEFAULT_FORMAT_RULE(val, i, l)
+        };
+        assert_eq!(
+            "[1, 2, 3]",
+            v.into_par()
+                .orx_par_iter_string_with_state_mut_rule_ref(0i32, &mut smr)
+        );
+    }
+
+    // ========================================================================
+    // 10c. ORX-PARALLEL NESTED TRAITS
+    // ========================================================================
+    #[cfg(feature = "orx_parallel")]
+    #[test]
+    fn test_orx_par_nested_base_traits() {
+        use orx_parallel::*;
+        let v = vec![vec![1, 2], vec![3, 4]];
+        assert_eq!(
+            "[[1, 2], [3, 4]]",
+            v.clone()
+                .into_par()
+                .orx_par_iter_string_nested(DEFAULT_FORMAT_RULE, DEFAULT_FORMAT_RULE)
+        );
+        assert_eq!(
+            "[[1, 2], [3, 4]]",
+            v.clone()
+                .into_par()
+                .orx_par_iter_string_fn_nested(DEFAULT_FORMAT_RULE, DEFAULT_FORMAT_RULE)
+        );
+        assert_eq!(
+            "[[1, 2], [3, 4]]",
+            v.clone()
+                .into_par()
+                .orx_par_iter_string_fn_mut_nested(DEFAULT_FORMAT_RULE, DEFAULT_FORMAT_RULE)
+        );
+        assert_eq!(
+            "[[1, 2], [3, 4]]",
+            v.into_par()
+                .orx_par_iter_string_fn_ptr_nested(DEFAULT_FORMAT_RULE, DEFAULT_FORMAT_RULE)
+        );
+    }
+
+    #[cfg(feature = "orx_parallel")]
+    #[test]
+    fn test_orx_par_nested_with_state_traits() {
+        use orx_parallel::*;
+        let v = vec![vec![1, 2], vec![3, 4]];
+        assert_eq!(
+            "[[1, 2], [3, 4]]",
+            v.clone().into_par().orx_par_iter_string_with_state_nested(
+                DEFAULT_FORMAT_RULE,
+                0i32,
+                |s, val, i, l| {
+                    *s += 1;
+                    DEFAULT_FORMAT_RULE(val, i, l)
+                }
+            )
+        );
+        assert_eq!(
+            "[[1, 2], [3, 4]]",
+            v.clone()
+                .into_par()
+                .orx_par_iter_string_with_state_fn_nested(
+                    DEFAULT_FORMAT_RULE,
+                    &0i32,
+                    |_s, val, i, l| { DEFAULT_FORMAT_RULE(val, i, l) }
+                )
+        );
+        fn ptr_rule(_s: &i32, v: &str, i: usize, l: usize) -> String {
+            DEFAULT_FORMAT_RULE(v, i, l)
+        }
+        assert_eq!(
+            "[[1, 2], [3, 4]]",
+            v.into_par().orx_par_iter_string_with_state_fn_ptr_nested(
+                DEFAULT_FORMAT_RULE,
+                &0i32,
+                ptr_rule
+            )
+        );
+    }
+
+    #[cfg(feature = "orx_parallel")]
+    #[test]
+    fn test_orx_par_nested_rule_owned_traits() {
+        use orx_parallel::*;
+        let v = vec![vec![1, 2], vec![3, 4]];
+        let r = |val: &str, i: usize, l: usize| DEFAULT_FORMAT_RULE(val, i, l);
+        assert_eq!(
+            "[[1, 2], [3, 4]]",
+            v.clone()
+                .into_par()
+                .orx_par_iter_string_rule_owned_nested(DEFAULT_FORMAT_RULE, r)
+        );
+        let mut mr = |val: &str, i: usize, l: usize| DEFAULT_FORMAT_RULE(val, i, l);
+        assert_eq!(
+            "[[1, 2], [3, 4]]",
+            v.clone()
+                .into_par()
+                .orx_par_iter_string_mut_rule_owned_nested(DEFAULT_FORMAT_RULE, &mut mr)
+        );
+        let sr = |_s: &i32, val: &str, i: usize, l: usize| DEFAULT_FORMAT_RULE(val, i, l);
+        assert_eq!(
+            "[[1, 2], [3, 4]]",
+            v.clone()
+                .into_par()
+                .orx_par_iter_string_with_state_rule_owned_nested(DEFAULT_FORMAT_RULE, &0i32, sr)
+        );
+        let mut smr = |s: &mut i32, val: &str, i: usize, l: usize| {
+            *s += 1;
+            DEFAULT_FORMAT_RULE(val, i, l)
+        };
+        assert_eq!(
+            "[[1, 2], [3, 4]]",
+            v.into_par()
+                .orx_par_iter_string_with_state_mut_rule_owned_nested(
+                    DEFAULT_FORMAT_RULE,
+                    0i32,
+                    &mut smr
+                )
+        );
+    }
+
+    #[cfg(feature = "orx_parallel")]
+    #[test]
+    fn test_orx_par_nested_rule_ref_traits() {
+        use orx_parallel::*;
+        let v = vec![vec![1, 2], vec![3, 4]];
+        let r = |val: &str, i: usize, l: usize| DEFAULT_FORMAT_RULE(val, i, l);
+        assert_eq!(
+            "[[1, 2], [3, 4]]",
+            v.clone()
+                .into_par()
+                .orx_par_iter_string_rule_ref_nested(DEFAULT_FORMAT_RULE, &r)
+        );
+        let mut mr = |val: &str, i: usize, l: usize| DEFAULT_FORMAT_RULE(val, i, l);
+        assert_eq!(
+            "[[1, 2], [3, 4]]",
+            v.clone()
+                .into_par()
+                .orx_par_iter_string_mut_rule_ref_nested(DEFAULT_FORMAT_RULE, &mut mr)
+        );
+        let sr = |_s: &i32, val: &str, i: usize, l: usize| DEFAULT_FORMAT_RULE(val, i, l);
+        assert_eq!(
+            "[[1, 2], [3, 4]]",
+            v.clone()
+                .into_par()
+                .orx_par_iter_string_with_state_rule_ref_nested(DEFAULT_FORMAT_RULE, &0i32, &sr)
+        );
+        let mut smr = |s: &mut i32, val: &str, i: usize, l: usize| {
+            *s += 1;
+            DEFAULT_FORMAT_RULE(val, i, l)
+        };
+        assert_eq!(
+            "[[1, 2], [3, 4]]",
+            v.into_par()
+                .orx_par_iter_string_with_state_mut_rule_ref_nested(
+                    DEFAULT_FORMAT_RULE,
+                    0i32,
+                    &mut smr
+                )
+        );
     }
 
     // ========================================================================

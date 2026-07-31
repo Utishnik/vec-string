@@ -2365,13 +2365,8 @@ where
             .into_par_iter()
             .enumerate()
             .map(|(i, s)| f(&s, i, l))
-            .reduce(
-                || String::new(),
-                |mut a, c| {
-                    a.push_str(&c);
-                    a
-                },
-            )
+            .collect::<Vec<_>>()
+            .concat()
     }
 }
 
@@ -2397,13 +2392,8 @@ where
             .into_par_iter()
             .enumerate()
             .map(|(i, s)| f(&s, i, l))
-            .reduce(
-                || String::new(),
-                |mut a, c| {
-                    a.push_str(&c);
-                    a
-                },
-            )
+            .collect::<Vec<_>>()
+            .concat()
     }
 }
 
@@ -2451,13 +2441,8 @@ where
             .into_par_iter()
             .enumerate()
             .map(|(i, s)| f(&s, i, l))
-            .reduce(
-                || String::new(),
-                |mut a, c| {
-                    a.push_str(&c);
-                    a
-                },
-            )
+            .collect::<Vec<_>>()
+            .concat()
     }
 }
 
@@ -2511,13 +2496,8 @@ where
             .into_par_iter()
             .enumerate()
             .map(|(i, s)| f(st, &s, i, l))
-            .reduce(
-                || String::new(),
-                |mut a, c| {
-                    a.push_str(&c);
-                    a
-                },
-            )
+            .collect::<Vec<_>>()
+            .concat()
     }
 }
 
@@ -2548,13 +2528,8 @@ where
             .into_par_iter()
             .enumerate()
             .map(|(i, s)| f(st, &s, i, l))
-            .reduce(
-                || String::new(),
-                |mut a, c| {
-                    a.push_str(&c);
-                    a
-                },
-            )
+            .collect::<Vec<_>>()
+            .concat()
     }
 }
 
@@ -2580,13 +2555,8 @@ where
             .into_par_iter()
             .enumerate()
             .map(|(i, s)| rule.clone().format(&s, i, l))
-            .reduce(
-                || String::new(),
-                |mut a, c| {
-                    a.push_str(&c);
-                    a
-                },
-            )
+            .collect::<Vec<_>>()
+            .concat()
     }
 }
 
@@ -2632,13 +2602,8 @@ where
             .into_par_iter()
             .enumerate()
             .map(|(i, s)| rule.format(st, &s, i, l))
-            .reduce(
-                || String::new(),
-                |mut a, c| {
-                    a.push_str(&c);
-                    a
-                },
-            )
+            .collect::<Vec<_>>()
+            .concat()
     }
 }
 
@@ -2684,13 +2649,8 @@ where
             .into_par_iter()
             .enumerate()
             .map(|(i, s)| rule.format(&s, i, l))
-            .reduce(
-                || String::new(),
-                |mut a, c| {
-                    a.push_str(&c);
-                    a
-                },
-            )
+            .collect::<Vec<_>>()
+            .concat()
     }
 }
 
@@ -2736,13 +2696,8 @@ where
             .into_par_iter()
             .enumerate()
             .map(|(i, s)| rule.format(st, &s, i, l))
-            .reduce(
-                || String::new(),
-                |mut a, c| {
-                    a.push_str(&c);
-                    a
-                },
-            )
+            .collect::<Vec<_>>()
+            .concat()
     }
 }
 
@@ -2790,13 +2745,8 @@ where
             .into_par_iter()
             .enumerate()
             .map(|(i, s)| f(&s, i, l))
-            .reduce(
-                || String::new(),
-                |mut a, c| {
-                    a.push_str(&c);
-                    a
-                },
-            )
+            .collect::<Vec<_>>()
+            .concat()
     }
 }
 
@@ -2822,13 +2772,8 @@ where
             .into_par_iter()
             .enumerate()
             .map(|(i, s)| f(&s, i, l))
-            .reduce(
-                || String::new(),
-                |mut a, c| {
-                    a.push_str(&c);
-                    a
-                },
-            )
+            .collect::<Vec<_>>()
+            .concat()
     }
 }
 
@@ -2873,13 +2818,8 @@ where
             .into_par_iter()
             .enumerate()
             .map(|(i, s)| f(&s, i, l))
-            .reduce(
-                || String::new(),
-                |mut a, c| {
-                    a.push_str(&c);
-                    a
-                },
-            )
+            .collect::<Vec<_>>()
+            .concat()
     }
 }
 
@@ -2944,13 +2884,8 @@ where
             .into_par_iter()
             .enumerate()
             .map(|(i, s)| f(st, &s, i, l))
-            .reduce(
-                || String::new(),
-                |mut a, c| {
-                    a.push_str(&c);
-                    a
-                },
-            )
+            .collect::<Vec<_>>()
+            .concat()
     }
 }
 
@@ -2983,13 +2918,8 @@ where
             .into_par_iter()
             .enumerate()
             .map(|(i, s)| f(st, &s, i, l))
-            .reduce(
-                || String::new(),
-                |mut a, c| {
-                    a.push_str(&c);
-                    a
-                },
-            )
+            .collect::<Vec<_>>()
+            .concat()
     }
 }
 
@@ -3012,13 +2942,8 @@ where
             .into_par_iter()
             .enumerate()
             .map(|(i, s)| rule.clone().format(&s, i, l))
-            .reduce(
-                || String::new(),
-                |mut a, c| {
-                    a.push_str(&c);
-                    a
-                },
-            )
+            .collect::<Vec<_>>()
+            .concat()
     }
 }
 
@@ -3078,13 +3003,8 @@ where
             .into_par_iter()
             .enumerate()
             .map(|(i, s)| rule.format(st, &s, i, l))
-            .reduce(
-                || String::new(),
-                |mut a, c| {
-                    a.push_str(&c);
-                    a
-                },
-            )
+            .collect::<Vec<_>>()
+            .concat()
     }
 }
 
@@ -3140,13 +3060,8 @@ where
             .into_par_iter()
             .enumerate()
             .map(|(i, s)| rule.format(&s, i, l))
-            .reduce(
-                || String::new(),
-                |mut a, c| {
-                    a.push_str(&c);
-                    a
-                },
-            )
+            .collect::<Vec<_>>()
+            .concat()
     }
 }
 
@@ -3202,13 +3117,8 @@ where
             .into_par_iter()
             .enumerate()
             .map(|(i, s)| rule.format(st, &s, i, l))
-            .reduce(
-                || String::new(),
-                |mut a, c| {
-                    a.push_str(&c);
-                    a
-                },
-            )
+            .collect::<Vec<_>>()
+            .concat()
     }
 }
 
@@ -3262,11 +3172,8 @@ impl<P: orx_parallel::ParIter<Item = T>, T: core::fmt::Display> OrxParIteratorSt
         (0..l)
             .into_par()
             .map(|i| f(&items[i], i, l))
-            .reduce(|mut a, b| {
-                a.push_str(&b);
-                a
-            })
-            .unwrap_or_default()
+            .collect::<Vec<_>>()
+            .concat()
     }
 }
 
@@ -3289,11 +3196,8 @@ impl<
         (0..l)
             .into_par()
             .map(|i| f(&items[i], i, l))
-            .reduce(|mut a, b| {
-                a.push_str(&b);
-                a
-            })
-            .unwrap_or_default()
+            .collect::<Vec<_>>()
+            .concat()
     }
 }
 
@@ -3335,11 +3239,8 @@ impl<P: orx_parallel::ParIter<Item = T>, T: core::fmt::Display> OrxParIteratorSt
         (0..l)
             .into_par()
             .map(|i| f(&items[i], i, l))
-            .reduce(|mut a, b| {
-                a.push_str(&b);
-                a
-            })
-            .unwrap_or_default()
+            .collect::<Vec<_>>()
+            .concat()
     }
 }
 
@@ -3388,11 +3289,8 @@ impl<
         (0..l)
             .into_par()
             .map(|i| f(st, &items[i], i, l))
-            .reduce(|mut a, b| {
-                a.push_str(&b);
-                a
-            })
-            .unwrap_or_default()
+            .collect::<Vec<_>>()
+            .concat()
     }
 }
 
@@ -3420,11 +3318,8 @@ impl<P: orx_parallel::ParIter<Item = T>, T: core::fmt::Display, S: Sync>
         (0..l)
             .into_par()
             .map(|i| f(st, &items[i], i, l))
-            .reduce(|mut a, b| {
-                a.push_str(&b);
-                a
-            })
-            .unwrap_or_default()
+            .collect::<Vec<_>>()
+            .concat()
     }
 }
 
@@ -3447,11 +3342,8 @@ impl<
         (0..l)
             .into_par()
             .map(|i| rule.clone().format(&items[i], i, l))
-            .reduce(|mut a, b| {
-                a.push_str(&b);
-                a
-            })
-            .unwrap_or_default()
+            .collect::<Vec<_>>()
+            .concat()
     }
 }
 
@@ -3496,11 +3388,8 @@ impl<
         (0..l)
             .into_par()
             .map(|i| rule.format(st, &items[i], i, l))
-            .reduce(|mut a, b| {
-                a.push_str(&b);
-                a
-            })
-            .unwrap_or_default()
+            .collect::<Vec<_>>()
+            .concat()
     }
 }
 
@@ -3545,11 +3434,8 @@ impl<
         (0..l)
             .into_par()
             .map(|i| rule.format(&items[i], i, l))
-            .reduce(|mut a, b| {
-                a.push_str(&b);
-                a
-            })
-            .unwrap_or_default()
+            .collect::<Vec<_>>()
+            .concat()
     }
 }
 
@@ -3594,11 +3480,8 @@ impl<
         (0..l)
             .into_par()
             .map(|i| rule.format(st, &items[i], i, l))
-            .reduce(|mut a, b| {
-                a.push_str(&b);
-                a
-            })
-            .unwrap_or_default()
+            .collect::<Vec<_>>()
+            .concat()
     }
 }
 
@@ -3640,11 +3523,8 @@ impl<P: orx_parallel::ParIter<Item = T>, T: VecString> OrxParIteratorStringNeste
         (0..l)
             .into_par()
             .map(|i| f(&items[i], i, l))
-            .reduce(|mut a, b| {
-                a.push_str(&b);
-                a
-            })
-            .unwrap_or_default()
+            .collect::<Vec<_>>()
+            .concat()
     }
 }
 
@@ -3667,11 +3547,8 @@ impl<
         (0..l)
             .into_par()
             .map(|i| f(&items[i], i, l))
-            .reduce(|mut a, b| {
-                a.push_str(&b);
-                a
-            })
-            .unwrap_or_default()
+            .collect::<Vec<_>>()
+            .concat()
     }
 }
 
@@ -3715,11 +3592,8 @@ impl<P: orx_parallel::ParIter<Item = T>, T: VecString> OrxParIteratorStringFnPtr
         (0..l)
             .into_par()
             .map(|i| f(&items[i], i, l))
-            .reduce(|mut a, b| {
-                a.push_str(&b);
-                a
-            })
-            .unwrap_or_default()
+            .collect::<Vec<_>>()
+            .concat()
     }
 }
 
@@ -3784,11 +3658,8 @@ impl<
         (0..l)
             .into_par()
             .map(|i| f(st, &items[i], i, l))
-            .reduce(|mut a, b| {
-                a.push_str(&b);
-                a
-            })
-            .unwrap_or_default()
+            .collect::<Vec<_>>()
+            .concat()
     }
 }
 
@@ -3818,11 +3689,8 @@ impl<P: orx_parallel::ParIter<Item = T>, T: VecString, S: Sync>
         (0..l)
             .into_par()
             .map(|i| f(st, &items[i], i, l))
-            .reduce(|mut a, b| {
-                a.push_str(&b);
-                a
-            })
-            .unwrap_or_default()
+            .collect::<Vec<_>>()
+            .concat()
     }
 }
 
@@ -3845,11 +3713,8 @@ impl<
         (0..l)
             .into_par()
             .map(|i| rule.clone().format(&items[i], i, l))
-            .reduce(|mut a, b| {
-                a.push_str(&b);
-                a
-            })
-            .unwrap_or_default()
+            .collect::<Vec<_>>()
+            .concat()
     }
 }
 
@@ -3909,11 +3774,8 @@ impl<
         (0..l)
             .into_par()
             .map(|i| rule.format(st, &items[i], i, l))
-            .reduce(|mut a, b| {
-                a.push_str(&b);
-                a
-            })
-            .unwrap_or_default()
+            .collect::<Vec<_>>()
+            .concat()
     }
 }
 
@@ -3964,11 +3826,8 @@ impl<'a, P: orx_parallel::ParIter<Item = T>, T: VecString, R: FormatRuleNoState 
         (0..l)
             .into_par()
             .map(|i| rule.format(&items[i], i, l))
-            .reduce(|mut a, b| {
-                a.push_str(&b);
-                a
-            })
-            .unwrap_or_default()
+            .collect::<Vec<_>>()
+            .concat()
     }
 }
 
@@ -4027,11 +3886,8 @@ impl<P: orx_parallel::ParIter<Item = T>, T: VecString, S: Sync, R: FormatRule<S>
         (0..l)
             .into_par()
             .map(|i| rule.format(st, &items[i], i, l))
-            .reduce(|mut a, b| {
-                a.push_str(&b);
-                a
-            })
-            .unwrap_or_default()
+            .collect::<Vec<_>>()
+            .concat()
     }
 }
 

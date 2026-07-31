@@ -4360,6 +4360,568 @@ impl<P: orx_parallel::ParIter<Item = T>, T: core::fmt::Display> OrxParIteratorSt
 }
 
 // ============================================================================
+// ORX-PARALLEL SYNC CLONE - F: Clone instead of F: Sync (no shared reference)
+// ============================================================================
+#[cfg(feature = "orx_parallel")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
+pub trait OrxParIteratorStringFnClone<F: Fn(&str, usize, usize) -> String> {
+    fn orx_par_iter_string_fn_clone(self, f: F) -> String;
+}
+
+#[cfg(feature = "orx_parallel")]
+impl<
+        P: orx_parallel::ParIter<Item = T>,
+        T: core::fmt::Display,
+        F: Fn(&str, usize, usize) -> String + Clone,
+    > OrxParIteratorStringFnClone<F> for P
+{
+    fn orx_par_iter_string_fn_clone(self, f: F) -> String {
+        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let l = items.len();
+        let mut r = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            r.push_str(&f.clone()(&s, i, l));
+        }
+        r
+    }
+}
+
+#[cfg(feature = "orx_parallel")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
+pub trait OrxParIteratorStringWithStateFnClone<S, F: Fn(&S, &str, usize, usize) -> String> {
+    fn orx_par_iter_string_with_state_fn_clone(self, st: S, f: F) -> String;
+}
+
+#[cfg(feature = "orx_parallel")]
+impl<
+        P: orx_parallel::ParIter<Item = T>,
+        T: core::fmt::Display,
+        S: Clone,
+        F: Fn(&S, &str, usize, usize) -> String + Clone,
+    > OrxParIteratorStringWithStateFnClone<S, F> for P
+{
+    fn orx_par_iter_string_with_state_fn_clone(self, st: S, f: F) -> String {
+        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let l = items.len();
+        let mut r = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            r.push_str(&f.clone()(&st, &s, i, l));
+        }
+        r
+    }
+}
+
+#[cfg(feature = "orx_parallel")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
+pub trait OrxParIteratorStringRuleRefClone<R: FormatRuleNoState> {
+    fn orx_par_iter_string_rule_ref_clone(self, rule: R) -> String;
+}
+
+#[cfg(feature = "orx_parallel")]
+impl<P: orx_parallel::ParIter<Item = T>, T: core::fmt::Display, R: FormatRuleNoState + Clone>
+    OrxParIteratorStringRuleRefClone<R> for P
+{
+    fn orx_par_iter_string_rule_ref_clone(self, rule: R) -> String {
+        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let l = items.len();
+        let mut r = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            r.push_str(&rule.clone().format(&s, i, l));
+        }
+        r
+    }
+}
+
+#[cfg(feature = "orx_parallel")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
+pub trait OrxParIteratorStringWithStateRuleRefClone<S, R: FormatRule<S>> {
+    fn orx_par_iter_string_with_state_rule_ref_clone(self, st: S, rule: R) -> String;
+}
+
+#[cfg(feature = "orx_parallel")]
+impl<
+        P: orx_parallel::ParIter<Item = T>,
+        T: core::fmt::Display,
+        S: Clone,
+        R: FormatRule<S> + Clone,
+    > OrxParIteratorStringWithStateRuleRefClone<S, R> for P
+{
+    fn orx_par_iter_string_with_state_rule_ref_clone(self, st: S, rule: R) -> String {
+        let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+        let l = items.len();
+        let mut r = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            r.push_str(&rule.clone().format(&st, &s, i, l));
+        }
+        r
+    }
+}
+
+// ============================================================================
+// ORX-PARALLEL NESTED CLONE - F: Clone instead of F: Sync
+// ============================================================================
+#[cfg(feature = "orx_parallel")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
+pub trait OrxParIteratorStringFnCloneNested<F: Fn(&str, usize, usize) -> String> {
+    fn orx_par_iter_string_fn_clone_nested(self, inner_rule: FormatRuleFn, f: F) -> String;
+}
+
+#[cfg(feature = "orx_parallel")]
+impl<
+        P: orx_parallel::ParIter<Item = T>,
+        T: VecString,
+        F: Fn(&str, usize, usize) -> String + Clone,
+    > OrxParIteratorStringFnCloneNested<F> for P
+{
+    fn orx_par_iter_string_fn_clone_nested(self, inner_rule: FormatRuleFn, f: F) -> String {
+        let items: Vec<String> = self.map(|x| x.vec_string(inner_rule)).collect();
+        let l = items.len();
+        let mut r = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            r.push_str(&f.clone()(&s, i, l));
+        }
+        r
+    }
+}
+
+#[cfg(feature = "orx_parallel")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
+pub trait OrxParIteratorStringWithStateFnCloneNested<S, F: Fn(&S, &str, usize, usize) -> String> {
+    fn orx_par_iter_string_with_state_fn_clone_nested(self, inner_rule: FormatRuleFn, st: S, f: F)
+        -> String;
+}
+
+#[cfg(feature = "orx_parallel")]
+impl<
+        P: orx_parallel::ParIter<Item = T>,
+        T: VecString,
+        S: Clone,
+        F: Fn(&S, &str, usize, usize) -> String + Clone,
+    > OrxParIteratorStringWithStateFnCloneNested<S, F> for P
+{
+    fn orx_par_iter_string_with_state_fn_clone_nested(
+        self,
+        inner_rule: FormatRuleFn,
+        st: S,
+        f: F,
+    ) -> String {
+        let items: Vec<String> = self.map(|x| x.vec_string(inner_rule)).collect();
+        let l = items.len();
+        let mut r = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            r.push_str(&f.clone()(&st, &s, i, l));
+        }
+        r
+    }
+}
+
+#[cfg(feature = "orx_parallel")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
+pub trait OrxParIteratorStringRuleRefCloneNested<R: FormatRuleNoState> {
+    fn orx_par_iter_string_rule_ref_clone_nested(self, inner_rule: FormatRuleFn, rule: R) -> String;
+}
+
+#[cfg(feature = "orx_parallel")]
+impl<P: orx_parallel::ParIter<Item = T>, T: VecString, R: FormatRuleNoState + Clone>
+    OrxParIteratorStringRuleRefCloneNested<R> for P
+{
+    fn orx_par_iter_string_rule_ref_clone_nested(
+        self,
+        inner_rule: FormatRuleFn,
+        rule: R,
+    ) -> String {
+        let items: Vec<String> = self.map(|x| x.vec_string(inner_rule)).collect();
+        let l = items.len();
+        let mut r = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            r.push_str(&rule.clone().format(&s, i, l));
+        }
+        r
+    }
+}
+
+#[cfg(feature = "orx_parallel")]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
+pub trait OrxParIteratorStringWithStateRuleRefCloneNested<S, R: FormatRule<S>> {
+    fn orx_par_iter_string_with_state_rule_ref_clone_nested(
+        self,
+        inner_rule: FormatRuleFn,
+        st: S,
+        rule: R,
+    ) -> String;
+}
+
+#[cfg(feature = "orx_parallel")]
+impl<
+        P: orx_parallel::ParIter<Item = T>,
+        T: VecString,
+        S: Clone,
+        R: FormatRule<S> + Clone,
+    > OrxParIteratorStringWithStateRuleRefCloneNested<S, R> for P
+{
+    fn orx_par_iter_string_with_state_rule_ref_clone_nested(
+        self,
+        inner_rule: FormatRuleFn,
+        st: S,
+        rule: R,
+    ) -> String {
+        let items: Vec<String> = self.map(|x| x.vec_string(inner_rule)).collect();
+        let l = items.len();
+        let mut r = String::new();
+        for (i, s) in items.into_iter().enumerate() {
+            r.push_str(&rule.clone().format(&st, &s, i, l));
+        }
+        r
+    }
+}
+
+// ============================================================================
+// ORX-PARALLEL + DYN ASYNC CLONE - F: Clone, no Sync required
+// ============================================================================
+#[cfg(all(feature = "orx_parallel", feature = "dyn_async"))]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
+pub trait OrxParIteratorStringFnAsyncClone<
+    F: Fn(&str, usize, usize) -> Fut + Clone,
+    Fut: core::future::Future<Output = String>,
+>
+{
+    fn orx_par_iter_string_async_fn_clone(
+        self,
+        f: F,
+    ) -> Box<dyn core::future::Future<Output = String>>;
+}
+
+#[cfg(all(feature = "orx_parallel", feature = "dyn_async"))]
+impl<
+        P: orx_parallel::ParIter<Item = T> + 'static,
+        T: core::fmt::Display,
+        F: Fn(&str, usize, usize) -> Fut + Clone + 'static,
+        Fut: core::future::Future<Output = String>,
+    > OrxParIteratorStringFnAsyncClone<F, Fut> for P
+{
+    fn orx_par_iter_string_async_fn_clone(
+        self,
+        f: F,
+    ) -> Box<dyn core::future::Future<Output = String>> {
+        Box::new(async move {
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let l = items.len();
+            let mut r = String::new();
+            r.reserve(l.saturating_mul(16));
+            for (i, s) in items.into_iter().enumerate() {
+                r.push_str(&f.clone()(&s, i, l).await);
+            }
+            r
+        })
+    }
+}
+
+#[cfg(all(feature = "orx_parallel", feature = "dyn_async"))]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
+pub trait OrxParIteratorStringFnAsyncCloneSend<
+    F: Fn(&str, usize, usize) -> Fut + Clone + Send,
+    Fut: core::future::Future<Output = String> + Send,
+>
+{
+    fn orx_par_iter_string_async_fn_clone(
+        self,
+        f: F,
+    ) -> Box<dyn core::future::Future<Output = String> + Send>;
+}
+
+#[cfg(all(feature = "orx_parallel", feature = "dyn_async"))]
+impl<
+        P: orx_parallel::ParIter<Item = T> + Send + 'static,
+        T: core::fmt::Display + Send,
+        F: Fn(&str, usize, usize) -> Fut + Clone + Send + 'static,
+        Fut: core::future::Future<Output = String> + Send,
+    > OrxParIteratorStringFnAsyncCloneSend<F, Fut> for P
+{
+    fn orx_par_iter_string_async_fn_clone(
+        self,
+        f: F,
+    ) -> Box<dyn core::future::Future<Output = String> + Send> {
+        Box::new(async move {
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let l = items.len();
+            let mut r = String::new();
+            r.reserve(l.saturating_mul(16));
+            for (i, s) in items.into_iter().enumerate() {
+                r.push_str(&f.clone()(&s, i, l).await);
+            }
+            r
+        })
+    }
+}
+
+#[cfg(all(feature = "orx_parallel", feature = "dyn_async"))]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
+pub trait OrxParIteratorStringFnMutAsyncClone<
+    F: FnMut(&str, usize, usize) -> Fut + Clone,
+    Fut: core::future::Future<Output = String>,
+>
+{
+    fn orx_par_iter_string_async_fn_mut_clone(
+        self,
+        f: F,
+    ) -> Box<dyn core::future::Future<Output = String>>;
+}
+
+#[cfg(all(feature = "orx_parallel", feature = "dyn_async"))]
+impl<
+        P: orx_parallel::ParIter<Item = T> + 'static,
+        T: core::fmt::Display,
+        F: FnMut(&str, usize, usize) -> Fut + Clone + 'static,
+        Fut: core::future::Future<Output = String>,
+    > OrxParIteratorStringFnMutAsyncClone<F, Fut> for P
+{
+    fn orx_par_iter_string_async_fn_mut_clone(
+        self,
+        f: F,
+    ) -> Box<dyn core::future::Future<Output = String>> {
+        Box::new(async move {
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let l = items.len();
+            let mut r = String::new();
+            r.reserve(l.saturating_mul(16));
+            for (i, s) in items.into_iter().enumerate() {
+                r.push_str(&f.clone()(&s, i, l).await);
+            }
+            r
+        })
+    }
+}
+
+#[cfg(all(feature = "orx_parallel", feature = "dyn_async"))]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
+pub trait OrxParIteratorStringFnMutAsyncCloneSend<
+    F: FnMut(&str, usize, usize) -> Fut + Clone + Send,
+    Fut: core::future::Future<Output = String> + Send,
+>
+{
+    fn orx_par_iter_string_async_fn_mut_clone(
+        self,
+        f: F,
+    ) -> Box<dyn core::future::Future<Output = String> + Send>;
+}
+
+#[cfg(all(feature = "orx_parallel", feature = "dyn_async"))]
+impl<
+        P: orx_parallel::ParIter<Item = T> + Send + 'static,
+        T: core::fmt::Display + Send,
+        F: FnMut(&str, usize, usize) -> Fut + Clone + Send + 'static,
+        Fut: core::future::Future<Output = String> + Send,
+    > OrxParIteratorStringFnMutAsyncCloneSend<F, Fut> for P
+{
+    fn orx_par_iter_string_async_fn_mut_clone(
+        self,
+        f: F,
+    ) -> Box<dyn core::future::Future<Output = String> + Send> {
+        Box::new(async move {
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let l = items.len();
+            let mut r = String::new();
+            r.reserve(l.saturating_mul(16));
+            for (i, s) in items.into_iter().enumerate() {
+                r.push_str(&f.clone()(&s, i, l).await);
+            }
+            r
+        })
+    }
+}
+
+// ============================================================================
+// ORX-PARALLEL + IMPL ASYNC CLONE - F: Clone, no Sync required
+// ============================================================================
+#[cfg(all(feature = "orx_parallel", feature = "impl_async"))]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
+pub trait OrxParIteratorStringFnImplAsyncClone<
+    F: Fn(&str, usize, usize) -> Fut + Clone,
+    Fut: core::future::Future<Output = String>,
+>
+{
+    fn orx_par_iter_string_async_fn_clone<'a>(
+        self,
+        f: F,
+    ) -> impl core::future::Future<Output = String> + 'a
+    where
+        Self: 'a,
+        F: 'a,
+        Fut: 'a;
+}
+
+#[cfg(all(feature = "orx_parallel", feature = "impl_async"))]
+impl<
+        P: orx_parallel::ParIter<Item = T>,
+        T: core::fmt::Display,
+        F: Fn(&str, usize, usize) -> Fut + Clone,
+        Fut: core::future::Future<Output = String>,
+    > OrxParIteratorStringFnImplAsyncClone<F, Fut> for P
+{
+    fn orx_par_iter_string_async_fn_clone<'a>(
+        self,
+        f: F,
+    ) -> impl core::future::Future<Output = String> + 'a
+    where
+        Self: 'a,
+        F: 'a,
+        Fut: 'a,
+    {
+        async move {
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let l = items.len();
+            let mut r = String::new();
+            r.reserve(l.saturating_mul(16));
+            for (i, s) in items.into_iter().enumerate() {
+                r.push_str(&f.clone()(&s, i, l).await);
+            }
+            r
+        }
+    }
+}
+
+#[cfg(all(feature = "orx_parallel", feature = "impl_async"))]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
+pub trait OrxParIteratorStringFnImplAsyncCloneSend<
+    F: Fn(&str, usize, usize) -> Fut + Clone + Send,
+    Fut: core::future::Future<Output = String> + Send,
+>
+{
+    fn orx_par_iter_string_async_fn_clone<'a>(
+        self,
+        f: F,
+    ) -> impl core::future::Future<Output = String> + 'a + Send
+    where
+        Self: 'a,
+        F: 'a,
+        Fut: 'a;
+}
+
+#[cfg(all(feature = "orx_parallel", feature = "impl_async"))]
+impl<
+        P: orx_parallel::ParIter<Item = T> + Send,
+        T: core::fmt::Display + Send,
+        F: Fn(&str, usize, usize) -> Fut + Clone + Send,
+        Fut: core::future::Future<Output = String> + Send,
+    > OrxParIteratorStringFnImplAsyncCloneSend<F, Fut> for P
+{
+    fn orx_par_iter_string_async_fn_clone<'a>(
+        self,
+        f: F,
+    ) -> impl core::future::Future<Output = String> + 'a + Send
+    where
+        Self: 'a,
+        F: 'a,
+        Fut: 'a,
+    {
+        async move {
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let l = items.len();
+            let mut r = String::new();
+            r.reserve(l.saturating_mul(16));
+            for (i, s) in items.into_iter().enumerate() {
+                r.push_str(&f.clone()(&s, i, l).await);
+            }
+            r
+        }
+    }
+}
+
+#[cfg(all(feature = "orx_parallel", feature = "impl_async"))]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
+pub trait OrxParIteratorStringFnMutImplAsyncClone<
+    F: FnMut(&str, usize, usize) -> Fut + Clone,
+    Fut: core::future::Future<Output = String>,
+>
+{
+    fn orx_par_iter_string_async_fn_mut_clone<'a>(
+        self,
+        f: F,
+    ) -> impl core::future::Future<Output = String> + 'a
+    where
+        Self: 'a,
+        F: 'a,
+        Fut: 'a;
+}
+
+#[cfg(all(feature = "orx_parallel", feature = "impl_async"))]
+impl<
+        P: orx_parallel::ParIter<Item = T>,
+        T: core::fmt::Display,
+        F: FnMut(&str, usize, usize) -> Fut + Clone,
+        Fut: core::future::Future<Output = String>,
+    > OrxParIteratorStringFnMutImplAsyncClone<F, Fut> for P
+{
+    fn orx_par_iter_string_async_fn_mut_clone<'a>(
+        self,
+        f: F,
+    ) -> impl core::future::Future<Output = String> + 'a
+    where
+        Self: 'a,
+        F: 'a,
+        Fut: 'a,
+    {
+        async move {
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let l = items.len();
+            let mut r = String::new();
+            r.reserve(l.saturating_mul(16));
+            for (i, s) in items.into_iter().enumerate() {
+                r.push_str(&f.clone()(&s, i, l).await);
+            }
+            r
+        }
+    }
+}
+
+#[cfg(all(feature = "orx_parallel", feature = "impl_async"))]
+#[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
+pub trait OrxParIteratorStringFnMutImplAsyncCloneSend<
+    F: FnMut(&str, usize, usize) -> Fut + Clone + Send,
+    Fut: core::future::Future<Output = String> + Send,
+>
+{
+    fn orx_par_iter_string_async_fn_mut_clone<'a>(
+        self,
+        f: F,
+    ) -> impl core::future::Future<Output = String> + 'a + Send
+    where
+        Self: 'a,
+        F: 'a,
+        Fut: 'a;
+}
+
+#[cfg(all(feature = "orx_parallel", feature = "impl_async"))]
+impl<
+        P: orx_parallel::ParIter<Item = T> + Send,
+        T: core::fmt::Display + Send,
+        F: FnMut(&str, usize, usize) -> Fut + Clone + Send,
+        Fut: core::future::Future<Output = String> + Send,
+    > OrxParIteratorStringFnMutImplAsyncCloneSend<F, Fut> for P
+{
+    fn orx_par_iter_string_async_fn_mut_clone<'a>(
+        self,
+        f: F,
+    ) -> impl core::future::Future<Output = String> + 'a + Send
+    where
+        Self: 'a,
+        F: 'a,
+        Fut: 'a,
+    {
+        async move {
+            let items: Vec<String> = self.map(|x| format!("{}", x)).collect();
+            let l = items.len();
+            let mut r = String::new();
+            r.reserve(l.saturating_mul(16));
+            for (i, s) in items.into_iter().enumerate() {
+                r.push_str(&f.clone()(&s, i, l).await);
+            }
+            r
+        }
+    }
+}
+
+// ============================================================================
 // DYN ASYNC: Format Rule traits
 // ============================================================================
 #[cfg(feature = "dyn_async")]
@@ -11044,6 +11606,215 @@ mod nested_tests {
                     v.into_par(),
                     my_fmt,
                 ),
+            );
+            assert_eq!("[1][2][3]", result);
+        }
+    }
+
+
+    // ========================================================================
+    // 10c. ORX CLONE TRAITS
+    // ========================================================================
+    #[cfg(feature = "orx_parallel")]
+    #[test]
+    fn test_orx_par_clone_traits() {
+        use orx_parallel::*;
+        let f = |val: &str, i: usize, l: usize| {
+            if i == l - 1 { format!("{}]", val) } else { format!("{}, ", val) }
+        };
+        let result: String = vec![10, 20, 30].into_par().orx_par_iter_string_fn_clone(f);
+        assert_eq!("10, 20, 30]", result);
+
+        let st = "S".to_string();
+        let f2 = |s: &String, val: &str, _i: usize, _l: usize| format!("{}{}", s, val);
+        let result2: String = vec![10, 20, 30].into_par().orx_par_iter_string_with_state_fn_clone(st, f2);
+        assert_eq!("S10S20S30", result2);
+
+        let rule = |val: &str, _i: usize, _l: usize| format!("<{}>", val);
+        let result3: String = vec![10, 20, 30].into_par().orx_par_iter_string_rule_ref_clone(rule);
+        assert_eq!("<10><20><30>", result3);
+
+        let st2 = "P".to_string();
+        let rule2 = |s: &String, val: &str, _i: usize, _l: usize| format!("{}{}", s, val);
+        let result4: String = vec![10, 20, 30].into_par().orx_par_iter_string_with_state_rule_ref_clone(st2, rule2);
+        assert_eq!("P10P20P30", result4);
+    }
+
+    #[cfg(feature = "orx_parallel")]
+    #[test]
+    fn test_orx_par_nested_clone_traits() {
+        use orx_parallel::*;
+        let f = |val: &str, _i: usize, _l: usize| format!("{}|", val);
+        let result: String = vec![vec![1, 2], vec![3]].into_par().orx_par_iter_string_fn_clone_nested(DEFAULT_FORMAT_RULE, f);
+        assert_eq!("[1, 2]|[3]|", result);
+
+        let st = "X".to_string();
+        let f2 = |s: &String, val: &str, _i: usize, _l: usize| format!("{}{}", s, val);
+        let result2: String = vec![vec![1, 2], vec![3]].into_par().orx_par_iter_string_with_state_fn_clone_nested(DEFAULT_FORMAT_RULE, st, f2);
+        assert_eq!("X[1, 2]X[3]", result2);
+
+        let rule = |val: &str, _i: usize, _l: usize| format!("<{}>", val);
+        let result3: String = vec![vec![1, 2], vec![3]].into_par().orx_par_iter_string_rule_ref_clone_nested(DEFAULT_FORMAT_RULE, rule);
+        assert_eq!("<[1, 2]><[3]>", result3);
+
+        let st2 = "Y".to_string();
+        let rule2 = |s: &String, val: &str, _i: usize, _l: usize| format!("{}{}", s, val);
+        let result4: String = vec![vec![1, 2], vec![3]].into_par().orx_par_iter_string_with_state_rule_ref_clone_nested(DEFAULT_FORMAT_RULE, st2, rule2);
+        assert_eq!("Y[1, 2]Y[3]", result4);
+    }
+
+    #[cfg(all(feature = "orx_parallel", feature = "dyn_async"))]
+    mod orx_clone_dyn_async_tests {
+        use super::*;
+        use alloc::boxed::Box;
+        use core::future::Future;
+        use orx_parallel::*;
+
+        fn block_on_dyn<T>(fut: Box<dyn Future<Output = T>>) -> T {
+            let mut pin_future = Box::into_pin(fut);
+            let mut fut = pin_future.as_mut();
+            let waker = unsafe { core::task::Waker::from_raw(noop_raw_waker()) };
+            let mut cx = core::task::Context::from_waker(&waker);
+            loop {
+                if let core::task::Poll::Ready(val) = fut.as_mut().poll(&mut cx) {
+                    return val;
+                }
+                core::hint::spin_loop();
+            }
+        }
+
+        fn noop_raw_waker() -> core::task::RawWaker {
+            fn no_op(_: *const ()) {}
+            fn clone(p: *const ()) -> core::task::RawWaker {
+                core::task::RawWaker::new(p, &VTABLE)
+            }
+            static VTABLE: core::task::RawWakerVTable =
+                core::task::RawWakerVTable::new(clone, no_op, no_op, no_op);
+            core::task::RawWaker::new(core::ptr::null(), &VTABLE)
+        }
+
+        #[test]
+        fn test_orx_dyn_async_clone_fn() {
+            let f = |val: &str, _i: usize, _l: usize| {
+                let val = val.to_string();
+                async move { format!("[{}]", val) }
+            };
+            let result = block_on_dyn(
+                OrxParIteratorStringFnAsyncClone::orx_par_iter_string_async_fn_clone(vec![1, 2, 3].into_par(), f),
+            );
+            assert_eq!("[1][2][3]", result);
+        }
+
+        #[test]
+        fn test_orx_dyn_async_clone_fn_send() {
+            let f = |val: &str, _i: usize, _l: usize| {
+                let val = val.to_string();
+                async move { format!("[{}]", val) }
+            };
+            let result = block_on_dyn(
+                OrxParIteratorStringFnAsyncCloneSend::orx_par_iter_string_async_fn_clone(vec![1, 2, 3].into_par(), f),
+            );
+            assert_eq!("[1][2][3]", result);
+        }
+
+        #[test]
+        fn test_orx_dyn_async_clone_fn_mut() {
+            let f = |val: &str, _i: usize, _l: usize| {
+                let val = val.to_string();
+                async move { format!("[{}]", val) }
+            };
+            let result = block_on_dyn(
+                OrxParIteratorStringFnMutAsyncClone::orx_par_iter_string_async_fn_mut_clone(vec![1, 2, 3].into_par(), f),
+            );
+            assert_eq!("[1][2][3]", result);
+        }
+
+        #[test]
+        fn test_orx_dyn_async_clone_fn_mut_send() {
+            let f = |val: &str, _i: usize, _l: usize| {
+                let val = val.to_string();
+                async move { format!("[{}]", val) }
+            };
+            let result = block_on_dyn(
+                OrxParIteratorStringFnMutAsyncCloneSend::orx_par_iter_string_async_fn_mut_clone(vec![1, 2, 3].into_par(), f),
+            );
+            assert_eq!("[1][2][3]", result);
+        }
+    }
+
+    #[cfg(all(feature = "orx_parallel", feature = "impl_async"))]
+    mod orx_clone_impl_async_tests {
+        use super::*;
+        use core::future::Future;
+        use orx_parallel::*;
+
+        fn block_on_impl<F: Future>(mut fut: F) -> F::Output {
+            let mut fut = unsafe { core::pin::Pin::new_unchecked(&mut fut) };
+            let waker = noop_raw_waker();
+            let mut cx = core::task::Context::from_waker(&waker);
+            loop {
+                if let core::task::Poll::Ready(val) = fut.as_mut().poll(&mut cx) {
+                    return val;
+                }
+                core::hint::spin_loop();
+            }
+        }
+
+        fn noop_raw_waker() -> core::task::Waker {
+            fn no_op(_: *const ()) {}
+            fn clone(p: *const ()) -> core::task::RawWaker {
+                core::task::RawWaker::new(p, &VTABLE)
+            }
+            static VTABLE: core::task::RawWakerVTable =
+                core::task::RawWakerVTable::new(clone, no_op, no_op, no_op);
+            let raw = core::task::RawWaker::new(core::ptr::null(), &VTABLE);
+            unsafe { core::task::Waker::from_raw(raw) }
+        }
+
+        #[test]
+        fn test_orx_impl_async_clone_fn() {
+            let f = |val: &str, _i: usize, _l: usize| {
+                let val = val.to_string();
+                async move { format!("[{}]", val) }
+            };
+            let result = block_on_impl(
+                OrxParIteratorStringFnImplAsyncClone::orx_par_iter_string_async_fn_clone(vec![1, 2, 3].into_par(), f),
+            );
+            assert_eq!("[1][2][3]", result);
+        }
+
+        #[test]
+        fn test_orx_impl_async_clone_fn_send() {
+            let f = |val: &str, _i: usize, _l: usize| {
+                let val = val.to_string();
+                async move { format!("[{}]", val) }
+            };
+            let result = block_on_impl(
+                OrxParIteratorStringFnImplAsyncCloneSend::orx_par_iter_string_async_fn_clone(vec![1, 2, 3].into_par(), f),
+            );
+            assert_eq!("[1][2][3]", result);
+        }
+
+        #[test]
+        fn test_orx_impl_async_clone_fn_mut() {
+            let f = |val: &str, _i: usize, _l: usize| {
+                let val = val.to_string();
+                async move { format!("[{}]", val) }
+            };
+            let result = block_on_impl(
+                OrxParIteratorStringFnMutImplAsyncClone::orx_par_iter_string_async_fn_mut_clone(vec![1, 2, 3].into_par(), f),
+            );
+            assert_eq!("[1][2][3]", result);
+        }
+
+        #[test]
+        fn test_orx_impl_async_clone_fn_mut_send() {
+            let f = |val: &str, _i: usize, _l: usize| {
+                let val = val.to_string();
+                async move { format!("[{}]", val) }
+            };
+            let result = block_on_impl(
+                OrxParIteratorStringFnMutImplAsyncCloneSend::orx_par_iter_string_async_fn_mut_clone(vec![1, 2, 3].into_par(), f),
             );
             assert_eq!("[1][2][3]", result);
         }

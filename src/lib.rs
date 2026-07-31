@@ -4480,8 +4480,8 @@ pub trait OrxParIteratorStringFnPtrImplAsync {
 }
 
 #[cfg(all(feature = "orx_parallel", feature = "impl_async"))]
-impl<P: orx_parallel::ParIter<Item = T>, T: core::fmt::Display>
-    OrxParIteratorStringFnPtrImplAsync for P
+impl<P: orx_parallel::ParIter<Item = T>, T: core::fmt::Display> OrxParIteratorStringFnPtrImplAsync
+    for P
 {
     fn orx_par_iter_string_async_fn_ptr<'a>(
         self,
@@ -11108,9 +11108,10 @@ mod nested_tests {
                 let value = value.to_string();
                 async move { format!("[{}]", value) }
             };
-            let result = block_on_dyn(
-                OrxParIteratorStringFnAsync::orx_par_iter_string_async_fn(v.into_par(), &fmt),
-            );
+            let result = block_on_dyn(OrxParIteratorStringFnAsync::orx_par_iter_string_async_fn(
+                v.into_par(),
+                &fmt,
+            ));
             assert_eq!("[1][2][3]", result);
         }
     }

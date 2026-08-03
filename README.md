@@ -16,11 +16,11 @@ assert_eq!("[1, 2, 3]", vec![1, 2, 3].vec_string(DEFAULT_FORMAT_RULE));
 | Feature | Default | Description |
 |---------|---------|-------------|
 | `std` | ✓ | Standard library support (disable for `no_std`) |
-| `rayon` | ✓ | Parallel formatting via rayon |
-| `orx_parallel` | ✓ | Parallel formatting via orx-parallel (sync + async) |
-| `dyn_async` | ✓ | Async formatting with `Box<dyn Future>` return type |
-| `impl_async` | ✓ | Async formatting with `impl Future` return type |
-| `ambassador_delegatable` | ✓ | Marks traits as `#[delegatable_trait]` for ambassador |
+| `rayon` | | Parallel formatting via rayon |
+| `orx_parallel` | | Parallel formatting via orx-parallel (sync + async) |
+| `dyn_async` | | Async formatting with `Box<dyn Future>` return type |
+| `impl_async` | | Async formatting with `impl Future` return type |
+| `ambassador_delegatable` | | Marks traits as `#[delegatable_trait]` for ambassador |
 
 ## Quick Start
 

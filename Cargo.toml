@@ -18,7 +18,7 @@ rayon = { version = "1.10", optional = true }
 orx-parallel = { version = "3", optional = true }
 
 [features]
-default = ["std","rayon","orx_parallel","dyn_async","impl_async","ambassador_delegatable"]
+default = ["std"]
 std = []
 rayon = ["dep:rayon"]
 orx_parallel = ["dep:orx-parallel"]

@@ -20,7 +20,7 @@ itertools = { version = "0.14", optional = true }
 itermore = { version = "0.8", optional = true, features = ["full"] }
 
 [features]
-default = ["std","rayon","orx_parallel","itertools","itermore","dyn_async","impl_async","ambassador_delegatable"]
+default = ["std"]
 std = []
 rayon = ["dep:rayon"]
 orx_parallel = ["dep:orx-parallel"]

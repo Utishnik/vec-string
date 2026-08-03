@@ -16,13 +16,11 @@ assert_eq!("[1, 2, 3]", vec![1, 2, 3].vec_string(DEFAULT_FORMAT_RULE));
 | Feature | Default | Description |
 |---------|---------|-------------|
 | `std` | ✓ | Standard library support (disable for `no_std`) |
-| `rayon` | ✓ | Parallel formatting via rayon |
-| `orx_parallel` | ✓ | Parallel formatting via orx-parallel (sync + async) |
-| `itertools` | ✓ | `StableIter` impls for itertools adapters |
-| `itermore` | ✓ | `StableIter` impls for itermore adapters |
-| `dyn_async` | ✓ | Async formatting with `Box<dyn Future>` return type |
-| `impl_async` | ✓ | Async formatting with `impl Future` return type |
-| `ambassador_delegatable` | ✓ | Marks traits as `#[delegatable_trait]` for ambassador |
+| `rayon` | | Parallel formatting via rayon |
+| `orx_parallel` | | Parallel formatting via orx-parallel (sync + async) |
+| `dyn_async` | | Async formatting with `Box<dyn Future>` return type |
+| `impl_async` | | Async formatting with `impl Future` return type |
+| `ambassador_delegatable` | | Marks traits as `#[delegatable_trait]` for ambassador |
 
 ## Quick Start
 
@@ -80,7 +78,7 @@ assert_eq!(
 ```rust
 use vec_string::*;
 
-// Any StableIter iterator with Display items
+// Any iterator with Display items
 let result: String = (1..=3).map(|x| x * 10).iterator_string(DEFAULT_FORMAT_RULE);
 assert_eq!("[10, 20, 30]", result);
 
@@ -202,21 +200,17 @@ Each formatting operation exists in multiple variants:
 - **Async** — `dyn_async` (`Box<dyn Future>`) and `impl_async` (`impl Future`)
 - **Send** — `+ Send` bounds for multi-threaded executors
 
-### Iterator Coherence (stable branch)
+### Iterator Coherence (nightly branch)
 
-This branch uses the `StableIter` marker trait on stable Rust:
+This branch uses the `NotVec` auto trait (requires nightly `auto_traits` + `negative_impls`):
 
 ```rust
-pub trait StableIter: Iterator {}
+pub auto trait NotVec {}
+impl<T, A: Allocator> !NotVec for Vec<T, A> {}
 ```
 
-Manual impls are provided for:
-- All standard library iterator adapters (`Map`, `Filter`, `Zip`, `Chain`, `FlatMap`, etc.)
-- **itertools** adapters (`Interleave`, `Product`, `Combinations`, `Permutations`, `Unique`, etc.)
-- **itermore** adapters (`ArrayChunks`, `ArrayWindows`, `CartesianProduct`, `Combinations`, etc.)
-
-This guarantees that `IteratorString*` traits don't conflict with `VecString*` impls on `Vec<T>`,
-while covering the most common iterator adapters from the ecosystem.
+This allows blanket impls on `I: Iterator + NotVec` without conflicting with `Vec<T>` impls,
+covering all iterator adapters automatically without manual listing.
 
 ### no_std
 

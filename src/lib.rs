@@ -12072,3 +12072,1265 @@ mod nested_tests {
         );
     }
 }
+
+// ============================================================================
+// FULL API COVERAGE TESTS - async families (dyn + impl), slice impls, rules
+// ============================================================================
+#[cfg(test)]
+mod full_api_tests {
+    use super::*;
+    use alloc::format;
+    use alloc::string::String;
+    use alloc::vec;
+    use core::fmt;
+    use core::future::Future;
+    use pollster::FutureExt;
+
+    #[cfg(feature = "dyn_async")]
+    fn block_dyn<'a, T>(fut: Box<dyn Future<Output = T> + 'a>) -> T {
+        let mut pin_future = Box::into_pin(fut);
+        let fut = pin_future.as_mut();
+        fut.block_on()
+    }
+
+    fn block_fut<F: Future>(mut fut: F) -> F::Output {
+        fut.block_on()
+    }
+
+    fn default_fmt(v: &str, i: usize, l: usize) -> String {
+        DEFAULT_FORMAT_RULE(v, i, l)
+    }
+
+    // ------------------------------------------------------------------------
+    // DYN ASYNC: Format rule traits (fn items, since closures are not
+    // polymorphic over the returned future lifetime)
+    // ------------------------------------------------------------------------
+    #[cfg(feature = "dyn_async")]
+    #[test]
+    fn test_dyn_format_rule_traits() {
+        struct R1;
+        impl<'a> FormatRuleNoStateAsync<'a> for R1 {
+            fn format(
+                &'a self,
+                value: &str,
+                index: usize,
+                length: usize,
+            ) -> Box<dyn Future<Output = String> + 'a> {
+                let v = value.to_string();
+                Box::new(async move { DEFAULT_FORMAT_RULE(&v, index, length) })
+            }
+        }
+        impl<'a> FormatRuleMutNoStateAsync<'a> for R1 {
+            fn format(
+                &'a mut self,
+                value: &str,
+                index: usize,
+                length: usize,
+            ) -> Box<dyn Future<Output = String> + 'a> {
+                let v = value.to_string();
+                Box::new(async move { DEFAULT_FORMAT_RULE(&v, index, length) })
+            }
+        }
+        struct R1s;
+        impl<'a> FormatRuleNoStateAsyncSend<'a> for R1s {
+            fn format(
+                &'a self,
+                value: &str,
+                index: usize,
+                length: usize,
+            ) -> Box<dyn Future<Output = String> + Send + 'a> {
+                let v = value.to_string();
+                Box::new(async move { DEFAULT_FORMAT_RULE(&v, index, length) })
+            }
+        }
+        impl<'a> FormatRuleMutNoStateAsyncSend<'a> for R1s {
+            fn format(
+                &'a mut self,
+                value: &str,
+                index: usize,
+                length: usize,
+            ) -> Box<dyn Future<Output = String> + Send + 'a> {
+                let v = value.to_string();
+                Box::new(async move { DEFAULT_FORMAT_RULE(&v, index, length) })
+            }
+        }
+        struct R1o;
+        impl FormatRuleNoStateOwnedAsync for R1o {
+            fn format(
+                self,
+                value: String,
+                index: usize,
+                length: usize,
+            ) -> Box<dyn Future<Output = String>> {
+                Box::new(async move { DEFAULT_FORMAT_RULE(&value, index, length) })
+            }
+        }
+        struct R1os;
+        impl FormatRuleNoStateOwnedAsyncSend for R1os {
+            fn format(
+                self,
+                value: String,
+                index: usize,
+                length: usize,
+            ) -> Box<dyn Future<Output = String> + Send> {
+                Box::new(async move { DEFAULT_FORMAT_RULE(&value, index, length) })
+            }
+        }
+        struct RState;
+        impl<'a> FormatRuleAsync<'a, i32> for RState {
+            fn format(
+                &'a self,
+                state: &'a i32,
+                value: &str,
+                index: usize,
+                length: usize,
+            ) -> Box<dyn Future<Output = String> + 'a> {
+                let s = *state;
+                let v = value.to_string();
+                Box::new(async move { format!("{}{}", s, DEFAULT_FORMAT_RULE(&v, index, length)) })
+            }
+        }
+        impl<'a> FormatRuleAsyncSend<'a, i32> for RState {
+            fn format(
+                &'a self,
+                state: &'a i32,
+                value: &str,
+                index: usize,
+                length: usize,
+            ) -> Box<dyn Future<Output = String> + Send + 'a> {
+                let s = *state;
+                let v = value.to_string();
+                Box::new(async move { format!("{}{}", s, DEFAULT_FORMAT_RULE(&v, index, length)) })
+            }
+        }
+        struct RStateMut;
+        impl<'a> FormatRuleMutAsync<'a, i32> for RStateMut {
+            fn format(
+                &'a mut self,
+                state: &'a mut i32,
+                value: &str,
+                index: usize,
+                length: usize,
+            ) -> Box<dyn Future<Output = String> + 'a> {
+                *state += 1;
+                let s = *state;
+                let v = value.to_string();
+                Box::new(async move { format!("{}{}", s, DEFAULT_FORMAT_RULE(&v, index, length)) })
+            }
+        }
+        impl<'a> FormatRuleMutAsyncSend<'a, i32> for RStateMut {
+            fn format(
+                &'a mut self,
+                state: &'a mut i32,
+                value: &str,
+                index: usize,
+                length: usize,
+            ) -> Box<dyn Future<Output = String> + Send + 'a> {
+                *state += 1;
+                let s = *state;
+                let v = value.to_string();
+                Box::new(async move { format!("{}{}", s, DEFAULT_FORMAT_RULE(&v, index, length)) })
+            }
+        }
+
+        let mut r1m = R1;
+        let mut r1ms = R1s;
+        let mut r_state_mut_p = RStateMut;
+        let mut r_state_muts_p = RStateMut;
+        let st = 0i32;
+        let mut stm = 5i32;
+        let mut stms = 5i32;
+
+        assert_eq!(
+            "[1]",
+            block_dyn(FormatRuleNoStateAsync::format(&R1, "1", 0, 1))
+        );
+        assert_eq!(
+            "[1]",
+            block_dyn(FormatRuleNoStateAsyncSend::format(&R1s, "1", 0, 1))
+        );
+        assert_eq!(
+            "[1]",
+            block_dyn(FormatRuleNoStateOwnedAsync::format(
+                R1o,
+                "1".to_string(),
+                0,
+                1
+            ))
+        );
+        assert_eq!(
+            "[1]",
+            block_dyn(FormatRuleNoStateOwnedAsyncSend::format(
+                R1os,
+                "1".to_string(),
+                0,
+                1
+            ))
+        );
+        assert_eq!(
+            "[1]",
+            block_dyn(FormatRuleMutNoStateAsync::format(&mut r1m, "1", 0, 1))
+        );
+        assert_eq!(
+            "[1]",
+            block_dyn(FormatRuleMutNoStateAsyncSend::format(&mut r1ms, "1", 0, 1))
+        );
+        assert_eq!(
+            "0[1]",
+            block_dyn(FormatRuleAsync::format(&RState, &st, "1", 0, 1))
+        );
+        assert_eq!(
+            "0[1]",
+            block_dyn(FormatRuleAsyncSend::format(&RState, &st, "1", 0, 1))
+        );
+        assert_eq!(
+            "6[1]",
+            block_dyn(FormatRuleMutAsync::format(
+                &mut r_state_mut_p,
+                &mut stm,
+                "1",
+                0,
+                1
+            ))
+        );
+        assert_eq!(
+            "6[1]",
+            block_dyn(FormatRuleMutAsyncSend::format(
+                &mut r_state_muts_p,
+                &mut stms,
+                "1",
+                0,
+                1
+            ))
+        );
+
+        fn r1_ptr(v: &str, i: usize, l: usize) -> Box<dyn Future<Output = String>> {
+            let v = v.to_string();
+            Box::new(async move { DEFAULT_FORMAT_RULE(&v, i, l) })
+        }
+        let rp: fn(&str, usize, usize) -> Box<dyn Future<Output = String> + '_> =
+            r1_ptr as fn(&str, usize, usize) -> Box<dyn Future<Output = String> + '_>;
+        assert_eq!(
+            "[1]",
+            block_dyn(FormatRuleFnPtrAsync::format(&rp, "1", 0, 1))
+        );
+    }
+
+    // ------------------------------------------------------------------------
+    // IMPL ASYNC: Format rule traits
+    // ------------------------------------------------------------------------
+    #[cfg(feature = "impl_async")]
+    #[test]
+    fn test_impl_format_rule_traits() {
+        struct ImplFut(String, usize, usize, String);
+        impl Future for ImplFut {
+            type Output = String;
+            fn poll(
+                self: core::pin::Pin<&mut Self>,
+                _: &mut core::task::Context<'_>,
+            ) -> core::task::Poll<Self::Output> {
+                core::task::Poll::Ready(format!(
+                    "{}{}",
+                    self.3,
+                    DEFAULT_FORMAT_RULE(&self.0, self.1, self.2)
+                ))
+            }
+        }
+        fn i1(v: &str, i: usize, l: usize) -> ImplFut {
+            ImplFut(v.to_string(), i, l, String::new())
+        }
+        fn i1s(v: &str, i: usize, l: usize) -> ImplFut {
+            ImplFut(v.to_string(), i, l, String::new())
+        }
+        fn i_state(s: &i32, v: &str, i: usize, l: usize) -> ImplFut {
+            ImplFut(v.to_string(), i, l, format!("{}", s))
+        }
+        fn i_state_mut(s: &mut i32, v: &str, i: usize, l: usize) -> ImplFut {
+            *s += 1;
+            ImplFut(v.to_string(), i, l, format!("{}", s))
+        }
+
+        let mut i1m = i1;
+        let mut i1ms = i1s;
+        let st = 0i32;
+        let mut stm = 5i32;
+        let mut stms = 5i32;
+
+        let mut fo = |v: String, i: usize, l: usize| async move { DEFAULT_FORMAT_RULE(&v, i, l) };
+        let mut foi = |v: String, i: usize, l: usize| async move { DEFAULT_FORMAT_RULE(&v, i, l) };
+
+        assert_eq!(
+            "[1]",
+            block_fut(FormatRuleNoStateImplAsync::format(&i1, "1", 0, 1))
+        );
+        assert_eq!(
+            "[1]",
+            block_fut(FormatRuleNoStateImplAsyncSend::format(&i1s, "1", 0, 1))
+        );
+        assert_eq!(
+            "[1]",
+            block_fut(FormatRuleNoStateOwnedImplAsync::format(
+                foi,
+                "1".to_string(),
+                0,
+                1
+            ))
+        );
+        assert_eq!(
+            "[1]",
+            block_fut(FormatRuleNoStateOwnedImplAsyncSend::format(
+                fo,
+                "1".to_string(),
+                0,
+                1
+            ))
+        );
+        assert_eq!(
+            "[1]",
+            block_fut(FormatRuleMutNoStateImplAsync::format(&mut i1m, "1", 0, 1))
+        );
+        assert_eq!(
+            "[1]",
+            block_fut(FormatRuleMutNoStateImplAsyncSend::format(
+                &mut i1ms, "1", 0, 1
+            ))
+        );
+        assert_eq!(
+            "0[1]",
+            block_fut(FormatRuleImplAsync::format(&i_state, &st, "1", 0, 1))
+        );
+        assert_eq!(
+            "0[1]",
+            block_fut(FormatRuleImplAsyncSend::format(&i_state, &st, "1", 0, 1))
+        );
+        assert_eq!(
+            "6[1]",
+            block_fut(FormatRuleMutImplAsync::format(
+                &mut i_state_mut,
+                &mut stm,
+                "1",
+                0,
+                1
+            ))
+        );
+        assert_eq!(
+            "6[1]",
+            block_fut(FormatRuleMutImplAsyncSend::format(
+                &mut i_state_mut,
+                &mut stms,
+                "1",
+                0,
+                1
+            ))
+        );
+
+        fn iptr(v: &str, i: usize, l: usize) -> std::future::Ready<String> {
+            std::future::ready(DEFAULT_FORMAT_RULE(v, i, l))
+        }
+        let ptr: fn(&str, usize, usize) -> std::future::Ready<String> = iptr;
+        assert_eq!(
+            "[1]",
+            block_fut(FormatRuleFnPtrImplAsync::format(&ptr, "1", 0, 1))
+        );
+    }
+
+    // ------------------------------------------------------------------------
+    // DYN ASYNC: Vec (slice [T] impls + Vec<T> delegate impls)
+    // ------------------------------------------------------------------------
+    #[cfg(feature = "dyn_async")]
+    #[test]
+    fn test_dyn_vec_async_impls() {
+        let v = vec![1, 2, 3];
+        let fmt = |value: &str, index: usize, length: usize| {
+            let value = value.to_string();
+            async move { DEFAULT_FORMAT_RULE(&value, index, length) }
+        };
+        let mut counter = 0i32;
+        let mut fmt_mut = |value: &str, index: usize, length: usize| {
+            counter += 1;
+            let value = value.to_string();
+            async move { DEFAULT_FORMAT_RULE(&value, index, length) }
+        };
+        let mut fmt_send = |value: &str, index: usize, length: usize| {
+            let value = value.to_string();
+            async move { DEFAULT_FORMAT_RULE(&value, index, length) }
+        };
+        let mut fmt_mut_send = |value: &str, index: usize, length: usize| {
+            let value = value.to_string();
+            async move { DEFAULT_FORMAT_RULE(&value, index, length) }
+        };
+        let mut fmt_state = |st: &mut i32, value: &str, index: usize, length: usize| {
+            *st += 1;
+            let value = value.to_string();
+            async move { DEFAULT_FORMAT_RULE(&value, index, length) }
+        };
+
+        assert_eq!(
+            "[1, 2, 3]",
+            block_dyn(VecStringFnAsync::vec_string_async_fn(&v[..], &fmt))
+        );
+        assert_eq!(
+            "[1, 2, 3]",
+            block_dyn(VecStringFnAsyncSend::vec_string_async_fn(&v[..], &fmt))
+        );
+        assert_eq!(
+            "[1, 2, 3]",
+            block_dyn(VecStringFnMutAsync::vec_string_async_fn_mut(
+                &v[..],
+                &mut fmt_mut
+            ))
+        );
+        assert_eq!(
+            "[1, 2, 3]",
+            block_dyn(VecStringFnMutAsyncSend::vec_string_async_fn_mut(
+                &v[..],
+                &mut fmt_mut_send
+            ))
+        );
+        assert_eq!(
+            "[1, 2, 3]",
+            block_dyn(VecStringWithStateAsync::vec_string_with_state_async(
+                &v[..],
+                0i32,
+                &mut fmt_state
+            ))
+        );
+
+        assert_eq!(
+            "[1, 2, 3]",
+            block_dyn(VecStringFnAsync::vec_string_async_fn(&v, &fmt))
+        );
+        assert_eq!(
+            "[1, 2, 3]",
+            block_dyn(VecStringFnAsyncSend::vec_string_async_fn(&v, &fmt))
+        );
+        assert_eq!(
+            "[1, 2, 3]",
+            block_dyn(VecStringFnMutAsync::vec_string_async_fn_mut(
+                &v,
+                &mut fmt_mut
+            ))
+        );
+        assert_eq!(
+            "[1, 2, 3]",
+            block_dyn(VecStringFnMutAsyncSend::vec_string_async_fn_mut(
+                &v,
+                &mut fmt_mut_send
+            ))
+        );
+        assert_eq!(
+            "[1, 2, 3]",
+            block_dyn(VecStringWithStateAsync::vec_string_with_state_async(
+                &v,
+                0i32,
+                &mut fmt_state
+            ))
+        );
+    }
+
+    // ------------------------------------------------------------------------
+    // DYN ASYNC: Iterator collecting + exact (fn_mut / with_state variants)
+    // ------------------------------------------------------------------------
+    #[cfg(feature = "dyn_async")]
+    #[test]
+    fn test_dyn_iter_async_variants() {
+        let v = vec![1, 2, 3];
+        let fmt = |value: &str, index: usize, length: usize| {
+            let value = value.to_string();
+            async move { DEFAULT_FORMAT_RULE(&value, index, length) }
+        };
+        let mut counter = 0i32;
+        let mut fmt_mut = |value: &str, index: usize, length: usize| {
+            counter += 1;
+            let value = value.to_string();
+            async move { DEFAULT_FORMAT_RULE(&value, index, length) }
+        };
+        let mut fmt_send = |value: &str, index: usize, length: usize| {
+            let value = value.to_string();
+            async move { DEFAULT_FORMAT_RULE(&value, index, length) }
+        };
+        let mut fmt_mut_send = |value: &str, index: usize, length: usize| {
+            let value = value.to_string();
+            async move { DEFAULT_FORMAT_RULE(&value, index, length) }
+        };
+        let mut fmt_state = |st: &mut i32, value: &str, index: usize, length: usize| {
+            *st += 1;
+            let value = value.to_string();
+            async move { DEFAULT_FORMAT_RULE(&value, index, length) }
+        };
+
+        assert_eq!(
+            "[1, 2, 3]",
+            block_dyn(IteratorStringFnAsyncSend::iter_string_async_fn(
+                v.iter(),
+                &fmt
+            ))
+        );
+        assert_eq!(
+            "[1, 2, 3]",
+            block_dyn(IteratorStringFnMutAsync::iter_string_async_fn_mut(
+                v.iter(),
+                &mut fmt_mut
+            ))
+        );
+        assert_eq!(
+            "[1, 2, 3]",
+            block_dyn(IteratorStringFnMutAsyncSend::iter_string_async_fn_mut(
+                v.iter(),
+                &mut fmt_mut_send
+            ))
+        );
+        assert_eq!(
+            "[1, 2, 3]",
+            block_dyn(IteratorStringWithStateAsync::iter_string_with_state_async(
+                v.iter(),
+                0i32,
+                &mut fmt_state
+            ))
+        );
+
+        assert_eq!(
+            "[1, 2, 3]",
+            block_dyn(IteratorStringFnAsyncSendExact::iter_string_async_fn_exact(
+                v.iter(),
+                &fmt
+            ))
+        );
+        assert_eq!(
+            "[1, 2, 3]",
+            block_dyn(
+                IteratorStringFnMutAsyncExact::iter_string_async_fn_mut_exact(
+                    v.iter(),
+                    &mut fmt_mut
+                )
+            )
+        );
+        assert_eq!(
+            "[1, 2, 3]",
+            block_dyn(
+                IteratorStringFnMutAsyncSendExact::iter_string_async_fn_mut_exact(
+                    v.iter(),
+                    &mut fmt_mut_send
+                )
+            )
+        );
+        assert_eq!(
+            "[1, 2, 3]",
+            block_dyn(
+                IteratorStringWithStateAsyncExact::iter_string_with_state_async_exact(
+                    v.iter(),
+                    0i32,
+                    &mut fmt_state
+                )
+            )
+        );
+    }
+
+    // ------------------------------------------------------------------------
+    // IMPL ASYNC: Vec (slice [T] impls + Vec<T> delegate impls)
+    // ------------------------------------------------------------------------
+    #[cfg(feature = "impl_async")]
+    #[test]
+    fn test_impl_vec_async_impls() {
+        let v = vec![1, 2, 3];
+        let fmt = |value: &str, index: usize, length: usize| {
+            let value = value.to_string();
+            async move { DEFAULT_FORMAT_RULE(&value, index, length) }
+        };
+        let mut counter = 0i32;
+        let mut fmt_mut = |value: &str, index: usize, length: usize| {
+            counter += 1;
+            let value = value.to_string();
+            async move { DEFAULT_FORMAT_RULE(&value, index, length) }
+        };
+        let mut fmt_send = |value: &str, index: usize, length: usize| {
+            let value = value.to_string();
+            async move { DEFAULT_FORMAT_RULE(&value, index, length) }
+        };
+        let mut fmt_mut_send = |value: &str, index: usize, length: usize| {
+            let value = value.to_string();
+            async move { DEFAULT_FORMAT_RULE(&value, index, length) }
+        };
+        let mut fmt_state = |st: &mut i32, value: &str, index: usize, length: usize| {
+            *st += 1;
+            let value = value.to_string();
+            async move { DEFAULT_FORMAT_RULE(&value, index, length) }
+        };
+
+        assert_eq!(
+            "[1, 2, 3]",
+            block_fut(VecStringFnImplAsync::vec_string_async_fn(&v[..], &fmt))
+        );
+        assert_eq!(
+            "[1, 2, 3]",
+            block_fut(VecStringFnImplAsyncSend::vec_string_async_fn(&v[..], &fmt))
+        );
+        assert_eq!(
+            "[1, 2, 3]",
+            block_fut(VecStringFnMutImplAsync::vec_string_async_fn_mut(
+                &v[..],
+                &mut fmt_mut
+            ))
+        );
+        assert_eq!(
+            "[1, 2, 3]",
+            block_fut(VecStringFnMutImplAsyncSend::vec_string_async_fn_mut(
+                &v[..],
+                &mut fmt_mut_send
+            ))
+        );
+        assert_eq!(
+            "[1, 2, 3]",
+            block_fut(VecStringWithStateImplAsync::vec_string_with_state_async(
+                &v[..],
+                0i32,
+                &mut fmt_state
+            ))
+        );
+
+        assert_eq!(
+            "[1, 2, 3]",
+            block_fut(VecStringFnImplAsync::vec_string_async_fn(&v, &fmt))
+        );
+        assert_eq!(
+            "[1, 2, 3]",
+            block_fut(VecStringFnImplAsyncSend::vec_string_async_fn(&v, &fmt))
+        );
+        assert_eq!(
+            "[1, 2, 3]",
+            block_fut(VecStringFnMutImplAsync::vec_string_async_fn_mut(
+                &v,
+                &mut fmt_mut
+            ))
+        );
+        assert_eq!(
+            "[1, 2, 3]",
+            block_fut(VecStringFnMutImplAsyncSend::vec_string_async_fn_mut(
+                &v,
+                &mut fmt_mut_send
+            ))
+        );
+        assert_eq!(
+            "[1, 2, 3]",
+            block_fut(VecStringWithStateImplAsync::vec_string_with_state_async(
+                &v,
+                0i32,
+                &mut fmt_state
+            ))
+        );
+    }
+
+    // ------------------------------------------------------------------------
+    // IMPL ASYNC: Iterator collecting + exact (fn_mut / with_state variants)
+    // ------------------------------------------------------------------------
+    #[cfg(feature = "impl_async")]
+    #[test]
+    fn test_impl_iter_async_variants() {
+        let v = vec![1, 2, 3];
+        let fmt = |value: &str, index: usize, length: usize| {
+            let value = value.to_string();
+            async move { DEFAULT_FORMAT_RULE(&value, index, length) }
+        };
+        let mut counter = 0i32;
+        let mut fmt_mut = |value: &str, index: usize, length: usize| {
+            counter += 1;
+            let value = value.to_string();
+            async move { DEFAULT_FORMAT_RULE(&value, index, length) }
+        };
+        let mut fmt_send = |value: &str, index: usize, length: usize| {
+            let value = value.to_string();
+            async move { DEFAULT_FORMAT_RULE(&value, index, length) }
+        };
+        let mut fmt_mut_send = |value: &str, index: usize, length: usize| {
+            let value = value.to_string();
+            async move { DEFAULT_FORMAT_RULE(&value, index, length) }
+        };
+        let mut fmt_state = |st: &mut i32, value: &str, index: usize, length: usize| {
+            *st += 1;
+            let value = value.to_string();
+            async move { DEFAULT_FORMAT_RULE(&value, index, length) }
+        };
+
+        assert_eq!(
+            "[1, 2, 3]",
+            block_fut(IteratorStringFnImplAsyncSend::iter_string_async_fn(
+                v.iter(),
+                &fmt
+            ))
+        );
+        assert_eq!(
+            "[1, 2, 3]",
+            block_fut(IteratorStringFnMutImplAsync::iter_string_async_fn_mut(
+                v.iter(),
+                &mut fmt_mut
+            ))
+        );
+        assert_eq!(
+            "[1, 2, 3]",
+            block_fut(IteratorStringFnMutImplAsyncSend::iter_string_async_fn_mut(
+                v.iter(),
+                &mut fmt_mut_send
+            ))
+        );
+        assert_eq!(
+            "[1, 2, 3]",
+            block_fut(
+                IteratorStringWithStateImplAsync::iter_string_with_state_async(
+                    v.iter(),
+                    0i32,
+                    &mut fmt_state
+                )
+            )
+        );
+
+        assert_eq!(
+            "[1, 2, 3]",
+            block_fut(
+                IteratorStringFnImplAsyncSendExact::iter_string_async_fn_exact(v.iter(), &fmt)
+            )
+        );
+        assert_eq!(
+            "[1, 2, 3]",
+            block_fut(
+                IteratorStringFnMutImplAsyncExact::iter_string_async_fn_mut_exact(
+                    v.iter(),
+                    &mut fmt_mut
+                )
+            )
+        );
+        assert_eq!(
+            "[1, 2, 3]",
+            block_fut(
+                IteratorStringFnMutImplAsyncSendExact::iter_string_async_fn_mut_exact(
+                    v.iter(),
+                    &mut fmt_mut_send
+                )
+            )
+        );
+        assert_eq!(
+            "[1, 2, 3]",
+            block_fut(
+                IteratorStringWithStateImplAsyncExact::iter_string_with_state_async_exact(
+                    v.iter(),
+                    0i32,
+                    &mut fmt_state
+                )
+            )
+        );
+    }
+
+    // ------------------------------------------------------------------------
+    // ORX-PARALLEL + DYN ASYNC
+    // ------------------------------------------------------------------------
+    #[cfg(all(feature = "orx_parallel", feature = "dyn_async"))]
+    #[test]
+    fn test_orx_dyn_async_impls() {
+        use orx_parallel::*;
+        let v = vec![1, 2, 3];
+        let fmt = |value: &str, index: usize, length: usize| {
+            let value = value.to_string();
+            async move { DEFAULT_FORMAT_RULE(&value, index, length) }
+        };
+        let mut counter = 0i32;
+        let mut fmt_mut = |value: &str, index: usize, length: usize| {
+            counter += 1;
+            let value = value.to_string();
+            async move { DEFAULT_FORMAT_RULE(&value, index, length) }
+        };
+        let mut fmt_mut_send = |value: &str, index: usize, length: usize| {
+            let value = value.to_string();
+            async move { DEFAULT_FORMAT_RULE(&value, index, length) }
+        };
+
+        assert_eq!(
+            "[1, 2, 3]",
+            block_dyn(OrxParIteratorStringFnAsync::orx_par_iter_string_async_fn(
+                v.clone().into_par(),
+                &fmt
+            ))
+        );
+        assert_eq!(
+            "[1, 2, 3]",
+            block_dyn(
+                OrxParIteratorStringFnAsyncSend::orx_par_iter_string_async_fn(
+                    v.clone().into_par(),
+                    &fmt
+                )
+            )
+        );
+        assert_eq!(
+            "[1, 2, 3]",
+            block_dyn(
+                OrxParIteratorStringFnMutAsync::orx_par_iter_string_async_fn_mut(
+                    v.clone().into_par(),
+                    &mut fmt_mut
+                )
+            )
+        );
+        assert_eq!(
+            "[1, 2, 3]",
+            block_dyn(
+                OrxParIteratorStringFnMutAsyncSend::orx_par_iter_string_async_fn_mut(
+                    v.clone().into_par(),
+                    &mut fmt_mut_send
+                )
+            )
+        );
+        assert_eq!(
+            "[1, 2, 3]",
+            block_dyn(
+                OrxParIteratorStringFnPtrAsync::orx_par_iter_string_async_fn_ptr(
+                    v.into_par(),
+                    DEFAULT_FORMAT_RULE
+                )
+            )
+        );
+    }
+
+    // ------------------------------------------------------------------------
+    // ORX-PARALLEL + IMPL ASYNC
+    // ------------------------------------------------------------------------
+    #[cfg(all(feature = "orx_parallel", feature = "impl_async"))]
+    #[test]
+    fn test_orx_impl_async_impls() {
+        use orx_parallel::*;
+        let v = vec![1, 2, 3];
+        let fmt = |value: &str, index: usize, length: usize| {
+            let value = value.to_string();
+            async move { DEFAULT_FORMAT_RULE(&value, index, length) }
+        };
+        let mut counter = 0i32;
+        let mut fmt_mut = |value: &str, index: usize, length: usize| {
+            counter += 1;
+            let value = value.to_string();
+            async move { DEFAULT_FORMAT_RULE(&value, index, length) }
+        };
+        let mut fmt_mut_send = |value: &str, index: usize, length: usize| {
+            let value = value.to_string();
+            async move { DEFAULT_FORMAT_RULE(&value, index, length) }
+        };
+
+        assert_eq!(
+            "[1, 2, 3]",
+            block_fut(
+                OrxParIteratorStringFnImplAsync::orx_par_iter_string_async_fn(
+                    v.clone().into_par(),
+                    &fmt
+                )
+            )
+        );
+        assert_eq!(
+            "[1, 2, 3]",
+            block_fut(
+                OrxParIteratorStringFnImplAsyncSend::orx_par_iter_string_async_fn(
+                    v.clone().into_par(),
+                    &fmt
+                )
+            )
+        );
+        assert_eq!(
+            "[1, 2, 3]",
+            block_fut(
+                OrxParIteratorStringFnMutImplAsync::orx_par_iter_string_async_fn_mut(
+                    v.clone().into_par(),
+                    &mut fmt_mut
+                )
+            )
+        );
+        assert_eq!(
+            "[1, 2, 3]",
+            block_fut(
+                OrxParIteratorStringFnMutImplAsyncSend::orx_par_iter_string_async_fn_mut(
+                    v.clone().into_par(),
+                    &mut fmt_mut_send
+                )
+            )
+        );
+        assert_eq!(
+            "[1, 2, 3]",
+            block_fut(
+                OrxParIteratorStringFnPtrImplAsync::orx_par_iter_string_async_fn_ptr(
+                    v.into_par(),
+                    DEFAULT_FORMAT_RULE
+                )
+            )
+        );
+    }
+
+    // ------------------------------------------------------------------------
+    // ORX + ASYNC CLONES
+    // ------------------------------------------------------------------------
+    #[cfg(all(
+        feature = "orx_parallel",
+        any(feature = "dyn_async", feature = "impl_async")
+    ))]
+    #[test]
+    fn test_orx_async_clones() {
+        use orx_parallel::*;
+        let v = vec![1, 2, 3];
+        let fmt = |value: &str, index: usize, length: usize| {
+            let value = value.to_string();
+            async move { DEFAULT_FORMAT_RULE(&value, index, length) }
+        };
+
+        #[cfg(feature = "dyn_async")]
+        {
+            assert_eq!(
+                "[1, 2, 3]",
+                block_dyn(
+                    OrxParIteratorStringFnAsyncClone::orx_par_iter_string_async_fn_clone(
+                        v.clone().into_par(),
+                        fmt.clone()
+                    )
+                )
+            );
+            assert_eq!(
+                "[1, 2, 3]",
+                block_dyn(
+                    OrxParIteratorStringFnAsyncCloneSend::orx_par_iter_string_async_fn_clone(
+                        v.clone().into_par(),
+                        fmt.clone()
+                    )
+                )
+            );
+            assert_eq!(
+                "[1, 2, 3]",
+                block_dyn(
+                    OrxParIteratorStringFnMutAsyncClone::orx_par_iter_string_async_fn_mut_clone(
+                        v.clone().into_par(),
+                        fmt.clone()
+                    )
+                )
+            );
+            assert_eq!(
+                "[1, 2, 3]",
+                block_dyn(
+                    OrxParIteratorStringFnMutAsyncCloneSend::orx_par_iter_string_async_fn_mut_clone(
+                        v.clone().into_par(),
+                        fmt.clone()
+                    )
+                )
+            );
+        }
+
+        #[cfg(feature = "impl_async")]
+        {
+            assert_eq!(
+                "[1, 2, 3]",
+                block_fut(
+                    OrxParIteratorStringFnImplAsyncClone::orx_par_iter_string_async_fn_clone(
+                        v.clone().into_par(),
+                        fmt.clone()
+                    )
+                )
+            );
+            assert_eq!(
+                "[1, 2, 3]",
+                block_fut(
+                    OrxParIteratorStringFnImplAsyncCloneSend::orx_par_iter_string_async_fn_clone(
+                        v.clone().into_par(),
+                        fmt.clone()
+                    )
+                )
+            );
+            assert_eq!(
+                "[1, 2, 3]",
+                block_fut(
+                    OrxParIteratorStringFnMutImplAsyncClone::orx_par_iter_string_async_fn_mut_clone(
+                        v.clone().into_par(),
+                        fmt.clone()
+                    )
+                )
+            );
+            assert_eq!(
+                "[1, 2, 3]",
+                block_fut(
+                    OrxParIteratorStringFnMutImplAsyncCloneSend::orx_par_iter_string_async_fn_mut_clone(
+                        v.clone().into_par(),
+                        fmt.clone()
+                    )
+                )
+            );
+        }
+    }
+
+    // ------------------------------------------------------------------------
+    // RAYON + DYN ASYNC
+    // ------------------------------------------------------------------------
+    #[cfg(all(feature = "rayon", feature = "dyn_async"))]
+    #[test]
+    fn test_rayon_dyn_async_variants() {
+        use rayon::prelude::*;
+        let v = vec![1, 2, 3];
+        let fmt = |value: &str, index: usize, length: usize| {
+            let value = value.to_string();
+            async move { DEFAULT_FORMAT_RULE(&value, index, length) }
+        };
+        let mut counter = 0i32;
+        let mut fmt_mut = |value: &str, index: usize, length: usize| {
+            counter += 1;
+            let value = value.to_string();
+            async move { DEFAULT_FORMAT_RULE(&value, index, length) }
+        };
+        let mut fmt_mut_send = |value: &str, index: usize, length: usize| {
+            let value = value.to_string();
+            async move { DEFAULT_FORMAT_RULE(&value, index, length) }
+        };
+
+        assert_eq!(
+            "[1, 2, 3]",
+            block_dyn(ParIteratorStringFnAsync::par_iter_string_async_fn(
+                v.par_iter(),
+                &fmt
+            ))
+        );
+        assert_eq!(
+            "[1, 2, 3]",
+            block_dyn(ParIteratorStringFnAsyncSend::par_iter_string_async_fn(
+                v.par_iter(),
+                &fmt
+            ))
+        );
+        assert_eq!(
+            "[1, 2, 3]",
+            block_dyn(ParIteratorStringFnMutAsync::par_iter_string_async_fn_mut(
+                v.par_iter(),
+                &mut fmt_mut
+            ))
+        );
+        assert_eq!(
+            "[1, 2, 3]",
+            block_dyn(
+                ParIteratorStringFnMutAsyncSend::par_iter_string_async_fn_mut(
+                    v.par_iter(),
+                    &mut fmt_mut_send
+                )
+            )
+        );
+        assert_eq!(
+            "[1, 2, 3]",
+            block_dyn(ParIteratorStringFnPtrAsync::par_iter_string_async_fn_ptr(
+                v.par_iter(),
+                DEFAULT_FORMAT_RULE
+            ))
+        );
+    }
+
+    // ------------------------------------------------------------------------
+    // RAYON + IMPL ASYNC
+    // ------------------------------------------------------------------------
+    #[cfg(all(feature = "rayon", feature = "impl_async"))]
+    #[test]
+    fn test_rayon_impl_async_variants() {
+        use rayon::prelude::*;
+        let v = vec![1, 2, 3];
+        let fmt = |value: &str, index: usize, length: usize| {
+            let value = value.to_string();
+            async move { DEFAULT_FORMAT_RULE(&value, index, length) }
+        };
+        let mut counter = 0i32;
+        let mut fmt_mut = |value: &str, index: usize, length: usize| {
+            counter += 1;
+            let value = value.to_string();
+            async move { DEFAULT_FORMAT_RULE(&value, index, length) }
+        };
+        let mut fmt_mut_send = |value: &str, index: usize, length: usize| {
+            let value = value.to_string();
+            async move { DEFAULT_FORMAT_RULE(&value, index, length) }
+        };
+
+        assert_eq!(
+            "[1, 2, 3]",
+            block_fut(ParIteratorStringFnImplAsync::par_iter_string_async_fn(
+                v.par_iter(),
+                &fmt
+            ))
+        );
+        assert_eq!(
+            "[1, 2, 3]",
+            block_fut(ParIteratorStringFnImplAsyncSend::par_iter_string_async_fn(
+                v.par_iter(),
+                &fmt
+            ))
+        );
+        assert_eq!(
+            "[1, 2, 3]",
+            block_fut(
+                ParIteratorStringFnMutImplAsync::par_iter_string_async_fn_mut(
+                    v.par_iter(),
+                    &mut fmt_mut
+                )
+            )
+        );
+        assert_eq!(
+            "[1, 2, 3]",
+            block_fut(
+                ParIteratorStringFnMutImplAsyncSend::par_iter_string_async_fn_mut(
+                    v.par_iter(),
+                    &mut fmt_mut_send
+                )
+            )
+        );
+        assert_eq!(
+            "[1, 2, 3]",
+            block_fut(
+                ParIteratorStringFnPtrImplAsync::par_iter_string_async_fn_ptr(
+                    v.par_iter(),
+                    DEFAULT_FORMAT_RULE
+                )
+            )
+        );
+    }
+
+    // ------------------------------------------------------------------------
+    // DISPLAY traits for [T] slices
+    // ------------------------------------------------------------------------
+    #[test]
+    fn test_display_slice_impls() {
+        let v = vec![1, 2, 3];
+
+        struct D1<'a>(&'a [i32]);
+        impl core::fmt::Display for D1<'_> {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                DisplayVecString::fmt(self.0, f, DEFAULT_FORMAT_RULE)
+            }
+        }
+        assert_eq!("[1, 2, 3]", format!("{}", D1(&v[..])));
+
+        struct D2<'a, F: Fn(&str, usize, usize) -> String + Copy>(&'a [i32], F);
+        impl<'a, F: Fn(&str, usize, usize) -> String + Copy> core::fmt::Display for D2<'a, F> {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                DisplayVecStringFn::fmt(self.0, f, self.1)
+            }
+        }
+        assert_eq!(
+            "[1, 2, 3]",
+            format!("{}", D2(&v[..], |v, i, l| DEFAULT_FORMAT_RULE(v, i, l)))
+        );
+
+        struct D3<'a, F: FnMut(&str, usize, usize) -> String + Clone>(&'a [i32], F);
+        impl<'a, F: FnMut(&str, usize, usize) -> String + Clone> core::fmt::Display for D3<'a, F> {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                DisplayVecStringFnMut::fmt(self.0, f, self.1.clone())
+            }
+        }
+        let r3 = |v: &str, i: usize, l: usize| DEFAULT_FORMAT_RULE(v, i, l);
+        assert_eq!("[1, 2, 3]", format!("{}", D3(&v[..], r3)));
+
+        struct D4<'a, F: FnMut(&mut i32, &str, usize, usize) -> String + Clone>(&'a [i32], F);
+        impl<'a, F: FnMut(&mut i32, &str, usize, usize) -> String + Clone> core::fmt::Display
+            for D4<'a, F>
+        {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                DisplayVecStringWithState::fmt(self.0, f, 0i32, self.1.clone())
+            }
+        }
+        let r4 = |_s: &mut i32, v: &str, i: usize, l: usize| DEFAULT_FORMAT_RULE(v, i, l);
+        assert_eq!("[1, 2, 3]", format!("{}", D4(&v[..], r4)));
+
+        struct D5<'a, F: Fn(&i32, &str, usize, usize) -> String + Copy>(&'a [i32], F);
+        impl<'a, F: Fn(&i32, &str, usize, usize) -> String + Copy> core::fmt::Display for D5<'a, F> {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                DisplayVecStringWithStateFn::fmt(self.0, f, &0i32, self.1)
+            }
+        }
+        assert_eq!(
+            "[1, 2, 3]",
+            format!("{}", D5(&v[..], |_s, v, i, l| DEFAULT_FORMAT_RULE(v, i, l)))
+        );
+
+        struct D6<'a>(&'a [i32]);
+        impl core::fmt::Display for D6<'_> {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                DisplayVecStringWithStateFnPtr::fmt(self.0, f, &0i32, |_s, v, i, l| {
+                    DEFAULT_FORMAT_RULE(v, i, l)
+                })
+            }
+        }
+        assert_eq!("[1, 2, 3]", format!("{}", D6(&v[..])));
+
+        struct D7<'a, R: FormatRuleNoStateOwned>(&'a [i32], R);
+        impl<'a, R: FormatRuleNoStateOwned + Clone> core::fmt::Display for D7<'a, R> {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                DisplayVecStringRuleOwned::fmt(self.0, f, self.1.clone())
+            }
+        }
+        assert_eq!("[1, 2, 3]", format!("{}", D7(&v[..], default_fmt)));
+
+        struct D8<'a, R: FormatRuleMutNoState + Clone>(&'a [i32], R);
+        impl<'a, R: FormatRuleMutNoState + Clone> core::fmt::Display for D8<'a, R> {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                DisplayVecStringMutRuleOwned::fmt(self.0, f, self.1.clone())
+            }
+        }
+        let r8 = |v: &str, i: usize, l: usize| DEFAULT_FORMAT_RULE(v, i, l);
+        assert_eq!("[1, 2, 3]", format!("{}", D8(&v[..], r8)));
+
+        struct D9<'a, R: FormatRule<i32> + Clone>(&'a [i32], R);
+        impl<'a, R: FormatRule<i32> + Clone> core::fmt::Display for D9<'a, R> {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                DisplayVecStringWithStateRuleOwned::fmt(self.0, f, &0i32, self.1.clone())
+            }
+        }
+        assert_eq!(
+            "[1, 2, 3]",
+            format!(
+                "{}",
+                D9(&v[..], |_s: &i32, v: &str, i: usize, l: usize| {
+                    DEFAULT_FORMAT_RULE(v, i, l)
+                })
+            )
+        );
+
+        struct D10<'a, R: FormatRuleMut<i32> + Clone>(&'a [i32], R);
+        impl<'a, R: FormatRuleMut<i32> + Clone> core::fmt::Display for D10<'a, R> {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                DisplayVecStringWithStateMutRuleOwned::fmt(self.0, f, 0i32, self.1.clone())
+            }
+        }
+        let r10 = |_s: &mut i32, v: &str, i: usize, l: usize| DEFAULT_FORMAT_RULE(v, i, l);
+        assert_eq!("[1, 2, 3]", format!("{}", D10(&v[..], r10)));
+
+        struct D11<'a, R: FormatRuleNoState>(&'a [i32], R);
+        impl<'a, R: FormatRuleNoState> core::fmt::Display for D11<'a, R> {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                DisplayVecStringRuleRef::fmt(self.0, f, &self.1)
+            }
+        }
+        assert_eq!("[1, 2, 3]", format!("{}", D11(&v[..], default_fmt)));
+
+        struct D12<'a, R: FormatRuleMutNoState + Clone>(&'a [i32], R);
+        impl<'a, R: FormatRuleMutNoState + Clone> core::fmt::Display for D12<'a, R> {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                DisplayVecStringMutRuleRef::fmt(self.0, f, &mut self.1.clone())
+            }
+        }
+        let mut r12 = |v: &str, i: usize, l: usize| DEFAULT_FORMAT_RULE(v, i, l);
+        assert_eq!("[1, 2, 3]", format!("{}", D12(&v[..], r12)));
+
+        struct D13<'a, R: FormatRule<i32>>(&'a [i32], R);
+        impl<'a, R: FormatRule<i32>> core::fmt::Display for D13<'a, R> {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                DisplayVecStringWithStateRuleRef::fmt(self.0, f, &0i32, &self.1)
+            }
+        }
+        assert_eq!(
+            "[1, 2, 3]",
+            format!(
+                "{}",
+                D13(&v[..], |_s: &i32, v: &str, i: usize, l: usize| {
+                    DEFAULT_FORMAT_RULE(v, i, l)
+                })
+            )
+        );
+
+        struct D14<'a, R: FormatRuleMut<i32> + Clone>(&'a [i32], R);
+        impl<'a, R: FormatRuleMut<i32> + Clone> core::fmt::Display for D14<'a, R> {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                DisplayVecStringWithStateMutRuleRef::fmt(self.0, f, 0i32, &mut self.1.clone())
+            }
+        }
+        let mut r14 = |_s: &mut i32, v: &str, i: usize, l: usize| DEFAULT_FORMAT_RULE(v, i, l);
+        assert_eq!("[1, 2, 3]", format!("{}", D14(&v[..], r14)));
+    }
+}

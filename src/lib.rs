@@ -525,8 +525,8 @@ impl<T: core::fmt::Display, F: FnMut(&str, usize, usize) -> String> VecStringFnM
 // NESTED TRAITS - recursive formatting for Vec<Vec<T>> etc.
 // ============================================================================
 #[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
-pub trait VecStringNested {
-    fn vec_string_nested(&self, inner_rule: FormatRuleFn, format_rule: FormatRuleFn) -> String;
+pub trait VecStringNested<F2: Fn(&str, usize, usize) -> String> {
+    fn vec_string_nested(&self, inner_rule: F2, format_rule: FormatRuleFn) -> String;
 }
 
 #[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
@@ -547,12 +547,14 @@ pub trait VecStringFnMutNested<
     fn vec_string_fn_mut_nested(&self, inner_rule: F2, format_rule: F) -> String;
 }
 
-impl<T: VecString> VecStringNested for [T] {
-    fn vec_string_nested(&self, inner_rule: FormatRuleFn, f: FormatRuleFn) -> String {
+impl<T: for<'inner> VecStringRuleRef<'inner, F2>, F2: Fn(&str, usize, usize) -> String>
+    VecStringNested<F2> for [T]
+{
+    fn vec_string_nested(&self, inner_rule: F2, f: FormatRuleFn) -> String {
         let mut s = String::new();
         let l = self.len();
         for (i, x) in self.iter().enumerate() {
-            s.push_str(&f(&x.vec_string(inner_rule), i, l));
+            s.push_str(&f(&x.vec_string_rule_ref(&inner_rule), i, l));
         }
         s
     }
@@ -592,8 +594,8 @@ impl<
 
 // --- Iterator nested traits ---
 #[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
-pub trait IteratorStringNested {
-    fn iter_string_nested(self, inner_rule: FormatRuleFn, format_rule: FormatRuleFn) -> String;
+pub trait IteratorStringNested<F2: Fn(&str, usize, usize) -> String> {
+    fn iter_string_nested(self, inner_rule: F2, format_rule: FormatRuleFn) -> String;
 }
 
 #[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
@@ -614,12 +616,12 @@ pub trait IteratorStringFnMutNested<
     fn iter_string_fn_mut_nested(self, inner_rule: F2, format_rule: F) -> String;
 }
 
-impl<I: StableIter> IteratorStringNested for I
+impl<I: StableIter, F2: Fn(&str, usize, usize) -> String> IteratorStringNested<F2> for I
 where
-    I::Item: VecString,
+    I::Item: for<'inner> VecStringRuleRef<'inner, F2>,
 {
-    fn iter_string_nested(self, inner_rule: FormatRuleFn, f: FormatRuleFn) -> String {
-        let items: Vec<String> = self.map(|x| x.vec_string(inner_rule)).collect();
+    fn iter_string_nested(self, inner_rule: F2, f: FormatRuleFn) -> String {
+        let items: Vec<String> = self.map(|x| x.vec_string_rule_ref(&inner_rule)).collect();
         let l = items.len();
         let mut r = String::new();
         for (i, s) in items.into_iter().enumerate() {
@@ -1231,23 +1233,20 @@ where
 
 // --- Exact nested traits ---
 #[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
-pub trait IteratorStringExactNested {
-    fn iter_string_exact_nested(
-        self,
-        inner_rule: FormatRuleFn,
-        format_rule: FormatRuleFn,
-    ) -> String;
+pub trait IteratorStringExactNested<F2: Fn(&str, usize, usize) -> String> {
+    fn iter_string_exact_nested(self, inner_rule: F2, format_rule: FormatRuleFn) -> String;
 }
 
-impl<I: StableIter + ExactSizeIterator> IteratorStringExactNested for I
+impl<I: StableIter + ExactSizeIterator, F2: Fn(&str, usize, usize) -> String>
+    IteratorStringExactNested<F2> for I
 where
-    I::Item: VecString,
+    I::Item: for<'inner> VecStringRuleRef<'inner, F2>,
 {
-    fn iter_string_exact_nested(self, inner_rule: FormatRuleFn, f: FormatRuleFn) -> String {
+    fn iter_string_exact_nested(self, inner_rule: F2, f: FormatRuleFn) -> String {
         let l = self.len();
         let mut r = String::new();
         for (i, x) in self.enumerate() {
-            r.push_str(&f(&x.vec_string(inner_rule), i, l));
+            r.push_str(&f(&x.vec_string_rule_ref(&inner_rule), i, l));
         }
         r
     }
@@ -3150,16 +3149,17 @@ where
 // ============================================================================
 #[cfg(feature = "rayon")]
 #[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
-pub trait ParIteratorStringNested {
-    fn par_iter_string_nested(self, inner_rule: FormatRuleFn, f: FormatRuleFn) -> String;
+pub trait ParIteratorStringNested<F2: Fn(&str, usize, usize) -> String> {
+    fn par_iter_string_nested(self, inner_rule: F2, f: FormatRuleFn) -> String;
 }
 
 #[cfg(feature = "rayon")]
-impl<I: rayon::iter::ParallelIterator, T: VecString> ParIteratorStringNested for I
+impl<I: rayon::iter::ParallelIterator, T: VecString, F2: Fn(&str, usize, usize) -> String>
+    ParIteratorStringNested<F2> for I
 where
     I: rayon::iter::ParallelIterator<Item = T>,
 {
-    fn par_iter_string_nested(self, inner_rule: FormatRuleFn, f: FormatRuleFn) -> String {
+    fn par_iter_string_nested(self, inner_rule: F2, f: FormatRuleFn) -> String {
         let items: Vec<String> = self.map(|x| x.vec_string(inner_rule)).collect();
         let l = items.len();
         items
@@ -3232,16 +3232,17 @@ where
 
 #[cfg(feature = "rayon")]
 #[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
-pub trait ParIteratorStringFnPtrNested {
-    fn par_iter_string_fn_ptr_nested(self, inner_rule: FormatRuleFn, f: FormatRuleFn) -> String;
+pub trait ParIteratorStringFnPtrNested<F2: Fn(&str, usize, usize) -> String> {
+    fn par_iter_string_fn_ptr_nested(self, inner_rule: F2, f: FormatRuleFn) -> String;
 }
 
 #[cfg(feature = "rayon")]
-impl<I: rayon::iter::ParallelIterator, T: VecString> ParIteratorStringFnPtrNested for I
+impl<I: rayon::iter::ParallelIterator, T: VecString, F2: Fn(&str, usize, usize) -> String>
+    ParIteratorStringFnPtrNested<F2> for I
 where
     I: rayon::iter::ParallelIterator<Item = T>,
 {
-    fn par_iter_string_fn_ptr_nested(self, inner_rule: FormatRuleFn, f: FormatRuleFn) -> String {
+    fn par_iter_string_fn_ptr_nested(self, inner_rule: F2, f: FormatRuleFn) -> String {
         let items: Vec<String> = self.map(|x| x.vec_string(inner_rule)).collect();
         let l = items.len();
         items
@@ -3948,13 +3949,15 @@ impl<P: orx_parallel::ParIter<Item = T>, T: core::fmt::Display, S, R: FormatRule
 // ============================================================================
 #[cfg(feature = "orx_parallel")]
 #[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
-pub trait OrxParIteratorStringNested {
-    fn orx_par_iter_string_nested(self, inner_rule: FormatRuleFn, f: FormatRuleFn) -> String;
+pub trait OrxParIteratorStringNested<F2: Fn(&str, usize, usize) -> String> {
+    fn orx_par_iter_string_nested(self, inner_rule: F2, f: FormatRuleFn) -> String;
 }
 
 #[cfg(feature = "orx_parallel")]
-impl<P: orx_parallel::ParIter<Item = T>, T: VecString> OrxParIteratorStringNested for P {
-    fn orx_par_iter_string_nested(self, inner_rule: FormatRuleFn, f: FormatRuleFn) -> String {
+impl<P: orx_parallel::ParIter<Item = T>, T: VecString, F2: Fn(&str, usize, usize) -> String>
+    OrxParIteratorStringNested<F2> for P
+{
+    fn orx_par_iter_string_nested(self, inner_rule: F2, f: FormatRuleFn) -> String {
         let items: Vec<String> = self.map(|x| x.vec_string(inner_rule)).collect();
         let l = items.len();
         (0..l)
@@ -4292,23 +4295,19 @@ impl<
 
 #[cfg(feature = "orx_parallel")]
 #[cfg_attr(feature = "ambassador_delegatable", ambassador::delegatable_trait)]
-pub trait OrxParIteratorStringMutRuleRefNested<R: FormatRuleMutNoState> {
-    fn orx_par_iter_string_mut_rule_ref_nested(
-        self,
-        inner_rule: FormatRuleFn,
-        rule: &mut R,
-    ) -> String;
+pub trait OrxParIteratorStringMutRuleRefNested<R: FormatRuleMutNoState, R2: FormatRuleMutNoState> {
+    fn orx_par_iter_string_mut_rule_ref_nested(self, inner_rule: R2, rule: &mut R) -> String;
 }
 
 #[cfg(feature = "orx_parallel")]
-impl<P: orx_parallel::ParIter<Item = T>, T: VecString, R: FormatRuleMutNoState>
-    OrxParIteratorStringMutRuleRefNested<R> for P
+impl<
+        P: orx_parallel::ParIter<Item = T>,
+        T: VecString,
+        R: FormatRuleMutNoState,
+        R2: FormatRuleMutNoState,
+    > OrxParIteratorStringMutRuleRefNested<R, R2> for P
 {
-    fn orx_par_iter_string_mut_rule_ref_nested(
-        self,
-        inner_rule: FormatRuleFn,
-        rule: &mut R,
-    ) -> String {
+    fn orx_par_iter_string_mut_rule_ref_nested(self, inner_rule: R2, rule: &mut R) -> String {
         let items: Vec<String> = self.map(|x| x.vec_string(inner_rule)).collect();
         let l = items.len();
         let mut r = String::new();
@@ -7994,8 +7993,10 @@ impl<T: core::fmt::Display, S, R: FormatRuleMut<S>> DisplayVecStringWithStateMut
 // NESTED Vec<T> IMPLS - delegate to [T] nested impls via as_slice()
 // ============================================================================
 
-impl<T: VecString> VecStringNested for Vec<T> {
-    fn vec_string_nested(&self, inner_rule: FormatRuleFn, f: FormatRuleFn) -> String {
+impl<T: for<'inner> VecStringRuleRef<'inner, F2>, F2: Fn(&str, usize, usize) -> String>
+    VecStringNested<F2> for Vec<T>
+{
+    fn vec_string_nested(&self, inner_rule: F2, f: FormatRuleFn) -> String {
         self.as_slice().vec_string_nested(inner_rule, f)
     }
 }

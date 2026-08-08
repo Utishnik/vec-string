@@ -3371,8 +3371,12 @@ pub trait ParIteratorStringRuleOwnedNested<R: FormatRuleNoStateOwned, R2: Format
 }
 
 #[cfg(feature = "rayon")]
-impl<I: rayon::iter::ParallelIterator, T: VecString, R: FormatRuleNoStateOwned + Clone + Sync>
-    ParIteratorStringRuleOwnedNested<R> for I
+impl<
+        I: rayon::iter::ParallelIterator,
+        T: VecString,
+        R: FormatRuleNoStateOwned + Clone + Sync,
+        R2: FormatRuleNoStateOwned + Clone + Sync,
+    > ParIteratorStringRuleOwnedNested<R, R2> for I
 where
     I: rayon::iter::ParallelIterator<Item = T>,
 {
